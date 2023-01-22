@@ -15,5 +15,5 @@
 #include "ds.cc"
 #include "error.cc"
 #include "frontend/lexer.cc"
-#include "frontend/type.cc"
 #include "frontend/parser.cc"
+#include "frontend/type.cc"

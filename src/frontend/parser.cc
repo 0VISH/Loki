@@ -218,7 +218,7 @@ s64 string2int(String &str){
 
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
 
-void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding=0) {
+void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 	DynamicArray<Token_Type> &tokTypes = lexer.tokenTypes;
 	DynamicArray<TokenOffset> &tokOffs = lexer.tokenOffsets;
 	PAD;
@@ -259,12 +259,16 @@ void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding=0) {
 			printf("op: %c", c);
 			PAD;
 			printf("LHS");
-			if (lr->lhs != nullptr) {dumpNodes(lr->lhs, lexer, padding + 1);};
+			if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
 			PAD;
 			printf("RHS");
-			if (lr->rhs != nullptr) {dumpNodes(lr->rhs, lexer, padding + 1);};
+			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
 		}break;
 		default: DEBUG_UNREACHABLE;
 	};
+};
+void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding = 0){
+	__dumpNodesWithoutEndPadding(node, lexer, padding);
+	printf("\n----\n");
 };
 #endif
