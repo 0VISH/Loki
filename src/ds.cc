@@ -92,11 +92,8 @@ public:
 		values.uninit();
 		empty.uninit();
 	};
-	u16 insertValue(String str, u16 value, b8 &inserted) {
-		if (empty.count == empty.len) {
-			inserted = false;
-			return NULL;
-		};
+	s32 insertValue(String str, u16 value) {
+		if (empty.count == empty.len) { return -1; };
 		u32 startHash = fnv_hash_1a_32(str.mem, str.len) % empty.len;
 		u32 hash = startHash;
 		while (empty[hash] == false) {
@@ -111,20 +108,16 @@ public:
 		keys[hash] = str;
 		return hash;
 	};
-	u16 getValue(String str, b8 &found) {
+	s32 getValue(String str) {
 		u32 startHash = fnv_hash_1a_32(str.mem, str.len) % empty.len;
 		u32 hash = startHash;
 		while (empty[hash] == false) {
-			if (cmpString(str, keys[hash]) == true) { return hash; };
+			if (cmpString(str, keys[hash]) == true) { return values[hash]; };
+			if (hash == startHash){ return -1; };
 			hash += 1;
-			if (hash == startHash){
-				found = false;
-				return NULL;
-			};
 			if (hash == empty.len) { hash = 0; };
 		};
-		found = false;
-		return NULL;
+		return -1;
 	};
 private:
 	u32 fnv_hash_1a_32(char *key, u32 len){

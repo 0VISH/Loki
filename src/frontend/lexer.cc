@@ -6,6 +6,16 @@ enum class Token_Type {
 	DECIMAL,
 	SINGLE_QUOTES,
 	DOUBLE_QUOTES,
+	//keywords start
+	K_START,
+	K_U8,
+	K_U16,
+	K_U32,
+	K_S8,
+	K_S16,
+	K_S32,
+	K_END,
+	//keywords end
 	END_OF_FILE,
 };
 
@@ -19,6 +29,38 @@ struct Lexer {
 	char *fileName;
 	char *fileContent;
 };
+
+Map keywords;
+const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
+
+constexpr void registerKeywords() {
+	struct KeywordData {
+		const char *str;
+		const Token_Type type;
+	};
+	KeywordData data[keywordCount] = {
+		{"u8", Token_Type::K_U8},
+		{"u16", Token_Type::K_U16},
+		{"u32", Token_Type::K_U32},
+		{"s8", Token_Type::K_S8},
+		{"s16", Token_Type::K_S16},
+		{"s32", Token_Type::K_S32},
+	};
+	for (u8 i = 0; i < keywordCount; i += 1) {
+		s32 k = keywords.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
+#if(XE_DBG)
+		if (k == -1) {
+			printf("\n[LEXER] Could not register keyword\n");
+			return;
+		};
+#endif
+	};
+};
+void initKeywords() {
+	keywords.init(keywordCount);
+	registerKeywords();
+};
+void uninitKeywords() { keywords.uninit(); };
 
 Lexer createLexer(char *filePath) {
 	Lexer lexer;
@@ -122,8 +164,12 @@ b32 genTokens(Lexer &lex) {
 				if (isAlpha(src[x]) || src[x] == '_') {
 					u64 start = x;
 					x += 1;
-					while (isAlpha(src[x]) || src[x] == '_') { x += 1; };
-					lex.tokenTypes.push(Token_Type::IDENTIFIER);
+					while (isAlpha(src[x]) || src[x] == '_' || isNum(src[x])) { x += 1; };
+					printf("%c %lld ", src[start], x-start);
+					s32 type = keywords.getValue({src+start, (u32)(x-start)});
+					printf("%d\n", type);
+					if (type != -1) { lex.tokenTypes.push((Token_Type)type); }
+					else { lex.tokenTypes.push(Token_Type::IDENTIFIER); };
 					TokenOffset offset;
 					offset.off = start;
 					offset.len = (u16)(x-start);
@@ -192,13 +238,14 @@ void dumpLexerTokens(Lexer &lexer) {
 			case Token_Type::DECIMAL: {
 				printf("decimal\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 			} break;
-			case Token_Type::END_OF_FILE: {
-				printf("end_of_file");
-			} break;
-			case (Token_Type)'\n':
-				printf("new_line"); break;
+			case Token_Type::END_OF_FILE: printf("end_of_file"); break;
+			case (Token_Type)'\n': printf("new_line"); break;
 			default:
-				printf("%c", lexer.tokenTypes[x]); break;
+				if (lexer.tokenTypes[x] >= Token_Type::K_START && lexer.tokenTypes[x] <= Token_Type::K_END) {
+					printf("keyword\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+				}
+				else { printf("%c", lexer.tokenTypes[x]); }; 
+				break;
 		};
 	};
 	printf("\n----\n");

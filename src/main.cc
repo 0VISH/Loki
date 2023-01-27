@@ -6,6 +6,7 @@ s32 main(s32 argc, char **argv) {
 		return EXIT_SUCCESS;
 	};
     
+	initKeywords();
 	Lexer lexer = createLexer(argv[1]);
 	if (lexer.fileContent == nullptr) {
 		printf("invalid file path: %s", lexer.fileName);
@@ -20,6 +21,7 @@ s32 main(s32 argc, char **argv) {
 		dumpNodes(base, lexer);
 		printf("type: %s", dbg::getTypeName(getTreeType(base)));
 	};
+	uninitKeywords();
 	flushReports();
 	destroyLexer(lexer);
 	destroyASTFile(astFile);
