@@ -84,7 +84,7 @@ Lexer createLexer(char *filePath) {
 	lexer.fileContent[0] = '\n'; //padding for getLineAndOff
 	lexer.fileContent += 1;
 	size = fread(lexer.fileContent, sizeof(char), size, fp);
-	lexer.fileContent[size-1] = '\0';
+	lexer.fileContent[size] = '\0';
 
 	//50% of the file size. @foodforthought: change percentage?
 	u32 tokenCount = (u32)((50 * size) / 100);
@@ -165,9 +165,7 @@ b32 genTokens(Lexer &lex) {
 					u64 start = x;
 					x += 1;
 					while (isAlpha(src[x]) || src[x] == '_' || isNum(src[x])) { x += 1; };
-					printf("%c %lld ", src[start], x-start);
 					s32 type = keywords.getValue({src+start, (u32)(x-start)});
-					printf("%d\n", type);
 					if (type != -1) { lex.tokenTypes.push((Token_Type)type); }
 					else { lex.tokenTypes.push(Token_Type::IDENTIFIER); };
 					TokenOffset offset;

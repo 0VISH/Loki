@@ -16,10 +16,9 @@ s32 main(s32 argc, char **argv) {
 	dumpLexerStat(lexer);
 	dumpLexerTokens(lexer);
 	ASTFile astFile = createASTFile();
-	ASTBase * base = genASTExprTree(lexer, astFile, 0, 15);
+	ASTBase * base = parseStatement(lexer, astFile, 0);
 	if (base != nullptr) {
 		dumpNodes(base, lexer);
-		printf("type: %s", dbg::getTypeName(getTreeType(base)));
 	};
 	uninitKeywords();
 	flushReports();

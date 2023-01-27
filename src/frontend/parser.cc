@@ -7,7 +7,8 @@ enum class ASTType {
 	BIN_SUB,
 	BIN_MUL,
 	BIN_DIV,
-	VAR,
+	ASSIGNMENT,
+	VARIABLE,
 };
 
 struct ASTBase {
@@ -124,7 +125,7 @@ ASTlr *genRHSExpr(Lexer &lexer, ASTFile &file, u32 x, u32 y, u32 &curPos, s16 &b
 	while (x < y) {
 		operand = genASTOperand(lexer, x, lexer.fileContent, file, bracket);
 		if (operand == nullptr) { return nullptr; };
-		if (x > y) { break; };
+		if (x >= y) { break; };
 		if (tokTypes[x] == (Token_Type)')') {
 			while (tokTypes[x] == (Token_Type)')') {
 				bracket -= 10;
@@ -177,6 +178,45 @@ ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 x, u32 y) {
 		};
 	};
 	return (ASTBase*)lhs;
+};
+u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
+	while (tokTypes[x] != (Token_Type)'\n' && tokTypes[x] != Token_Type::END_OF_FILE) {
+		x += 1;
+	};
+	return x;
+};
+ASTBase *parseStatement(Lexer &lexer, ASTFile &file, u32 x) {
+	DynamicArray<Token_Type> &tokTypes = lexer.tokenTypes;
+	DynamicArray<TokenOffset> &tokOffs = lexer.tokenOffsets;
+	while (tokTypes[x] == (Token_Type)'\n') { x += 1; };
+	u32 start = x;
+	switch (tokTypes[x]) {
+		case Token_Type::IDENTIFIER: {
+			x += 1;
+			switch (tokTypes[x]) {
+				case (Token_Type)':': {
+					x += 1;
+					switch (tokTypes[x]) {
+						case (Token_Type)'=': {
+							//variable assignment
+							ASTlr *assign = (ASTlr*)allocAST(sizeof(ASTlr), ASTType::ASSIGNMENT, x, file);
+							assign->lhs = allocAST(sizeof(ASTBase), ASTType::VARIABLE, start, file);
+							x += 1;
+							u32 end = getEndNewlineEOF(tokTypes, x);
+							assign->rhs = genASTExprTree(lexer, file, x, end);
+							if (assign->rhs == nullptr) { return nullptr; };
+							return (ASTBase*)assign;
+						} break;
+					} break;
+				} break;
+			} break;
+		} break;
+		default: {
+			u32 end = getEndNewlineEOF(tokTypes, x);
+			return genASTExprTree(lexer, file, x, end);
+		} break;
+	};
+	return nullptr;
 };
 
 u32 pow(u32 base, u32 exp){
@@ -264,6 +304,22 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 			printf("RHS");
 			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
 		}break;
+		case ASTType::VARIABLE: {
+			printf("variable");
+			PAD;
+			u32 x = node->tokenOff;
+			printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+		}break;
+		case ASTType::ASSIGNMENT: {
+			ASTlr *lr = (ASTlr*)node;
+			printf("assignment");
+			PAD;
+			printf("LHS");
+			if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
+			PAD;
+			printf("RHS");
+			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
+		} break;
 		default: DEBUG_UNREACHABLE;
 	};
 };
