@@ -48,7 +48,7 @@ struct DynamicArray {
 		mem = (T*)newMem;
 		len = newCap;
 	};
-	T &operator[](u32 index) {
+	T &getElement(u32 index) {
 #if(XE_DBG == true)
 		if (index >= len) {
 			printf("\n[ERROR]: abc(dynamic array) failed for type %s\n", typeid(T).name());
@@ -56,6 +56,7 @@ struct DynamicArray {
 #endif
 		return mem[index];
 	};
+	T &operator[](u32 index) { return getElement(index); };
 	void init(u32 startCount = 5) {
 		count = 0;
 		len = startCount;

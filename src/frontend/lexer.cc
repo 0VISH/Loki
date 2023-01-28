@@ -14,6 +14,7 @@ enum class Token_Type {
 	K_S8,
 	K_S16,
 	K_S32,
+	K_PROC,
 	K_END,
 	//keywords end
 	END_OF_FILE,
@@ -44,7 +45,8 @@ constexpr void registerKeywords() {
 		{"u32", Token_Type::K_U32},
 		{"s8", Token_Type::K_S8},
 		{"s16", Token_Type::K_S16},
-		{"s32", Token_Type::K_S32},
+		{"s32", Token_Type::K_S32 },
+		{"proc", Token_Type::K_PROC},
 	};
 	for (u8 i = 0; i < keywordCount; i += 1) {
 		s32 k = keywords.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
@@ -61,6 +63,8 @@ void initKeywords() {
 	registerKeywords();
 };
 void uninitKeywords() { keywords.uninit(); };
+
+bool isKeyword(Token_Type type) { return type > Token_Type::K_START && type < Token_Type::K_END; };
 
 Lexer createLexer(char *filePath) {
 	Lexer lexer;
