@@ -9,9 +9,13 @@ enum class ASTType {
 	BIN_SUB,
 	BIN_MUL,
 	BIN_DIV,
-	UNI_ASSIGNMENT,
-	MULTI_ASSIGNMENT,
+	UNI_ASSIGNMENT_T_UNKNOWN,
+	UNI_ASSIGNMENT_T_KNOWN,
+	MULTI_ASSIGNMENT_T_UNKNOWN,
+	MULTI_ASSIGNMENT_T_KNOWN,
 	PROC_DEFENITION,
+	UNI_DECLERATION_T_KNOWN,
+	MULTI_DECLERATION_T_KNOWN,
 	VARIABLE,
 };
 
@@ -224,6 +228,10 @@ s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTB
 	return varCount;
 };
 
+bool isType(Token_Type type) {
+	return (type>Token_Type::K_START && type<Token_Type::K_PROC) || type == Token_Type::IDENTIFIER;
+};
+
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	BRING_TOKENS_TO_SCOPE;
 	eatNewlines(tokTypes, x);
@@ -234,10 +242,13 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 			switch (tokTypes[x]) {
 				case (Token_Type)':': {
 					x += 1;
+					b8 flag = false;
 					switch (tokTypes[x]) {
 						case (Token_Type)'=': {
 							//single variable assignment
-							ASTlr *assign = (ASTlr*)allocAST(sizeof(ASTlr), ASTType::UNI_ASSIGNMENT, x, file);
+							SINGLE_VARIABLE_ASSIGNMENT:
+							ASTType type = (flag)?ASTType::UNI_ASSIGNMENT_T_KNOWN:ASTType::UNI_ASSIGNMENT_T_UNKNOWN;
+							ASTlr *assign = (ASTlr*)allocAST(sizeof(ASTlr), type, x, file);
 							assign->lhs = allocAST(sizeof(ASTBase), ASTType::VARIABLE, start, file);
 							x += 1;
 							u32 end = getEndNewlineEOF(tokTypes, x);
@@ -282,7 +293,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									return nullptr;
 								};
 								x += 1;
-								if (isKeyword(tokTypes[x]) == false && tokTypes[x] != Token_Type::IDENTIFIER) {
+								if (isType(tokTypes[x]) == false) {
 									emitErr(lexer.fileName,
 									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
 									        "Expected a type");
@@ -328,12 +339,22 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							x += 1;
 							return (ASTBase*)proc;
 						} break;
+						default: {
+							if (isType(tokTypes[x])) {
+								flag = true;
+								x += 1;
+								if (tokTypes[x] == (Token_Type)'=') { goto SINGLE_VARIABLE_ASSIGNMENT; };
+								ASTlr *assign = (ASTlr*)allocAST(sizeof(ASTlr), ASTType::UNI_DECLERATION_T_KNOWN, x, file);
+								assign->lhs = allocAST(sizeof(ASTBase), ASTType::VARIABLE, start, file);
+								return (ASTBase*)assign;
+							};
+						} break;
 					} break;
 				} break;
 				case (Token_Type)',': {
-					//multiple variable assignment
-					ASTlr *assign = (ASTlr*)allocASTWithTable(sizeof(ASTlr), ASTType::MULTI_ASSIGNMENT, NULL, file);
-					DynamicArray<ASTBase*> *table = getTable(assign, sizeof(ASTlr));
+					//multiple variable decleration
+					ASTlr *base = (ASTlr*)allocASTWithTable(sizeof(ASTlr), ASTType::MULTI_DECLERATION_T_KNOWN, NULL, file);
+					DynamicArray<ASTBase*> *table = getTable(base, sizeof(ASTlr));
 					table->init(4);
 					x = start;
 					s8 y = varDeclAddTableEntries(lexer, file, x, table);
@@ -346,22 +367,31 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 						return nullptr;
 					};
 					x += 1;
-					if (tokTypes[x] != (Token_Type)'=') {
+					if (isType(tokTypes[x])) {
+						x += 1;
+						if (tokTypes[x] != (Token_Type)'=') {
+							base->type = ASTType::MULTI_DECLERATION_T_KNOWN;
+							return (ASTBase*)base;
+						};
+						base->type = ASTType::MULTI_ASSIGNMENT_T_KNOWN;
+					} else if (tokTypes[x] == (Token_Type)'=') {
+						base->type = ASTType::MULTI_ASSIGNMENT_T_UNKNOWN;
+					} else {
 						emitErr(lexer.fileName,
 						        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-						        "Expected '='");
+						        "Expected a type or '='");
 						table->uninit();
 						return nullptr;
 					};
-					assign->tokenOff = x;
+					base->tokenOff = x;
 					x += 1;
 					u32 end = getEndNewlineEOF(tokTypes, x);
-					assign->rhs = genASTExprTree(lexer, file, x, end);
-					if (assign->rhs == nullptr) {
+					base->rhs = genASTExprTree(lexer, file, x, end);
+					if (base->rhs == nullptr) {
 						table->uninit();
 						return nullptr;
 					};
-					return (ASTBase*)assign;
+					return (ASTBase*)base;
 				} break;
 			} break;
 		} break;
@@ -422,6 +452,8 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 	printf("type: ");
 	ASTType type = node->type;
 	char c = NULL;
+	u8 flag = false;
+	ASTlr *lr = (ASTlr*)node;
 	switch (type) {
 		case ASTType::NUM_INTEGER: {
 			printf("num_integer");
@@ -442,7 +474,6 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 		case ASTType::BIN_SUB: if (c == NULL) { c = '-'; printf("bin_sub"); };
 		case ASTType::BIN_MUL: if (c == NULL) { c = '*'; printf("bin_mul"); };
 		case ASTType::BIN_DIV:{
-			ASTlr *lr = (ASTlr*)node;
 			if (c == NULL) { c = '/'; printf("bin_div"); };
 			PAD;
 			printf("lhs: %p", lr->lhs);
@@ -463,9 +494,25 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 			u32 x = node->tokenOff;
 			printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 		}break;
-		case ASTType::UNI_ASSIGNMENT: {
-			ASTlr *lr = (ASTlr*)node;
-			printf("uni_assignment");
+		case ASTType::UNI_DECLERATION_T_KNOWN: {
+			u32 x = node->tokenOff - 1;
+			printf("uni_decleration_t_known");
+			PAD;
+			printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+			PAD;
+			printf("LHS");
+			__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);
+		} break;
+		case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
+			u32 x = node->tokenOff - 1;
+			printf("uni_assignment_t_known");
+			PAD;
+			printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+		};
+		flag = true;
+		case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
+			if (flag) { flag = false; }
+			else { printf("uni_assignment_t_unkown"); };	
 			PAD;
 			printf("LHS");
 			if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
@@ -473,9 +520,16 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 			printf("RHS");
 			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
 		} break;
-		case ASTType::MULTI_ASSIGNMENT: {
-			ASTlr *lr = (ASTlr*)node;
-			printf("uni_assignment");
+		case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
+			u32 x = node->tokenOff - 1;
+			printf("multi_assignment_t_known");
+			PAD;
+			printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+		};
+		flag = true;
+		case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
+			if (flag) { flag = false; }
+			else { printf("multi_assignment_t_unkown"); };
 			PAD;
 			printf("LHS");
 			DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
@@ -488,7 +542,6 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
 		} break;
 		case ASTType::PROC_DEFENITION: {
-			ASTlr *lr = (ASTlr*)node;
 			u32 x = node->tokenOff;
 			printf("proc_defenition");
 			PAD;
