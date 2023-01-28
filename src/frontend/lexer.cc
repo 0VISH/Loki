@@ -115,6 +115,9 @@ void eatUnwantedChars(char *mem, u64& x) {
 		};
 	};
 };
+void eatNewlines(DynamicArray<Token_Type> &tokTypes, u32 &x){
+	while (tokTypes[x] == (Token_Type)'\n') { x += 1; };
+};
 LineOff getLineAndOff(char *mem, u64 offset) {
 	LineOff lo = { 1, 1 };
 	for (u64 i = 0; i < offset; i += 1) {

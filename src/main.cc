@@ -16,9 +16,15 @@ s32 main(s32 argc, char **argv) {
 	dumpLexerStat(lexer);
 	dumpLexerTokens(lexer);
 	ASTFile astFile = createASTFile();
-	ASTBase * base = parseStatement(lexer, astFile, 0);
-	if (base != nullptr) {
-		dumpNodes(base, lexer);
+	u32 off = 0;
+	b8 error = false;
+	while(lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
+		ASTBase *base = parseBlock(lexer, astFile, off);
+		if (base == nullptr) { error = true; break; };
+		astFile.nodes.push(base);
+	};
+	if (error == false) {
+		dumpASTFile(astFile, lexer);
 	};
 	uninitKeywords();
 	flushReports();

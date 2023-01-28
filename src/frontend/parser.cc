@@ -25,7 +25,7 @@ struct ASTlr : ASTBase {
 };
 struct ASTFile {
 	DynamicArray<char*> memPages;
-	ASTBase *root;
+	DynamicArray<ASTBase*> nodes;
 	u16 pageBrim;
 };
 struct ProcArgs {
@@ -46,7 +46,7 @@ ASTFile createASTFile() {
 	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
 	file.memPages.push(page);
 	file.pageBrim = 0;
-	file.root = nullptr;
+	file.nodes.init(10);
 	return file;
 };
 void destroyASTFile(ASTFile &file) {
@@ -163,8 +163,8 @@ ASTlr *genRHSExpr(Lexer &lexer, ASTFile &file, u32 x, u32 y, u32 &curPos, s16 &b
 	curPos = x;
 	return node;
 };
-//                                               begin off, end off+1
-ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 x, u32 y) {
+//                                                begin off, end off+1
+ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 y) {
 	u32 start = x;
 	BRING_TOKENS_TO_SCOPE;
 	Token_Type type = tokTypes[x];
@@ -224,9 +224,9 @@ s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTB
 	return varCount;
 };
 
-ASTBase *parseStatement(Lexer &lexer, ASTFile &file, u32 x) {
+ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	BRING_TOKENS_TO_SCOPE;
-	while (tokTypes[x] == (Token_Type)'\n') { x += 1; };
+	eatNewlines(tokTypes, x);
 	u32 start = x;
 	switch (tokTypes[x]) {
 		case Token_Type::IDENTIFIER: {
@@ -270,6 +270,7 @@ ASTBase *parseStatement(Lexer &lexer, ASTFile &file, u32 x) {
 							s8 y = 0;
 							while (true) {
 								x += 1;
+								eatNewlines(tokTypes, x);
 								y += varDeclAddTableEntries(lexer, file, x, table);
 								if (y == -1) { return nullptr; };
 								if (tokTypes[x] != (Token_Type)':') {
@@ -302,6 +303,29 @@ ASTBase *parseStatement(Lexer &lexer, ASTFile &file, u32 x) {
 									return nullptr;
 								};
 							};
+							x += 1;
+							eatNewlines(tokTypes, x);
+							if (tokTypes[x] != (Token_Type)'{') {
+								emitErr(lexer.fileName,
+								        getLineAndOff(lexer.fileContent, tokOffs[x].off),
+								        "Expected '{'");
+								table->uninit();
+								procArgs->uninit();
+								return nullptr;
+							};
+							table->push(nullptr);//marks the end of arguments
+							x += 1;
+							while (tokTypes[x] != (Token_Type)'}') {
+								ASTBase *node = parseBlock(lexer, file, x);
+								if (node == nullptr) {
+									table->uninit();
+									procArgs->uninit();
+									return nullptr;
+								};
+								table->push(node);
+								x += 1;
+							};
+							x += 1;
 							return (ASTBase*)proc;
 						} break;
 					} break;
@@ -475,17 +499,28 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 			DynamicArray<ProcArgs> *args = (DynamicArray<ProcArgs>*)lr->lhs;
 			u8 argOff = 0;
 			ProcArgs procArg = args->getElement(argOff);
-			for (u8 x = 0; x < table->count; x += 1) {
+			u8 v = 0;
+			for (; v < table->count; v += 1) {
+				if (table->getElement(v) == nullptr) {
+					v += 1;
+					break;
+				};
 				padding += 1;
-				__dumpNodesWithoutEndPadding(table->getElement(x), lexer, padding);
+				__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding);
 				PAD;
-				if (x == procArg.count) {
+				if (v == procArg.count) {
 					argOff += 1;
 					procArg = args->getElement(argOff);
 				};
 				u32 z = procArg.typeOff;
 				printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
 				padding -= 1;
+				PAD;
+			};
+			PAD;
+			printf("[BODY]");
+			for (; v < table->count; v += 1) {
+				__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding + 1);
 				PAD;
 			};
 		} break;
@@ -495,5 +530,11 @@ void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding = 0){
 	__dumpNodesWithoutEndPadding(node, lexer, padding);
 	printf("\n----\n");
+};
+void dumpASTFile(ASTFile &file, Lexer &lexer) {
+	for (u32 x=0; x<file.nodes.count; x+=1) {
+		ASTBase *node = file.nodes[x];
+		dumpNodes(node, lexer);
+	};
 };
 #endif
