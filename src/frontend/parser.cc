@@ -332,6 +332,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									DynamicArray<u32> *returnTypeOffs = (DynamicArray<u32>*)mem::alloc(sizeof(DynamicArray<u8>));
 									proc->rhs = (ASTBase*)returnTypeOffs;
 									returnTypeOffs->init();
+									bool bracket = false;
+									if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
 									while (true) {
 										if (isType(tokTypes[x]) == false) {
 											emitErr(lexer.fileName,
@@ -344,12 +346,35 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 										};
 										returnTypeOffs->push(x);
 										x += 1;
-										if (tokTypes[x] == (Token_Type)',') { x += 1; continue; };
 										eatNewlines(tokTypes, x);
+										if (tokTypes[x] == (Token_Type)',') { x += 1; continue; };
+										if (tokTypes[x] == (Token_Type)')') {
+											if (bracket != false) {
+												x += 1;
+												eatNewlines(tokTypes, x);
+												break;
+											};
+											emitErr(lexer.fileName,
+											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
+											        "Did not expect ')'");
+											table->uninit();
+											procArgs.uninit();
+											args.uninit();
+											return nullptr;
+										};
 										if (tokTypes[x] != (Token_Type)'{') {
 											emitErr(lexer.fileName,
 											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
 											        "Expected '{'");
+											table->uninit();
+											procArgs.uninit();
+											args.uninit();
+											return nullptr;
+										};
+										if (bracket == true) {
+											emitErr(lexer.fileName,
+											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
+											        "Expected ')'");
 											table->uninit();
 											procArgs.uninit();
 											args.uninit();

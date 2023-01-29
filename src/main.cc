@@ -11,13 +11,15 @@ s32 main(s32 argc, char **argv) {
 	Lexer lexer = createLexer(argv[1]);
 	if (lexer.fileContent == nullptr) {
 		printf("invalid file path: %s", lexer.fileName);
-		return EXIT_SUCCESS;
+		goto UNINIT_L1;
 	};
+	u32 off = 0;
 	b32 x = genTokens(lexer);
+	eatNewlines(lexer.tokenTypes, off);
+	if (lexer.tokenTypes[off] == Token_Type::END_OF_FILE) { goto UNINIT_L2; };
 	dbg::dumpLexerStat(lexer);
 	dbg::dumpLexerTokens(lexer);
 	ASTFile astFile = createASTFile();
-	u32 off = 0;
 	b8 error = false;
 	while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 		ASTBase *base = parseBlock(lexer, astFile, off);
@@ -30,10 +32,12 @@ s32 main(s32 argc, char **argv) {
 		dbg::dumpASTFile(astFile, lexer);
 		if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) { printf("\nchecking entites failed\n"); };
 	};
-	uninitKeywords();
 	flushReports();
-	destroyLexer(lexer);
 	destroyASTFile(astFile);
+	UNINIT_L2:
+	destroyLexer(lexer);
+	UNINIT_L1:
+	uninitKeywords();
 	dbg::dumpBlockTimes();
 	EXCEPTION_BLOCK_END
 #if(XE_DBG)

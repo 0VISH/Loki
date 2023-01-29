@@ -2,6 +2,7 @@
 
 #define XE_DBG       true
 #define XE_PLAT_WIN  true
+#define XE_TEST      true
 
 #define ARRAY_LENGTH(x)   sizeof(x)/sizeof(x[0])
 #define SET_BIT(x, pos)   x |=  (1 << (u32)pos)

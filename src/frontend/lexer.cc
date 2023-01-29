@@ -92,7 +92,7 @@ Lexer createLexer(char *filePath) {
 	lexer.fileContent[size] = '\0';
 
 	//50% of the file size. @foodforthought: change percentage?
-	u32 tokenCount = (u32)((50 * size) / 100);
+	u32 tokenCount = (u32)((50 * size) / 100) + 1;
 	lexer.tokenTypes.init(tokenCount);
 	lexer.tokenOffsets.init(tokenCount);
 
