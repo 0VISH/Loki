@@ -131,7 +131,7 @@ LineOff getLineAndOff(char *mem, u64 offset) {
 b32 isAlpha(char x) { return (x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z'); };
 b32 isNum(char x) { return (x >= '0' && x <= '9'); };
 b32 genTokens(Lexer &lex) {
-	TIME_BLOCK("genTokens");
+	TIME_BLOCK;
 	u64 x = 0;
 	char *src = lex.fileContent;
 	Token_Type stringType = Token_Type::EMPTY;

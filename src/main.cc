@@ -24,9 +24,10 @@ s32 main(s32 argc, char **argv) {
 		if (base == nullptr) { error = true; break; };
 		astFile.nodes.push(base);
 	};
+	ScopeEntities fileScopeEntities = createScopeEntities();
 	if (error == false) {
 		dbg::dumpASTFile(astFile, lexer);
-		if (checkEntities(astFile.nodes, lexer) == false) { printf("\nchecking entites failed\n"); };
+		if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) { printf("\nchecking entites failed\n"); };
 	};
 	uninitKeywords();
 	flushReports();

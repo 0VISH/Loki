@@ -11,10 +11,10 @@
 #if(XE_DBG)
 #include <typeinfo>
 #endif
+#include "timer.cc"
 #include "mem.cc"
 #include "ds.cc"
 #include "error.cc"
-#include "timer.cc"
 #include "frontend/lexer.cc"
 #include "frontend/parser.cc"
 #include "frontend/type.cc"
