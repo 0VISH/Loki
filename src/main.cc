@@ -5,7 +5,7 @@ s32 main(s32 argc, char **argv) {
 		printf("main file path not provided");
 		return EXIT_SUCCESS;
 	};
-    
+	EXCEPTION_BLOCK_START
 	dbg::initTimer();
 	initKeywords();
 	Lexer lexer = createLexer(argv[1]);
@@ -19,7 +19,7 @@ s32 main(s32 argc, char **argv) {
 	ASTFile astFile = createASTFile();
 	u32 off = 0;
 	b8 error = false;
-	while(lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
+	while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 		ASTBase *base = parseBlock(lexer, astFile, off);
 		if (base == nullptr) { error = true; break; };
 		astFile.nodes.push(base);
@@ -34,7 +34,7 @@ s32 main(s32 argc, char **argv) {
 	destroyLexer(lexer);
 	destroyASTFile(astFile);
 	dbg::dumpBlockTimes();
-
+	EXCEPTION_BLOCK_END
 #if(XE_DBG)
 	printf("\ndone!");
 #endif

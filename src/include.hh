@@ -11,7 +11,8 @@
 #if(XE_DBG)
 #include <typeinfo>
 #endif
-#include "timer.cc"
+#include "debug/timer.cc"
+#include "debug/exception.cc"
 #include "mem.cc"
 #include "ds.cc"
 #include "error.cc"

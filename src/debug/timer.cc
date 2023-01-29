@@ -69,5 +69,6 @@ namespace dbg{
 #define TIME_BLOCK_(name) dbg::Timer timer(name);
 #define TIME_BLOCK dbg::Timer timer(__FUNCTION__);
 #else
-#define TIME_BLOCK(name)
+#define TIME_BLOCK_(name)
+#define TIME_BLOCK
 #endif
