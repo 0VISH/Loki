@@ -14,6 +14,8 @@
 #include "mem.cc"
 #include "ds.cc"
 #include "error.cc"
+#include "timer.cc"
 #include "frontend/lexer.cc"
 #include "frontend/parser.cc"
 #include "frontend/type.cc"
+#include "frontend/entity.cc"

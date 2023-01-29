@@ -6,6 +6,7 @@ s32 main(s32 argc, char **argv) {
 		return EXIT_SUCCESS;
 	};
     
+	dbg::initTimer();
 	initKeywords();
 	Lexer lexer = createLexer(argv[1]);
 	if (lexer.fileContent == nullptr) {
@@ -13,8 +14,8 @@ s32 main(s32 argc, char **argv) {
 		return EXIT_SUCCESS;
 	};
 	b32 x = genTokens(lexer);
-	dumpLexerStat(lexer);
-	dumpLexerTokens(lexer);
+	dbg::dumpLexerStat(lexer);
+	dbg::dumpLexerTokens(lexer);
 	ASTFile astFile = createASTFile();
 	u32 off = 0;
 	b8 error = false;
@@ -24,12 +25,14 @@ s32 main(s32 argc, char **argv) {
 		astFile.nodes.push(base);
 	};
 	if (error == false) {
-		dumpASTFile(astFile, lexer);
+		dbg::dumpASTFile(astFile, lexer);
+		if (checkEntities(astFile.nodes, lexer) == false) { printf("\nchecking entites failed\n"); };
 	};
 	uninitKeywords();
 	flushReports();
 	destroyLexer(lexer);
 	destroyASTFile(astFile);
+	dbg::dumpBlockTimes();
 
 #if(XE_DBG)
 	printf("\ndone!");

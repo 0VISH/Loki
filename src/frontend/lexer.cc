@@ -131,6 +131,7 @@ LineOff getLineAndOff(char *mem, u64 offset) {
 b32 isAlpha(char x) { return (x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z'); };
 b32 isNum(char x) { return (x >= '0' && x <= '9'); };
 b32 genTokens(Lexer &lex) {
+	TIME_BLOCK("genTokens");
 	u64 x = 0;
 	char *src = lex.fileContent;
 	Token_Type stringType = Token_Type::EMPTY;
@@ -218,41 +219,43 @@ b32 genTokens(Lexer &lex) {
 };
 
 #if(XE_DBG)
-void dumpLexerStat(Lexer &lexer) {
-	printf("\n[LEXER_STAT]\nfileName: %s\ntokenCount: %d\n----\n", lexer.fileName, lexer.tokenTypes.count);
-};
-void dumpLexerTokens(Lexer &lexer) {
-	printf("\n[LEXER_TOKENS]");
-	for (u32 x = 0; x < lexer.tokenTypes.count; x += 1) {
-		printf("\n[TOKEN]\n");
-		LineOff lo = getLineAndOff(lexer.fileContent, lexer.tokenOffsets[x].off);
-		printf("line: %d off: %d\n", lo.line, lo.off);
-		switch (lexer.tokenTypes[x]) {
-			case Token_Type::DOUBLE_QUOTES: {
-				printf("double_quotes\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off + 1);
-			} break;
-			case Token_Type::SINGLE_QUOTES: {
-				printf("single_quotes\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off + 1);
-			} break;
-			case Token_Type::IDENTIFIER: {
-				printf("identifier\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-			} break;
-			case Token_Type::INTEGER: {
-				printf("integer\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-			} break;
-			case Token_Type::DECIMAL: {
-				printf("decimal\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-			} break;
-			case Token_Type::END_OF_FILE: printf("end_of_file"); break;
-			case (Token_Type)'\n': printf("new_line"); break;
-			default:
-				if (lexer.tokenTypes[x] >= Token_Type::K_START && lexer.tokenTypes[x] <= Token_Type::K_END) {
-					printf("keyword\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-				}
-				else { printf("%c", lexer.tokenTypes[x]); }; 
-				break;
-		};
+namespace dbg {
+	void dumpLexerStat(Lexer &lexer) {
+		printf("\n[LEXER_STAT]\nfileName: %s\ntokenCount: %d\n----\n", lexer.fileName, lexer.tokenTypes.count);
 	};
-	printf("\n----\n");
+	void dumpLexerTokens(Lexer &lexer) {
+		printf("\n[LEXER_TOKENS]");
+		for (u32 x = 0; x < lexer.tokenTypes.count; x += 1) {
+			printf("\n[TOKEN]\n");
+			LineOff lo = getLineAndOff(lexer.fileContent, lexer.tokenOffsets[x].off);
+			printf("line: %d off: %d\n", lo.line, lo.off);
+			switch (lexer.tokenTypes[x]) {
+				case Token_Type::DOUBLE_QUOTES: {
+					printf("double_quotes\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off + 1);
+				} break;
+				case Token_Type::SINGLE_QUOTES: {
+					printf("single_quotes\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off + 1);
+				} break;
+				case Token_Type::IDENTIFIER: {
+					printf("identifier\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+				} break;
+				case Token_Type::INTEGER: {
+					printf("integer\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+				} break;
+				case Token_Type::DECIMAL: {
+					printf("decimal\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+				} break;
+				case Token_Type::END_OF_FILE: printf("end_of_file"); break;
+				case (Token_Type)'\n': printf("new_line"); break;
+				default:
+					if (lexer.tokenTypes[x] >= Token_Type::K_START && lexer.tokenTypes[x] <= Token_Type::K_END) {
+						printf("keyword\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+					}
+					else { printf("%c", lexer.tokenTypes[x]); };
+					break;
+			};
+		};
+		printf("\n----\n");
+	};
 };
 #endif

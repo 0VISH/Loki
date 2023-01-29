@@ -1,5 +1,4 @@
 #define AST_PAGE_SIZE 1024
-
 #define BRING_TOKENS_TO_SCOPE DynamicArray<Token_Type> &tokTypes = lexer.tokenTypes;DynamicArray<TokenOffset> &tokOffs = lexer.tokenOffsets;
 
 enum class ASTType {
@@ -22,6 +21,7 @@ enum class ASTType {
 struct ASTBase {
 	ASTType type;
 	u32 tokenOff;
+	u8 flag;
 };
 struct ASTlr : ASTBase {
 	ASTBase *lhs;
@@ -442,152 +442,154 @@ s64 string2int(String &str){
 
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
 
-void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
-	BRING_TOKENS_TO_SCOPE;
-	PAD;
-	printf("[NODE]");
-	PAD;
-	printf("tokenOff: %d", node->tokenOff);
-	PAD;
-	printf("type: ");
-	ASTType type = node->type;
-	char c = NULL;
-	u8 flag = false;
-	ASTlr *lr = (ASTlr*)node;
-	switch (type) {
-		case ASTType::NUM_INTEGER: {
-			printf("num_integer");
-			TokenOffset off = tokOffs[node->tokenOff];
-			String str;
-			str.len = off.len;
-			str.mem = lexer.fileContent + off.off;
-			s64 num = string2int(str);
-			PAD;
-			printf("num: %lld", num);
-		} break;
-		case ASTType::NUM_DECIMAL: {
-			printf("num_decimal");
-			PAD;
-			printf("num: %f", 69.69);
-		} break;
-		case ASTType::BIN_ADD: if (c == NULL) { c = '+'; printf("bin_add"); };
-		case ASTType::BIN_SUB: if (c == NULL) { c = '-'; printf("bin_sub"); };
-		case ASTType::BIN_MUL: if (c == NULL) { c = '*'; printf("bin_mul"); };
-		case ASTType::BIN_DIV:{
-			if (c == NULL) { c = '/'; printf("bin_div"); };
-			PAD;
-			printf("lhs: %p", lr->lhs);
-			PAD;
-			printf("rhs: %p", lr->rhs);
-			PAD;
-			printf("op: %c", c);
-			PAD;
-			printf("LHS");
-			if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
-			PAD;
-			printf("RHS");
-			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
-		}break;
-		case ASTType::VARIABLE: {
-			printf("variable");
-			PAD;
-			u32 x = node->tokenOff;
-			printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-		}break;
-		case ASTType::UNI_DECLERATION_T_KNOWN: {
-			u32 x = node->tokenOff - 1;
-			printf("uni_decleration_t_known");
-			PAD;
-			printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-			PAD;
-			printf("LHS");
-			__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);
-		} break;
-		case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
-			u32 x = node->tokenOff - 1;
-			printf("uni_assignment_t_known");
-			PAD;
-			printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-		};
-		flag = true;
-		case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
-			if (flag) { flag = false; }
-			else { printf("uni_assignment_t_unkown"); };	
-			PAD;
-			printf("LHS");
-			if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
-			PAD;
-			printf("RHS");
-			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
-		} break;
-		case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
-			u32 x = node->tokenOff - 1;
-			printf("multi_assignment_t_known");
-			PAD;
-			printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-		};
-		flag = true;
-		case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
-			if (flag) { flag = false; }
-			else { printf("multi_assignment_t_unkown"); };
-			PAD;
-			printf("LHS");
-			DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
-			for (u8 x=0; x<table->count; x +=1) {
-				__dumpNodesWithoutEndPadding(table->getElement(x), lexer, padding + 1);
+namespace dbg {
+	void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
+		BRING_TOKENS_TO_SCOPE;
+		PAD;
+		printf("[NODE]");
+		PAD;
+		printf("tokenOff: %d", node->tokenOff);
+		PAD;
+		printf("type: ");
+		ASTType type = node->type;
+		char c = NULL;
+		u8 flag = false;
+		ASTlr *lr = (ASTlr*)node;
+		switch (type) {
+			case ASTType::NUM_INTEGER: {
+				printf("num_integer");
+				TokenOffset off = tokOffs[node->tokenOff];
+				String str;
+				str.len = off.len;
+				str.mem = lexer.fileContent + off.off;
+				s64 num = string2int(str);
 				PAD;
+				printf("num: %lld", num);
+			} break;
+			case ASTType::NUM_DECIMAL: {
+				printf("num_decimal");
+				PAD;
+				printf("num: %f", 69.69);
+			} break;
+			case ASTType::BIN_ADD: if (c == NULL) { c = '+'; printf("bin_add"); };
+			case ASTType::BIN_SUB: if (c == NULL) { c = '-'; printf("bin_sub"); };
+			case ASTType::BIN_MUL: if (c == NULL) { c = '*'; printf("bin_mul"); };
+			case ASTType::BIN_DIV:{
+				if (c == NULL) { c = '/'; printf("bin_div"); };
+				PAD;
+				printf("lhs: %p", lr->lhs);
+				PAD;
+				printf("rhs: %p", lr->rhs);
+				PAD;
+				printf("op: %c", c);
+				PAD;
+				printf("LHS");
+				if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
+				PAD;
+				printf("RHS");
+				if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
+			}break;
+			case ASTType::VARIABLE: {
+				printf("variable");
+				PAD;
+				u32 x = node->tokenOff;
+				printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+			}break;
+			case ASTType::UNI_DECLERATION_T_KNOWN: {
+				u32 x = node->tokenOff - 1;
+				printf("uni_decleration_t_known");
+				PAD;
+				printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+				PAD;
+				printf("LHS");
+				__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);
+			} break;
+			case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
+				u32 x = node->tokenOff - 1;
+				printf("uni_assignment_t_known");
+				PAD;
+				printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 			};
-			PAD;
-			printf("RHS");
-			if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
-		} break;
-		case ASTType::PROC_DEFENITION: {
-			u32 x = node->tokenOff;
-			printf("proc_defenition");
-			PAD;
-			printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-			PAD;
-			printf("[ARGS]");
-			DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
-			DynamicArray<ProcArgs> *args = (DynamicArray<ProcArgs>*)lr->lhs;
-			u8 argOff = 0;
-			ProcArgs procArg = args->getElement(argOff);
-			u8 v = 0;
-			for (; v < table->count; v += 1) {
-				if (table->getElement(v) == nullptr) {
-					v += 1;
-					break;
+			flag = true;
+			case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
+				if (flag) { flag = false; }
+				else { printf("uni_assignment_t_unkown"); };	
+				PAD;
+				printf("LHS");
+				if (lr->lhs != nullptr) {__dumpNodesWithoutEndPadding(lr->lhs, lexer, padding + 1);};
+				PAD;
+				printf("RHS");
+				if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
+			} break;
+			case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
+				u32 x = node->tokenOff - 1;
+				printf("multi_assignment_t_known");
+				PAD;
+				printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+			};
+			flag = true;
+			case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
+				if (flag) { flag = false; }
+				else { printf("multi_assignment_t_unkown"); };
+				PAD;
+				printf("LHS");
+				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
+				for (u8 x=0; x<table->count; x +=1) {
+					__dumpNodesWithoutEndPadding(table->getElement(x), lexer, padding + 1);
+					PAD;
 				};
-				padding += 1;
-				__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding);
 				PAD;
-				if (v == procArg.count) {
-					argOff += 1;
-					procArg = args->getElement(argOff);
+				printf("RHS");
+				if (lr->rhs != nullptr) {__dumpNodesWithoutEndPadding(lr->rhs, lexer, padding + 1);};
+			} break;
+			case ASTType::PROC_DEFENITION: {
+				u32 x = node->tokenOff;
+				printf("proc_defenition");
+				PAD;
+				printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+				PAD;
+				printf("[ARGS]");
+				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
+				DynamicArray<ProcArgs> *args = (DynamicArray<ProcArgs>*)lr->lhs;
+				u8 argOff = 0;
+				ProcArgs procArg = args->getElement(argOff);
+				u8 v = 0;
+				for (; v < table->count; v += 1) {
+					if (table->getElement(v) == nullptr) {
+						v += 1;
+						break;
+					};
+					padding += 1;
+					__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding);
+					PAD;
+					if (v == procArg.count) {
+						argOff += 1;
+						procArg = args->getElement(argOff);
+					};
+					u32 z = procArg.typeOff;
+					printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
+					padding -= 1;
+					PAD;
 				};
-				u32 z = procArg.typeOff;
-				printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
-				padding -= 1;
 				PAD;
-			};
-			PAD;
-			printf("[BODY]");
-			for (; v < table->count; v += 1) {
-				__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding + 1);
-				PAD;
-			};
-		} break;
-		default: DEBUG_UNREACHABLE;
+				printf("[BODY]");
+				for (; v < table->count; v += 1) {
+					__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding + 1);
+					PAD;
+				};
+			} break;
+			default: DEBUG_UNREACHABLE;
+		};
 	};
-};
-void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding = 0){
-	__dumpNodesWithoutEndPadding(node, lexer, padding);
-	printf("\n----\n");
-};
-void dumpASTFile(ASTFile &file, Lexer &lexer) {
-	for (u32 x=0; x<file.nodes.count; x+=1) {
-		ASTBase *node = file.nodes[x];
-		dumpNodes(node, lexer);
+	void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding = 0) {
+		__dumpNodesWithoutEndPadding(node, lexer, padding);
+		printf("\n----\n");
+	};
+	void dumpASTFile(ASTFile &file, Lexer &lexer) {
+		for (u32 x = 0; x < file.nodes.count; x += 1) {
+			ASTBase *node = file.nodes[x];
+			dumpNodes(node, lexer);
+		};
 	};
 };
 #endif
