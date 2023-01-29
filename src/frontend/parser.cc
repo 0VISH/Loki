@@ -43,6 +43,10 @@ struct ProcArgs {
 	s8 count;
 	u32 typeOff;
 };
+struct Arguments {
+	DynamicArray<ProcArgs> argsMeta;
+	DynamicArray<ASTBase*> args;
+};
 
 ASTFile createASTFile() {
 	ASTFile file;
@@ -275,25 +279,25 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							ASTlr *proc = (ASTlr*)allocASTWithTable(sizeof(ASTlr), ASTType::PROC_DEFENITION, start, file);
 							DynamicArray<ASTBase*> *table = getTable(proc, sizeof(ASTlr));
 							table->init();
-							DynamicArray<ProcArgs> *procArgs = (DynamicArray<ProcArgs>*)mem::alloc(sizeof(DynamicArray<ProcArgs>));
-							DynamicArray<ASTBase*> *args = (DynamicArray<ASTBase*>*)mem::alloc(sizeof(DynamicArray<ASTBase*>));
-							proc->lhs = (ASTBase*)procArgs;
-							proc->rhs = (ASTBase*)args;
-							procArgs->init();
-							args->init();
+							Arguments *arguments = (Arguments*)mem::alloc(sizeof(Arguments));
+							DynamicArray<ProcArgs> &procArgs = arguments->argsMeta;
+							DynamicArray<ASTBase*> &args = arguments->args;
+							proc->lhs = (ASTBase*)arguments;
+							procArgs.init();
+							args.init();
 							s8 y = 0;
 							while (true) {
 								x += 1;
 								eatNewlines(tokTypes, x);
-								y += varDeclAddTableEntries(lexer, file, x, args);
+								y += varDeclAddTableEntries(lexer, file, x, &args);
 								if (y == -1) { return nullptr; };
 								if (tokTypes[x] != (Token_Type)':') {
 									emitErr(lexer.fileName,
 									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
 									        "Expected ':'");
 									table->uninit();
-									procArgs->uninit();
-									args->uninit();
+									procArgs.uninit();
+									args.uninit();
 									return nullptr;
 								};
 								x += 1;
@@ -302,11 +306,11 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
 									        "Expected a type");
 									table->uninit();
-									procArgs->uninit();
-									args->uninit();
+									procArgs.uninit();
+									args.uninit();
 									return nullptr;
 								};
-								procArgs->push({y,x});
+								procArgs.push({y,x});
 								x += 1;
 								if (tokTypes[x] == (Token_Type)',') { continue; }
 								else if (tokTypes[x] == (Token_Type)')') { break; }
@@ -315,28 +319,66 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
 									        "Expected ','");
 									table->uninit();
-									procArgs->uninit();
-									args->uninit();
+									procArgs.uninit();
+									args.uninit();
 									return nullptr;
 								};
 							};
 							x += 1;
 							eatNewlines(tokTypes, x);
-							if (tokTypes[x] != (Token_Type)'{') {
-								emitErr(lexer.fileName,
-								        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-								        "Expected '{'");
-								table->uninit();
-								procArgs->uninit();
-								args->uninit();
-								return nullptr;
+							switch (tokTypes[x]) {
+								case Token_Type::ARROW: {
+									x += 1;
+									DynamicArray<u32> *returnTypeOffs = (DynamicArray<u32>*)mem::alloc(sizeof(DynamicArray<u8>));
+									proc->rhs = (ASTBase*)returnTypeOffs;
+									returnTypeOffs->init();
+									while (true) {
+										if (isType(tokTypes[x]) == false) {
+											emitErr(lexer.fileName,
+											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
+											        "Expected a type");
+											table->uninit();
+											procArgs.uninit();
+											args.uninit();
+											return nullptr;
+										};
+										returnTypeOffs->push(x);
+										x += 1;
+										if (tokTypes[x] == (Token_Type)',') { x += 1; continue; };
+										eatNewlines(tokTypes, x);
+										if (tokTypes[x] != (Token_Type)'{') {
+											emitErr(lexer.fileName,
+											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
+											        "Expected '{'");
+											table->uninit();
+											procArgs.uninit();
+											args.uninit();
+											return nullptr;
+										};
+										break;
+									};
+									x += 1;
+								} break;
+								case (Token_Type)'{': {
+									proc->rhs = nullptr;
+									x += 1;
+								} break;
+								default: {
+									emitErr(lexer.fileName,
+									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
+									        "Expected '{' or '->'");
+									table->uninit();
+									procArgs.uninit();
+									args.uninit();
+									return nullptr;
+								} break;
 							};
-							x += 1;
 							while (tokTypes[x] != (Token_Type)'}') {
 								ASTBase *node = parseBlock(lexer, file, x);
 								if (node == nullptr) {
 									table->uninit();
-									procArgs->uninit();
+									procArgs.uninit();
+									args.uninit();
 									return nullptr;
 								};
 								table->push(node);
@@ -556,17 +598,18 @@ namespace dbg {
 				PAD;
 				printf("[ARGS]");
 				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
-				DynamicArray<ProcArgs> *procArgs = (DynamicArray<ProcArgs>*)lr->lhs;
-				DynamicArray<ASTBase*> *args = (DynamicArray<ASTBase*>*)lr->rhs;
+				Arguments *arguments = (Arguments*)lr->lhs;
+				DynamicArray<ProcArgs> &procArgs = arguments->argsMeta;
+				DynamicArray<ASTBase*> &args = arguments->args;
 				u8 argOff = 0;
-				ProcArgs procArg = procArgs->getElement(argOff);
-				for (u8 v=0; v < args->count; v += 1) {
+				ProcArgs procArg = procArgs[argOff];
+				for (u8 v=0; v < args.count; v += 1) {
 					padding += 1;
-					__dumpNodesWithoutEndPadding(args->getElement(v), lexer, padding);
+					__dumpNodesWithoutEndPadding(args[v], lexer, padding);
 					PAD;
 					if (v == procArg.count) {
 						argOff += 1;
-						procArg = procArgs->getElement(argOff);
+						procArg = procArgs[argOff];
 					};
 					u32 z = procArg.typeOff;
 					printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
@@ -578,6 +621,18 @@ namespace dbg {
 				for (u32 v=0; v < table->count; v += 1) {
 					__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding + 1);
 					PAD;
+				};
+				printf("[RETURN]");
+				DynamicArray<u32> *returnTypeOffs = (DynamicArray<u32>*)lr->rhs;
+				if (returnTypeOffs == nullptr) {
+					PAD;
+					printf("type: void");
+				} else {
+					for (u32 v=0; v<returnTypeOffs->count; v+=1) {
+						u32 z = returnTypeOffs->getElement(v);
+						PAD;
+						printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
+					};
 				};
 			} break;
 			default: DEBUG_UNREACHABLE;

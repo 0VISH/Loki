@@ -23,6 +23,7 @@ s32 main(s32 argc, char **argv) {
 		ASTBase *base = parseBlock(lexer, astFile, off);
 		if (base == nullptr) { error = true; break; };
 		astFile.nodes.push(base);
+		eatNewlines(lexer.tokenTypes, off);
 	};
 	ScopeEntities fileScopeEntities = createScopeEntities();
 	if (error == false) {

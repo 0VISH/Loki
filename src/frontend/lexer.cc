@@ -16,6 +16,7 @@ enum class Token_Type {
 	K_S32,
 	K_PROC,
 	K_END,
+	ARROW,
 	//keywords end
 	END_OF_FILE,
 };
@@ -203,10 +204,15 @@ b32 genTokens(Lexer &lex) {
 					lex.tokenOffsets.push(offset);
 					lex.tokenTypes.push(numType);
 				} else {
+					Token_Type type = (Token_Type)src[x];
+					if (src[x] == '-' && src[x+1] == '>') {
+						type = Token_Type::ARROW;
+						x += 1;
+					};
 					TokenOffset offset;
 					offset.off = x;
 					lex.tokenOffsets.push(offset);
-					lex.tokenTypes.push((Token_Type)src[x]);
+					lex.tokenTypes.push(type);
 					x += 1;
 				};
 			} break;
