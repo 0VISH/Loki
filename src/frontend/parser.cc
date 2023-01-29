@@ -276,13 +276,16 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							DynamicArray<ASTBase*> *table = getTable(proc, sizeof(ASTlr));
 							table->init();
 							DynamicArray<ProcArgs> *procArgs = (DynamicArray<ProcArgs>*)mem::alloc(sizeof(DynamicArray<ProcArgs>));
+							DynamicArray<ASTBase*> *args = (DynamicArray<ASTBase*>*)mem::alloc(sizeof(DynamicArray<ASTBase*>));
 							proc->lhs = (ASTBase*)procArgs;
+							proc->rhs = (ASTBase*)args;
 							procArgs->init();
+							args->init();
 							s8 y = 0;
 							while (true) {
 								x += 1;
 								eatNewlines(tokTypes, x);
-								y += varDeclAddTableEntries(lexer, file, x, table);
+								y += varDeclAddTableEntries(lexer, file, x, args);
 								if (y == -1) { return nullptr; };
 								if (tokTypes[x] != (Token_Type)':') {
 									emitErr(lexer.fileName,
@@ -290,6 +293,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									        "Expected ':'");
 									table->uninit();
 									procArgs->uninit();
+									args->uninit();
 									return nullptr;
 								};
 								x += 1;
@@ -299,6 +303,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									        "Expected a type");
 									table->uninit();
 									procArgs->uninit();
+									args->uninit();
 									return nullptr;
 								};
 								procArgs->push({y,x});
@@ -311,6 +316,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									        "Expected ','");
 									table->uninit();
 									procArgs->uninit();
+									args->uninit();
 									return nullptr;
 								};
 							};
@@ -322,9 +328,9 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 								        "Expected '{'");
 								table->uninit();
 								procArgs->uninit();
+								args->uninit();
 								return nullptr;
 							};
-							table->push(nullptr);//marks the end of arguments
 							x += 1;
 							while (tokTypes[x] != (Token_Type)'}') {
 								ASTBase *node = parseBlock(lexer, file, x);
@@ -550,21 +556,17 @@ namespace dbg {
 				PAD;
 				printf("[ARGS]");
 				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
-				DynamicArray<ProcArgs> *args = (DynamicArray<ProcArgs>*)lr->lhs;
+				DynamicArray<ProcArgs> *procArgs = (DynamicArray<ProcArgs>*)lr->lhs;
+				DynamicArray<ASTBase*> *args = (DynamicArray<ASTBase*>*)lr->rhs;
 				u8 argOff = 0;
-				ProcArgs procArg = args->getElement(argOff);
-				u8 v = 0;
-				for (; v < table->count; v += 1) {
-					if (table->getElement(v) == nullptr) {
-						v += 1;
-						break;
-					};
+				ProcArgs procArg = procArgs->getElement(argOff);
+				for (u8 v=0; v < args->count; v += 1) {
 					padding += 1;
-					__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding);
+					__dumpNodesWithoutEndPadding(args->getElement(v), lexer, padding);
 					PAD;
 					if (v == procArg.count) {
 						argOff += 1;
-						procArg = args->getElement(argOff);
+						procArg = procArgs->getElement(argOff);
 					};
 					u32 z = procArg.typeOff;
 					printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
@@ -573,7 +575,7 @@ namespace dbg {
 				};
 				PAD;
 				printf("[BODY]");
-				for (; v < table->count; v += 1) {
+				for (u32 v=0; v < table->count; v += 1) {
 					__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding + 1);
 					PAD;
 				};

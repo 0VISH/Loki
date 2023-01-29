@@ -102,6 +102,9 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 		u8 multi = false;
 		switch (node->type) {
 			case ASTType::PROC_DEFENITION: {
+				ScopeEntities pse = createScopeEntities();
+				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
+				if (checkEntities(*table, lexer, pse) == false) { return false; };
 			} break;
 			case ASTType::UNI_DECLERATION_T_KNOWN:
 			case ASTType::MULTI_DECLERATION_T_KNOWN: {
