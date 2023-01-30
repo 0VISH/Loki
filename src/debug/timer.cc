@@ -26,7 +26,7 @@ namespace dbg{
 			BlockTime rep = blocks[r];
 			for (u8 x=0; x<rep.depth; x+=1) { printf("    "); };
 			printf("%s", rep.blockName);
-			for (u8 start = (u8)strlen(rep.blockName); start<dots; start += 1) { printf("."); };
+			for (u8 start = (u8)strlen(rep.blockName)+(rep.depth*4); start<dots; start += 1) { printf("."); };
 			printf("%f\n", rep.microSeconds);
 		};
 		printf("----\n");

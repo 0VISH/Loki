@@ -20,3 +20,6 @@
 #include "frontend/parser.cc"
 #include "frontend/type.cc"
 #include "frontend/entity.cc"
+#include "xenon.cc"
+
+#include "debug/tester.cc"
