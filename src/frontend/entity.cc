@@ -8,27 +8,56 @@ struct ProcEntity {
 	String name;
 };
 
-//TODO: store array of maps
 struct ScopeEntities{
-	Map varMap;
+	DynamicArray<Map> varMaps;
 	DynamicArray<VariableEntity> varEntities;
-	Map procMap;
-	DynamicArray<ProcEntity>     procEntities;
+	DynamicArray<Map> procMaps;
+	DynamicArray<ProcEntity> procEntities;
+};
+
+void registerScopedEntity(String str, u16 value, DynamicArray<Map> &maps) {
+	if (maps[maps.count-1].isFull()) {
+		Map mp;
+		mp.init(10);
+		maps.push(mp);
+	};
+	maps[maps.count-1].insertValue(str, value);
+};
+s32 getRegisteredScopedEntity(String str, DynamicArray<Map> &maps) {
+	for (u8 x=0; x<maps.count; x+=1) {
+		s32 val = maps[x].getValue(str);
+		if (val != -1) { return val; };
+	};
+	return -1;
 };
 
 ScopeEntities createScopeEntities() {
 	ScopeEntities se;
-	se.varMap.init(10);
 	se.varEntities.init();
-	se.procMap.init(10);
 	se.procEntities.init(10);
+	se.varMaps.init(10);
+	se.procMaps.init();
+	
+	Map mp1;
+	mp1.init(10);
+	se.varMaps.push(mp1);
+	Map mp2;
+	mp2.init(10);
+	se.procMaps.push(mp2);
+
 	return se;
 };
 void destroyFileEntities(ScopeEntities &se) {
-	se.varMap.uninit();
 	se.varEntities.uninit();
-	se.procMap.uninit();
 	se.procEntities.uninit();
+	for (u8 x = 0; x < se.varMaps.count; x += 1) {
+		se.varMaps[x].uninit();
+	};
+	for (u8 x = 0; x < se.procMaps.count; x += 1) {
+		se.procMaps[x].uninit();
+	};
+	se.varMaps.uninit();
+	se.procMaps.uninit();
 };
 String buildString(Lexer &lexer, u32 x) {
 	String str;
@@ -39,14 +68,14 @@ String buildString(Lexer &lexer, u32 x) {
 bool checkVariablePresentInScope(Lexer &lexer, Type type, u32 off, ScopeEntities &se) {
 	BRING_TOKENS_TO_SCOPE;
 	String name = buildString(lexer, off);
-	if (se.varMap.getValue(name) != -1) {
+	if (getRegisteredScopedEntity(name, se.varMaps) != -1) {
 		emitErr(lexer.fileName,
 		        getLineAndOff(lexer.fileContent, tokOffs[off].off),
 		        "Variable redecleration"
 		        );
 		return false;
 	};
-	se.varMap.insertValue(name, se.varEntities.count);
+	registerScopedEntity(name, se.varEntities.count, se.varMaps);
 	VariableEntity entity;
 	entity.name = name;
 	entity.type = type;

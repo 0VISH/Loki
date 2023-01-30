@@ -257,7 +257,6 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							x += 1;
 							u32 end = getEndNewlineEOF(tokTypes, x);
 							assign->rhs = genASTExprTree(lexer, file, x, end);
-							if (assign->rhs == nullptr) { return nullptr; };
 							return (ASTBase*)assign;
 						} break;
 						case (Token_Type)':': {
@@ -460,10 +459,6 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 					x += 1;
 					u32 end = getEndNewlineEOF(tokTypes, x);
 					base->rhs = genASTExprTree(lexer, file, x, end);
-					if (base->rhs == nullptr) {
-						table->uninit();
-						return nullptr;
-					};
 					return (ASTBase*)base;
 				} break;
 			} break;

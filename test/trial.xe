@@ -6,8 +6,8 @@ foo :: proc(
 		{
 	
 	z :s8
-	a,bb :u8 = 3
-	b := 5
+	a,bb :u8 = 3 + 3
+	aa := 5 - 2
 }
 
 x :s32= 2 + 2

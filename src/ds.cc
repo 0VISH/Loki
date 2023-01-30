@@ -120,6 +120,7 @@ public:
 		};
 		return -1;
 	};
+	bool isFull() { return empty.count == empty.len; };
 private:
 	u32 fnv_hash_1a_32(char *key, u32 len){
 		u32 h = 0x811c9dc5;
