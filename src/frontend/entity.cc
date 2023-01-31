@@ -131,6 +131,19 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 		u8 multi = false;
 		switch (node->type) {
 			case ASTType::PROC_DEFENITION: {
+				String name = buildString(lexer, node->tokenOff);
+				if (getRegisteredScopedEntity(name, se.procMaps) != -1) {
+					emitErr(lexer.fileName,
+					        getLineAndOff(lexer.fileContent, tokOffs[node->tokenOff].off),
+					        "Procedure redecleration"
+					        );
+					return false;
+				};
+				registerScopedEntity(name, se.varEntities.count, se.procMaps);
+				ProcEntity entity;
+				entity.name = name;
+				entity.args = (DynamicArray<ProcArgs>*)lr->lhs;
+				se.procEntities.push(entity);
 				ScopeEntities pse = createScopeEntities();
 				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
 				if (checkEntities(*table, lexer, pse) == false) { return false; };

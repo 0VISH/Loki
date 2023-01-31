@@ -10,5 +10,8 @@ foo :: proc(
 	aa := 5 - 2
 }
 
+bar ::proc(){
+}
+
 x :s32= 2 + 2
   xz,y := 2 + 2
