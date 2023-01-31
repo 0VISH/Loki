@@ -65,7 +65,7 @@ String buildString(Lexer &lexer, u32 x) {
 	str.len = lexer.tokenOffsets[x].len;
 	return str;
 };
-bool checkVariablePresentInScope(Lexer &lexer, Type type, u32 off, ScopeEntities &se) {
+bool checkVariablePresentInScopeElseReg(Lexer &lexer, Type type, u32 off, ScopeEntities &se, Flag flag) {
 	BRING_TOKENS_TO_SCOPE;
 	String name = buildString(lexer, off);
 	if (getRegisteredScopedEntity(name, se.varMaps) != -1) {
@@ -79,13 +79,14 @@ bool checkVariablePresentInScope(Lexer &lexer, Type type, u32 off, ScopeEntities
 	VariableEntity entity;
 	entity.name = name;
 	entity.type = type;
-	entity.flag = NULL;
+	entity.flag = flag;
 	se.varEntities.push(entity);
 	return true;
 };
 bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t_known, b8 multi) {
 	BRING_TOKENS_TO_SCOPE;
-	Type treeType = getTreeType(lr->rhs);
+	Flag flag;
+	Type treeType = getTreeType(lr->rhs, flag);
 	Type givenType;
 	if (t_known) {
 		switch (tokTypes[x-1]) {
@@ -110,12 +111,12 @@ bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t
 		DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
 		for (u8 x = 0; x < table->count; x += 1) {
 			u32 off = table->getElement(x)->tokenOff;
-			if (checkVariablePresentInScope(lexer, givenType, off, se) == false) {
+			if (checkVariablePresentInScopeElseReg(lexer, givenType, off, se, flag) == false) {
 				return false;
 			};
 		};
 	} else {
-		if (checkVariablePresentInScope(lexer, givenType, lr->lhs->tokenOff, se) == false) {
+		if (checkVariablePresentInScopeElseReg(lexer, givenType, lr->lhs->tokenOff, se, flag) == false) {
 			return false;
 		};
 	};
@@ -153,15 +154,15 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 			} break;
 			case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
 				t_known = true;
-			case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:
+			case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
 				multi = true;
 				if (checkVariableEntity(lr, x, lexer, se, t_known, multi) == false) { return false; };
-				break;
+			} break;
 			case ASTType::UNI_ASSIGNMENT_T_KNOWN:
 				t_known = true;
-			case ASTType::UNI_ASSIGNMENT_T_UNKNOWN:
+			case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 				if (checkVariableEntity(lr, x, lexer, se, t_known, multi) == false) { return false; };
-				break;
+			} break;
 			default: DEBUG_UNREACHABLE;
 		};
 	};

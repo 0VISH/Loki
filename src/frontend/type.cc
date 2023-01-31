@@ -1,39 +1,29 @@
-enum class Type{
-	COMP_VOID = 1,
-	S_64,
-	U_64,
-	S_32,
-	U_32,
-	S_16,
-	U_16,
-	S_8,
-	U_8,
-	COMP_DECIMAL,
-	COMP_INTEGER,
-	TYPE_COUNT
-};
-
-typedef u16 TypeId;
-
 Type getType(TypeId type) {
 	u16 x = 1;
 	while (IS_BIT(type, x) == 0) { x += 1; };
 	return (Type)x;
 };
 
-Type getTreeType(ASTBase *base) {
+Type getTreeType(ASTBase *base, Flag &flag) {
 	switch (base->type) {
 		case ASTType::BIN_ADD:
 		case ASTType::BIN_SUB:
 		case ASTType::BIN_MUL:
 		case ASTType::BIN_DIV: {
 			ASTlr *node = (ASTlr*)base;
-			Type lhsType = getTreeType(node->lhs);
-			Type rhsType = getTreeType(node->rhs);
+			Flag lhsFlag = NULL;
+			Flag rhsFlag = NULL;
+			Type lhsType = getTreeType(node->lhs, lhsFlag);
+			Type rhsType = getTreeType(node->rhs, rhsFlag);
+			flag = lhsFlag & rhsFlag;
 			return (Type)((u16)lhsType | (u16)rhsType);
 		} break;
-		case ASTType::NUM_INTEGER: return Type::COMP_INTEGER;
-		case ASTType::NUM_DECIMAL: return Type::COMP_DECIMAL;
+		case ASTType::NUM_INTEGER:
+			SET_BIT(flag, VarFlags::CONSTANT);
+			return Type::COMP_INTEGER;
+		case ASTType::NUM_DECIMAL:
+			SET_BIT(flag, VarFlags::CONSTANT);
+			return Type::COMP_DECIMAL;
 	};
 	return Type::COMP_VOID;
 };

@@ -21,7 +21,6 @@ enum class ASTType {
 struct ASTBase {
 	ASTType type;
 	u32 tokenOff;
-	u8 flag;
 };
 struct ASTlr : ASTBase {
 	ASTBase *lhs;
