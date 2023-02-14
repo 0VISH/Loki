@@ -99,10 +99,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, char *fileContent, ASTFile &file, s
 			goto CHECK_TYPE_AST_OPERAND;
 		}break;
 		default:
-			emitErr(lexer.fileName,
-			        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-			        "Invalid operand"
-			        );
+			lexer.emitErr(tokOffs[x].off, "Invalid operand");
 			return nullptr;
 	};
 	return nullptr;
@@ -117,10 +114,7 @@ s16 checkAndGetPrio(Lexer &lexer, u32 &x) {
 		case (Token_Type)'/':
 			return 2;
 		default:
-			emitErr(lexer.fileName,
-			        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-			        "Invalid operator"
-			        );
+			lexer.emitErr(tokOffs[x].off, "Invalid operator");
 			return -1;
 	};
 };
@@ -188,15 +182,9 @@ ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 y) {
 	if (bracket != 0) {
 		if (bracket < 0) {
 			bracket *= -1;
-			emitErr(lexer.fileName,
-			        getLineAndOff(lexer.fileContent, tokOffs[start].off),
-			        "Missing %d opening brackets", bracket/10
-			        );
+			lexer.emitErr(tokOffs[start].off, "Missing %d opening brackets", bracket / 10);
 		} else {
-			emitErr(lexer.fileName,
-			        getLineAndOff(lexer.fileContent, tokOffs[start].off),
-			        "Missing %d closing brackets", bracket/10
-			        );
+			lexer.emitErr(tokOffs[start].off, "Missing %d closing brackets", bracket/10);
 		};
 	};
 	return (ASTBase*)lhs;
@@ -213,9 +201,7 @@ s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTB
 	s8 varCount = 0;
 	while (true) {
 		if (tokTypes[x] != Token_Type::IDENTIFIER) {
-			emitErr(lexer.fileName,
-			        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-			        "Expected an identifier");
+			lexer.emitErr(tokOffs[x].off, "Expected an identifier");
 			table->uninit();
 			return -1;
 		};
@@ -262,16 +248,12 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							//procedure defenition
 							x += 1;
 							if (tokTypes[x] != Token_Type::K_PROC) {
-								emitErr(lexer.fileName,
-								        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-								        "Expected 'proc' keyword");
+								lexer.emitErr(tokOffs[x].off, "Expected 'proc' keyword");
 								return nullptr;
 							};
 							x += 1;
 							if (tokTypes[x] != (Token_Type)'(') {
-								emitErr(lexer.fileName,
-								        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-								        "Expected '('");
+								lexer.emitErr(tokOffs[x].off, "Expected '('");
 								return nullptr;
 							};
 							x += 1;
@@ -295,9 +277,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 								y += varDeclAddTableEntries(lexer, file, x, args);
 								if (y == -1) { return nullptr; };
 								if (tokTypes[x] != (Token_Type)':') {
-									emitErr(lexer.fileName,
-									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-									        "Expected ':'");
+									lexer.emitErr(tokOffs[x].off, "Expected ':'");
 									table->uninit();
 									procArgs->uninit();
 									args->uninit();
@@ -305,9 +285,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 								};
 								x += 1;
 								if (isType(tokTypes[x]) == false) {
-									emitErr(lexer.fileName,
-									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-									        "Expected a type");
+									lexer.emitErr(tokOffs[x].off, "Expected a type");
 									table->uninit();
 									procArgs->uninit();
 									args->uninit();
@@ -318,9 +296,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 								if (tokTypes[x] == (Token_Type)',') { x += 1; continue; }
 								else if (tokTypes[x] == (Token_Type)')') { break; }
 								else {
-									emitErr(lexer.fileName,
-									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-									        "Expected ','");
+									lexer.emitErr(tokOffs[x].off, "Expected ','");
 									table->uninit();
 									procArgs->uninit();
 									args->uninit();
@@ -340,9 +316,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
 									while (true) {
 										if (isType(tokTypes[x]) == false) {
-											emitErr(lexer.fileName,
-											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-											        "Expected a type");
+											lexer.emitErr(tokOffs[x].off, "Expected a type");
 											table->uninit();
 											if (procArgs == nullptr) { return nullptr; };
 											procArgs->uninit();
@@ -359,9 +333,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 												eatNewlines(tokTypes, x);
 												break;
 											};
-											emitErr(lexer.fileName,
-											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-											        "Did not expect ')'");
+											lexer.emitErr(tokOffs[x].off, "Did not expect ')'");
 											table->uninit();
 											if (procArgs == nullptr) { return nullptr; };
 											procArgs->uninit();
@@ -369,9 +341,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 											return nullptr;
 										};
 										if (tokTypes[x] != (Token_Type)'{') {
-											emitErr(lexer.fileName,
-											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-											        "Expected '{'");
+											lexer.emitErr(tokOffs[x].off, "Expected '{'");
 											table->uninit();
 											if (procArgs == nullptr) { return nullptr; };
 											procArgs->uninit();
@@ -379,9 +349,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 											return nullptr;
 										};
 										if (bracket == true) {
-											emitErr(lexer.fileName,
-											        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-											        "Expected ')'");
+											lexer.emitErr(tokOffs[x].off, "Expected ')'");
 											table->uninit();
 											if (procArgs == nullptr) { return nullptr; };
 											procArgs->uninit();
@@ -397,9 +365,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 									x += 1;
 								} break;
 								default: {
-									emitErr(lexer.fileName,
-									        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-									        "Expected '{' or '->'");
+									lexer.emitErr(tokOffs[x].off, "Expected '{' or '->'");
 									table->uninit();
 									if (procArgs == nullptr) { return nullptr; };
 									procArgs->uninit();
@@ -444,9 +410,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 					s8 y = varDeclAddTableEntries(lexer, file, x, table);
 					if (y == -1) { return nullptr; };
 					if (tokTypes[x] != (Token_Type)':') {
-						emitErr(lexer.fileName,
-						        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-						        "Expected ':'");
+						lexer.emitErr(tokOffs[x].off, "Expected ':'");
 						table->uninit();
 						return nullptr;
 					};
@@ -461,9 +425,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 					} else if (tokTypes[x] == (Token_Type)'=') {
 						base->type = ASTType::MULTI_ASSIGNMENT_T_UNKNOWN;
 					} else {
-						emitErr(lexer.fileName,
-						        getLineAndOff(lexer.fileContent, tokOffs[x].off),
-						        "Expected a type or '='");
+						lexer.emitErr(tokOffs[x].off, "Expected a type or '='");
 						table->uninit();
 						return nullptr;
 					};

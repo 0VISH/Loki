@@ -1,5 +1,8 @@
 
-foo :: proc(
+
+
+
+foo :: prod(
 		x,y,z: u32,
 		a: s8, b: u8)
 		-> (u32, u8)

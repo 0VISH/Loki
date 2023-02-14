@@ -30,6 +30,20 @@ struct Lexer {
 	DynamicArray<Token_Type> tokenTypes;
 	char *fileName;
 	char *fileContent;
+
+	void emitErr(u64 off, char *fmt, ...) {
+		if (report::errorOff == MAX_REPORTS) { return; };
+		report::Error &rep = report::errors[report::errorOff];
+		report::errorOff += 1;
+		rep.fileName = fileName;
+		rep.off = off;
+		rep.fileContent = fileContent;
+		if (fmt != nullptr) { rep.msg = report::reportBuff + report::reportBuffTop; };
+		va_list args;
+		va_start(args, fmt);
+		report::reportBuffTop += vsprintf(report::reportBuff, fmt, args);
+		va_end(args);
+	};
 };
 
 Map keywords;
@@ -119,16 +133,6 @@ void eatUnwantedChars(char *mem, u64& x) {
 void eatNewlines(DynamicArray<Token_Type> &tokTypes, u32 &x){
 	while (tokTypes[x] == (Token_Type)'\n') { x += 1; };
 };
-LineOff getLineAndOff(char *mem, u64 offset) {
-	LineOff lo = { 1, 1 };
-	for (u64 i = 0; i < offset; i += 1) {
-		if (mem[i] == '\n') { lo.line += 1; };
-	};
-	while (mem[offset-lo.off] != '\n') {
-		lo.off += 1;
-	};
-	return lo;
-};
 b32 isAlpha(char x) { return (x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z'); };
 b32 isNum(char x) { return (x >= '0' && x <= '9'); };
 b32 genTokens(Lexer &lex) {
@@ -154,9 +158,7 @@ b32 genTokens(Lexer &lex) {
 				while (src[x] != c) {
 					x += 1;
 					if (src[x] == '\0' || src[x] == '\n') {
-						emitErr(lex.fileName,
-						        getLineAndOff(lex.fileContent, off),
-						        "Expected ending %s quotes", (c == '"')?"double":"single");
+						lex.emitErr(off, "Expected ending %s quotes", (c == '"')?"double":"single");
 						return false;
 					};
 				};
@@ -189,10 +191,7 @@ b32 genTokens(Lexer &lex) {
 					while (isNum(src[x]) || src[x] == '_') { x += 1; };
 					if (src[x] == '.') {
 						if (numType == Token_Type::DECIMAL) {
-							emitErr(lex.fileName,
-							        getLineAndOff(lex.fileContent, start),
-							        "Decimal cannot have 2 decimals"
-							        );
+							lex.emitErr(start, "Decimal cannot have 2 decimals");
 							return false;
 						};
 						numType = Token_Type::DECIMAL;
@@ -233,8 +232,10 @@ namespace dbg {
 		printf("\n[LEXER_TOKENS]");
 		for (u32 x = 0; x < lexer.tokenTypes.count; x += 1) {
 			printf("\n[TOKEN]\n");
-			LineOff lo = getLineAndOff(lexer.fileContent, lexer.tokenOffsets[x].off);
-			printf("line: %d off: %d\n", lo.line, lo.off);
+			u32 line = 1;
+			u32 off = 1;
+			report::getLineAndOff(lexer.fileContent, lexer.tokenOffsets[x].off, line, off);
+			printf("line: %d off: %d\n", line, off);
 			switch (lexer.tokenTypes[x]) {
 				case Token_Type::DOUBLE_QUOTES: {
 					printf("double_quotes\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off + 1);

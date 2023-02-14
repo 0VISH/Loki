@@ -20,7 +20,7 @@ bool compile(char *fileName){
 		astFile.nodes.push(base);
 		eatNewlines(lexer.tokenTypes, off);
 	};
-	if (errorOff == 0) {
+	if (report::errorOff == 0) {
 		dbg::dumpASTFile(astFile, lexer);
 		ScopeEntities fileScopeEntities = createScopeEntities();
 		if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) {
@@ -37,15 +37,12 @@ bool compile(char *fileName){
 							varCount += 1;
 						};
 					};
-					emitErr(lexer.fileName,
-					        getLineAndOff(lexer.fileContent, lexer.tokenOffsets[astFile.nodes[nodeOff-1]->tokenOff].off),
-					        "Variable at global scope is not comptime"
-					        );
+					lexer.emitErr(lexer.tokenOffsets[astFile.nodes[nodeOff-1]->tokenOff].off, "Variable at global scope is not comptime");
 				};
 			};
 		};
 	};
-	flushReports();
+	report::flushReports();
 	destroyASTFile(astFile);
 	destroyLexer(lexer);
 	return true;

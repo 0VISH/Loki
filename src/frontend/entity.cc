@@ -69,10 +69,7 @@ bool checkVariablePresentInScopeElseReg(Lexer &lexer, Type type, u32 off, ScopeE
 	BRING_TOKENS_TO_SCOPE;
 	String name = buildString(lexer, off);
 	if (getRegisteredScopedEntity(name, se.varMaps) != -1) {
-		emitErr(lexer.fileName,
-		        getLineAndOff(lexer.fileContent, tokOffs[off].off),
-		        "Variable redecleration"
-		        );
+		lexer.emitErr(tokOffs[off].off, "Variable redecleration");
 		return false;
 	};
 	registerScopedEntity(name, se.varEntities.count, se.varMaps);
@@ -99,10 +96,7 @@ bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t
 		};
 		if (treeType != Type::COMP_VOID && treeType != Type::COMP_DECIMAL && treeType != Type::COMP_INTEGER) {
 			if (givenType != treeType) {
-				emitErr(lexer.fileName,
-				        getLineAndOff(lexer.fileContent, tokOffs[lr->tokenOff].off),
-				        "Tree type and given type do not match"
-				        );
+				lexer.emitErr(tokOffs[lr->tokenOff].off, "Tree type and given type do not match");
 				return false;
 			};
 		};
@@ -134,10 +128,7 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 			case ASTType::PROC_DEFENITION: {
 				String name = buildString(lexer, node->tokenOff);
 				if (getRegisteredScopedEntity(name, se.procMaps) != -1) {
-					emitErr(lexer.fileName,
-					        getLineAndOff(lexer.fileContent, tokOffs[node->tokenOff].off),
-					        "Procedure redecleration"
-					        );
+					lexer.emitErr(tokOffs[node->tokenOff].off, "Procedure redecleration");
 					return false;
 				};
 				registerScopedEntity(name, se.varEntities.count, se.procMaps);
