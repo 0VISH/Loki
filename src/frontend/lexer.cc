@@ -254,6 +254,7 @@ namespace dbg {
 				} break;
 				case Token_Type::END_OF_FILE: printf("end_of_file"); break;
 				case (Token_Type)'\n': printf("new_line"); break;
+				case Token_Type::ARROW: printf("->"); break;
 				default:
 					if (lexer.tokenTypes[x] >= Token_Type::K_START && lexer.tokenTypes[x] <= Token_Type::K_END) {
 						printf("keyword\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);

@@ -23,3 +23,12 @@ typedef unsigned int            b32;
 typedef unsigned long long int  b64;
 typedef float                   f32;
 typedef double                  f64;
+
+#if(XE_DBG)
+void debugUnreachable(char *file, u32 line) {
+	printf("\n[ERROR] unreachable area reached: %s(%d)", file, line);
+};
+#define DEBUG_UNREACHABLE debugUnreachable(__FILE__, __LINE__);
+#else
+#define DEBUG_UNREACHABLE
+#endif

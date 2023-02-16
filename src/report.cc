@@ -35,8 +35,10 @@ namespace report{
 			u32 off = 1;
 			char *beg = getLineAndOff(rep.fileContent, rep.off, line, off);
 			u32 x = 0;
-			while (beg[x] != '\n' && beg[x] != '\0') { x += 1; };
-			char c = beg[x];
+			while (beg[x] != '\n' && beg[x] != '\0') {
+				if (beg[x] == '\t') { beg[x] = ' '; }; //replace tabs with spaces for ez reporting and reading
+				x += 1;
+			};
 			beg[x] = '\0';
 			printf("\n%s(%d:%d) Error: %s\n", rep.fileName, line, off, rep.msg);
 			printf("    %s\n____", beg);
@@ -45,16 +47,7 @@ namespace report{
 				off -= 1;
 			};
 			printf("^\n");
-			beg[x] = c;
 		};
 		printf("\n\nflushed %d error%c\n", err, (err == 1)?' ':'s');
 	};
 }
-#if(XE_DBG)
-void debugUnreachable(char *file, u32 line) {
-	printf("\n[ERROR] unreachable area reached: %s(%d)", file, line);
-};
-#define DEBUG_UNREACHABLE debugUnreachable(__FILE__, __LINE__);
-#else
-#define DEBUG_UNREACHABLE
-#endif

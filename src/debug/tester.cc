@@ -1,4 +1,3 @@
-#if(XE_DBG)
 namespace tester{
 	char buff[1024];
 	DynamicArray<char*> files;
@@ -48,4 +47,3 @@ namespace tester{
 		return true;
 	};
 };
-#endif

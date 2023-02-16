@@ -9,55 +9,17 @@ struct ProcEntity {
 };
 
 struct ScopeEntities{
-	DynamicArray<Map> varMaps;
+	Map varMap;
+	Map procMap;
 	DynamicArray<VariableEntity> varEntities;
-	DynamicArray<Map> procMaps;
 	DynamicArray<ProcEntity> procEntities;
 };
 
-void registerScopedEntity(String str, u16 value, DynamicArray<Map> &maps) {
-	if (maps[maps.count-1].isFull()) {
-		Map mp;
-		mp.init(10);
-		maps.push(mp);
-	};
-	maps[maps.count-1].insertValue(str, value);
-};
-s32 getRegisteredScopedEntity(String str, DynamicArray<Map> &maps) {
-	for (u8 x=0; x<maps.count; x+=1) {
-		s32 val = maps[x].getValue(str);
-		if (val != -1) { return val; };
-	};
-	return -1;
-};
-
-ScopeEntities createScopeEntities() {
-	ScopeEntities se;
-	se.varEntities.init();
-	se.procEntities.init(10);
-	se.varMaps.init(10);
-	se.procMaps.init();
-	
-	Map mp1;
-	mp1.init(10);
-	se.varMaps.push(mp1);
-	Map mp2;
-	mp2.init(10);
-	se.procMaps.push(mp2);
-
-	return se;
-};
 void destroyFileEntities(ScopeEntities &se) {
 	se.varEntities.uninit();
 	se.procEntities.uninit();
-	for (u8 x = 0; x < se.varMaps.count; x += 1) {
-		se.varMaps[x].uninit();
-	};
-	for (u8 x = 0; x < se.procMaps.count; x += 1) {
-		se.procMaps[x].uninit();
-	};
-	se.varMaps.uninit();
-	se.procMaps.uninit();
+	se.varMap.uninit();
+	se.procMap.uninit();
 };
 String buildString(Lexer &lexer, u32 x) {
 	String str;
@@ -68,11 +30,11 @@ String buildString(Lexer &lexer, u32 x) {
 bool checkVariablePresentInScopeElseReg(Lexer &lexer, Type type, u32 off, ScopeEntities &se, Flag flag) {
 	BRING_TOKENS_TO_SCOPE;
 	String name = buildString(lexer, off);
-	if (getRegisteredScopedEntity(name, se.varMaps) != -1) {
+	if (se.varMap.getValue(name) != -1) {
 		lexer.emitErr(tokOffs[off].off, "Variable redecleration");
 		return false;
 	};
-	registerScopedEntity(name, se.varEntities.count, se.varMaps);
+	se.varMap.insertValue(name, se.varEntities.count);
 	VariableEntity entity;
 	entity.name = name;
 	entity.type = type;
@@ -116,9 +78,26 @@ bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t
 	};
 	return true;
 };
+void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntities &se) {
+	u32 procCount = 1;
+	u32 varCount = 1;
+	for (u32 x = 0; x < entities.count; x += 1) {
+		ASTBase *node = entities[x];
+		if (node->type == ASTType::PROC_DEFENITION) {
+			procCount += 1;
+		} else if (node->type >= ASTType::UNI_ASSIGNMENT_T_UNKNOWN && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN) {
+			varCount += 1;
+		};
+	};
+	se.varEntities.init(varCount);
+	se.varMap.init(varCount);
+	se.procEntities.init(procCount);
+	se.procMap.init(procCount);
+};
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se){
 	TIME_BLOCK;
 	BRING_TOKENS_TO_SCOPE;
+	goThroughEntitiesAndInitMaps(entities, se);
 	for (u32 x=0; x<entities.count; x+=1) {
 		ASTBase *node = entities[x];
 		ASTlr   *lr = (ASTlr*)node;
@@ -127,16 +106,16 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 		switch (node->type) {
 			case ASTType::PROC_DEFENITION: {
 				String name = buildString(lexer, node->tokenOff);
-				if (getRegisteredScopedEntity(name, se.procMaps) != -1) {
+				if (se.procMap.getValue(name) != -1) {
 					lexer.emitErr(tokOffs[node->tokenOff].off, "Procedure redecleration");
 					return false;
 				};
-				registerScopedEntity(name, se.varEntities.count, se.procMaps);
+				se.procMap.insertValue(name, se.varEntities.count);
 				ProcEntity entity;
 				entity.name = name;
 				entity.args = (DynamicArray<ProcArgs>*)lr->lhs;
 				se.procEntities.push(entity);
-				ScopeEntities pse = createScopeEntities();
+				ScopeEntities pse;
 				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
 				if (checkEntities(*table, lexer, pse) == false) { return false; };
 			} break;

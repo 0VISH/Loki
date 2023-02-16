@@ -1,16 +1,15 @@
 
 
 
-
-foo :: prod(
+foo :: 	proc(
 		x,y,z: u32,
 		a: s8, b: u8)
 		-> (u32, u8)
 		{
 	
 	z :s8
-	a,bb :u8 = 3 + 3
-	aa := 5 - 2
+	aa,bb :u8 = 3 + 3
+	a := 5 - 2
 }
 
 bar ::proc(){
