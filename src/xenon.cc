@@ -31,7 +31,7 @@ bool compile(char *fileName){
 	if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) {
 		printf("\nchecking entites failed\n");
 	} else {
-		for (u16 x = 0; x < fileScopeEntities.varEntities.count; x += 1) {
+		for (u16 x = 0; x < fileScopeEntities.varCount; x += 1) {
 			VariableEntity &entity = fileScopeEntities.varEntities[x];
 			if (!IS_BIT(entity.flag, VarFlags::CONSTANT)) {
 				u32 nodeOff = 0;

@@ -11,13 +11,15 @@ struct ProcEntity {
 struct ScopeEntities{
 	Map varMap;
 	Map procMap;
-	DynamicArray<VariableEntity> varEntities;
-	DynamicArray<ProcEntity> procEntities;
+	VariableEntity* varEntities;
+	ProcEntity* procEntities;
+	u16 varCount;
+	u16 procCount;
 };
 
 void destroyFileEntities(ScopeEntities &se) {
-	se.varEntities.uninit();
-	se.procEntities.uninit();
+	mem::free(se.varEntities);
+	mem::free(se.procEntities);
 	se.varMap.uninit();
 	se.procMap.uninit();
 };
@@ -34,12 +36,13 @@ bool checkVariablePresentInScopeElseReg(Lexer &lexer, Type type, u32 off, ScopeE
 		lexer.emitErr(tokOffs[off].off, "Variable redecleration");
 		return false;
 	};
-	se.varMap.insertValue(name, se.varEntities.count);
+	se.varMap.insertValue(name, se.varCount);
 	VariableEntity entity;
 	entity.name = name;
 	entity.type = type;
 	entity.flag = flag;
-	se.varEntities.push(entity);
+	se.varEntities[se.varCount] = entity;
+	se.varCount += 1;
 	return true;
 };
 bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t_known, b8 multi) {
@@ -64,7 +67,7 @@ bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t
 		};
 	};
 	if (multi) {
-		DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
+		DynamicArray<ASTBase*> *table = getTableLR(lr);
 		for (u8 x = 0; x < table->count; x += 1) {
 			u32 off = table->getElement(x)->tokenOff;
 			if (checkVariablePresentInScopeElseReg(lexer, givenType, off, se, flag) == false) {
@@ -79,20 +82,25 @@ bool checkVariableEntity(ASTlr *lr, u32 x, Lexer &lexer, ScopeEntities &se, b8 t
 	return true;
 };
 void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntities &se) {
-	u32 procCount = 1;
-	u32 varCount = 1;
+	u32 procCount = 0;
+	u32 varCount = 0;
 	for (u32 x = 0; x < entities.count; x += 1) {
 		ASTBase *node = entities[x];
 		if (node->type == ASTType::PROC_DEFENITION) {
 			procCount += 1;
-		} else if (node->type >= ASTType::UNI_ASSIGNMENT_T_UNKNOWN && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN) {
+		} else if (node->type >= ASTType::UNI_DECLERATION_T_KNOWN && node->type <= ASTType::UNI_ASSIGNMENT_T_KNOWN) {
 			varCount += 1;
+		} else if (node->type >= ASTType::MULTI_DECLERATION_T_KNOWN && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
+			DynamicArray<ASTBase*> *table = getTableLR((ASTlr*)node);
+			varCount += table->count;
 		};
 	};
-	se.varEntities.init(varCount);
 	se.varMap.init(varCount);
-	se.procEntities.init(procCount);
 	se.procMap.init(procCount);
+	se.varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
+	se.procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
+	se.varCount = 0;
+	se.procCount = 0;
 };
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se){
 	TIME_BLOCK;
@@ -110,13 +118,14 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 					lexer.emitErr(tokOffs[node->tokenOff].off, "Procedure redecleration");
 					return false;
 				};
-				se.procMap.insertValue(name, se.varEntities.count);
+				se.procMap.insertValue(name, se.procCount);
 				ProcEntity entity;
 				entity.name = name;
 				entity.args = (DynamicArray<ProcArgs>*)lr->lhs;
-				se.procEntities.push(entity);
+				se.procEntities[se.procCount] = entity;
+				se.procCount += 1;
 				ScopeEntities pse;
-				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
+				DynamicArray<ASTBase*> *table = getTableLR(lr);
 				if (checkEntities(*table, lexer, pse) == false) { return false; };
 			} break;
 			case ASTType::UNI_DECLERATION_T_KNOWN:

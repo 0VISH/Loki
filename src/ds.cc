@@ -1,14 +1,30 @@
 //TODO: optimize these data structures
 
-//array
+//array whose length is known at compiletime
 template<typename T, u32 len>
-struct Array {
+struct StaticArray {
 	T mem[len];
 
 	T& operator[](u32 index) {
 #if(XE_DBG == true)
 		if (index >= len) {
-			printf("\n[ERROR]: abc(array) failed for type %s\n", typeid(T).name());
+			printf("\n[ERROR]: abc(static_array) failed for type %s. index = %d\n", typeid(T).name(), index);
+		};
+#endif
+		return mem[index];
+	};
+};
+
+//array whose length is not known at comptime
+template<typename T>
+struct Array {
+	T *mem;
+	u32 len;
+
+	T& operator[](u32 index) {
+#if(XE_DBG == true)
+		if (index >= len) {
+			printf("\n[ERROR]: abc(array) failed for type %s. index = %d\n", typeid(T).name(), index);
 		};
 #endif
 		return mem[index];
@@ -23,7 +39,7 @@ struct String {
 	char operator[](u32 index) {
 #if(XE_DBG == true)
 		if (index >= len) {
-			printf("\n[ERROR]: abc(string) failed. mem: %p and len: %d\n", mem, len);
+			printf("\n[ERROR]: abc(string) failed. mem: %p, len: %d, index = %d\n", mem, len, index);
 		};
 #endif
 		return mem[index];
@@ -51,7 +67,7 @@ struct DynamicArray {
 	T &getElement(u32 index) {
 #if(XE_DBG == true)
 		if (index >= len) {
-			printf("\n[ERROR]: abc(dynamic array) failed for type %s\n", typeid(T).name());
+			printf("\n[ERROR]: abc(dynamic_array) failed for type %s. index = %d\n", typeid(T).name(), index);
 		};
 #endif
 		return mem[index];

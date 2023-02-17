@@ -8,13 +8,13 @@ enum class ASTType {
 	BIN_SUB,
 	BIN_MUL,
 	BIN_DIV,
+	UNI_DECLERATION_T_KNOWN,
 	UNI_ASSIGNMENT_T_UNKNOWN,
 	UNI_ASSIGNMENT_T_KNOWN,
+	MULTI_DECLERATION_T_KNOWN,
 	MULTI_ASSIGNMENT_T_UNKNOWN,
 	MULTI_ASSIGNMENT_T_KNOWN,
 	PROC_DEFENITION,
-	UNI_DECLERATION_T_KNOWN,
-	MULTI_DECLERATION_T_KNOWN,
 	VARIABLE,
 };
 
@@ -41,6 +41,10 @@ struct ProcArgs {
 	*/
 	s8 count;
 	u32 typeOff;
+};
+struct ProcInOut {
+	DynamicArray<ASTBase*> args;
+	DynamicArray<u32>      typeOffs;
 };
 struct Arguments {
 	DynamicArray<ProcArgs> argsMeta;
@@ -79,7 +83,16 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, u32 tokenOff, ASTFile &file) {
 ASTBase *allocASTWithTable(u32 nodeSize, ASTType type, u32 tokenOff, ASTFile &file) {
 	return allocAST(nodeSize + sizeof(DynamicArray<ASTBase*>), type, tokenOff, file);
 };
-DynamicArray<ASTBase*> *getTable(void *ptr, u32 size) { return (DynamicArray<ASTBase*>*)(((char*)ptr) + size); };
+DynamicArray<ASTBase*> *getTableLR(void *ptr) { return (DynamicArray<ASTBase*>*)(((char*)ptr) + sizeof(ASTlr)); };
+
+void initProcInOut(ProcInOut *pic) {
+	pic->args.init();
+	pic->typeOffs.init();
+};
+void uninitProcInOut(ProcInOut *pic) {
+	pic->args.uninit();
+	pic->typeOffs.uninit();
+};
 
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, char *fileContent, ASTFile &file, s16 &bracket) {
 	BRING_TOKENS_TO_SCOPE;
@@ -196,17 +209,23 @@ u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
 	return x;
 };
 
-s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> *table) {
+bool isType(Token_Type type) {
+	return (type>Token_Type::K_START && type<Token_Type::K_PROC) || type == Token_Type::IDENTIFIER;
+};
+s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &table, bool typesIncluded=false) {
 	BRING_TOKENS_TO_SCOPE;
 	s8 varCount = 0;
 	while (true) {
-		if (tokTypes[x] != Token_Type::IDENTIFIER) {
-			lexer.emitErr(tokOffs[x].off, "Expected an identifier");
-			table->uninit();
+		bool a;
+		if (typesIncluded) { a = isType(tokTypes[x]); }
+		else { a = tokTypes[x] == Token_Type::IDENTIFIER; };
+		if (a == false) {
+			lexer.emitErr(tokOffs[x].off, "Expected identifier%s", (typesIncluded)?" or a type":" ");
+			table.uninit();
 			return -1;
 		};
 		varCount += 1;
-		table->push(allocAST(sizeof(ASTBase), ASTType::VARIABLE, x, file));
+		table.push(allocAST(sizeof(ASTBase), ASTType::VARIABLE, x, file));
 		x += 1;
 		if (tokTypes[x] == (Token_Type)',') {
 			x += 1;
@@ -216,11 +235,39 @@ s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTB
 	};
 	return varCount;
 };
-
-bool isType(Token_Type type) {
-	return (type>Token_Type::K_START && type<Token_Type::K_PROC) || type == Token_Type::IDENTIFIER;
+bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, ProcInOut *pic, bool typesIncludes) {
+	BRING_TOKENS_TO_SCOPE;
+	while (true) {
+		eatNewlines(tokTypes, x);
+		s8 count = varDeclAddTableEntries(lexer, file, x, pic->args, typesIncludes);
+		if (count == -1) { return false; };
+		if (tokTypes[x] == (Token_Type)')' || tokTypes[x] == (Token_Type)'{' && typesIncludes) { return true; };
+		if (tokTypes[x] != (Token_Type)':') {
+			lexer.emitErr(tokOffs[x].off, "Expected ':'");
+			uninitProcInOut(pic);
+			return false;
+		};
+		x += 1;
+		if (isType(tokTypes[x]) == false) {
+			lexer.emitErr(tokOffs[x].off, "Expected a type");
+			uninitProcInOut(pic);
+			return false;
+		};
+		while (count != 0) {
+			pic->typeOffs.push(x);
+			count -= 1;
+		};
+		x += 1;
+		if (tokTypes[x] == (Token_Type)',') { x += 1; continue; }
+		else if (tokTypes[x] == (Token_Type)')') { break; }
+		else {
+			lexer.emitErr(tokOffs[x].off, "Expected ','");
+			uninitProcInOut(pic);
+			return false;
+		};
+	};
+	return true;
 };
-
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	BRING_TOKENS_TO_SCOPE;
 	eatNewlines(tokTypes, x);
@@ -258,105 +305,55 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							};
 							x += 1;
 							ASTlr *proc = (ASTlr*)allocASTWithTable(sizeof(ASTlr), ASTType::PROC_DEFENITION, start, file);
-							DynamicArray<ASTBase*> *table = getTable(proc, sizeof(ASTlr));
-							table->init();
-							DynamicArray<ProcArgs> *procArgs = nullptr;
+							DynamicArray<ASTBase*> *table = getTableLR(proc);
 							if (tokTypes[x] == (Token_Type)')') {
 								proc->lhs = nullptr;
 								goto PARSE_AFTER_ARGS;
 							};
-							Arguments *arguments = (Arguments*)mem::alloc(sizeof(Arguments));
-							procArgs = &(arguments->argsMeta);
-							DynamicArray<ASTBase*> *args = &(arguments->args);
-							proc->lhs = (ASTBase*)arguments;
-							procArgs->init();
-							args->init();
-							s8 y = 0;
-							while (true) {
-								eatNewlines(tokTypes, x);
-								y += varDeclAddTableEntries(lexer, file, x, args);
-								if (y == -1) { return nullptr; };
-								if (tokTypes[x] != (Token_Type)':') {
-									lexer.emitErr(tokOffs[x].off, "Expected ':'");
-									table->uninit();
-									procArgs->uninit();
-									args->uninit();
-									return nullptr;
-								};
-								x += 1;
-								if (isType(tokTypes[x]) == false) {
-									lexer.emitErr(tokOffs[x].off, "Expected a type");
-									table->uninit();
-									procArgs->uninit();
-									args->uninit();
-									return nullptr;
-								};
-								procArgs->push({y,x});
-								x += 1;
-								if (tokTypes[x] == (Token_Type)',') { x += 1; continue; }
-								else if (tokTypes[x] == (Token_Type)')') { break; }
-								else {
-									lexer.emitErr(tokOffs[x].off, "Expected ','");
-									table->uninit();
-									procArgs->uninit();
-									args->uninit();
-									return nullptr;
-								};
-							};
+							ProcInOut *in = (ProcInOut*)mem::alloc(sizeof(ProcInOut));
+							proc->lhs = (ASTBase*)in;
+							initProcInOut(in);
+							parseProcInOut(lexer, file, x, in, false);
 							PARSE_AFTER_ARGS:
 							x += 1;
 							eatNewlines(tokTypes, x);
 							switch (tokTypes[x]) {
 								case Token_Type::ARROW: {
 									x += 1;
-									DynamicArray<u32> *returnTypeOffs = (DynamicArray<u32>*)mem::alloc(sizeof(DynamicArray<u8>));
-									proc->rhs = (ASTBase*)returnTypeOffs;
-									returnTypeOffs->init();
+									ProcInOut *out = (ProcInOut*)mem::alloc(sizeof(ProcInOut));
+									proc->rhs = (ASTBase*)out;
+									initProcInOut(out);
 									bool bracket = false;
 									if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
-									while (true) {
-										if (isType(tokTypes[x]) == false) {
-											lexer.emitErr(tokOffs[x].off, "Expected a type");
-											table->uninit();
-											if (procArgs == nullptr) { return nullptr; };
-											procArgs->uninit();
-											args->uninit();
+									if (parseProcInOut(lexer, file, x, out, true) == false) {
+										//uninitProcInOut(out);
+										if (in == nullptr) { return nullptr; };
+										uninitProcInOut(in);
+										return nullptr;
+									};
+									if (tokTypes[x] == (Token_Type)')') {
+										if (bracket == false) {
+											lexer.emitErr(tokOffs[x].off, "Did not expect ')'");
+											uninitProcInOut(out);
+											if (in == nullptr) { return nullptr; };
+											uninitProcInOut(in);
 											return nullptr;
 										};
-										returnTypeOffs->push(x);
 										x += 1;
 										eatNewlines(tokTypes, x);
-										if (tokTypes[x] == (Token_Type)',') { x += 1; continue; };
-										if (tokTypes[x] == (Token_Type)')') {
-											if (bracket != false) {
-												x += 1;
-												eatNewlines(tokTypes, x);
-												break;
-											};
-											lexer.emitErr(tokOffs[x].off, "Did not expect ')'");
-											table->uninit();
-											if (procArgs == nullptr) { return nullptr; };
-											procArgs->uninit();
-											args->uninit();
-											return nullptr;
-										};
-										if (tokTypes[x] != (Token_Type)'{') {
-											lexer.emitErr(tokOffs[x].off, "Expected '{'");
-											table->uninit();
-											if (procArgs == nullptr) { return nullptr; };
-											procArgs->uninit();
-											args->uninit();
-											return nullptr;
-										};
-										if (bracket == true) {
-											lexer.emitErr(tokOffs[x].off, "Expected ')'");
-											table->uninit();
-											if (procArgs == nullptr) { return nullptr; };
-											procArgs->uninit();
-											args->uninit();
-											return nullptr;
-										};
-										break;
+									} else if(bracket == true) {
+										lexer.emitErr(tokOffs[x].off, "Expected ')'");
+										uninitProcInOut(out);
+										if (in == nullptr) { return nullptr; };
+										uninitProcInOut(in);
+										return nullptr;
+									};
+									if (tokTypes[x] != (Token_Type)'{') {
+										lexer.emitErr(tokOffs[x].off, "Expected '{'");
+										uninitProcInOut(out);
+										if (in == nullptr) { return nullptr; };
+										uninitProcInOut(in);
+										return nullptr;
 									};
 									x += 1;
 								} break;
@@ -366,21 +363,24 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 								} break;
 								default: {
 									lexer.emitErr(tokOffs[x].off, "Expected '{' or '->'");
-									table->uninit();
-									if (procArgs == nullptr) { return nullptr; };
-									procArgs->uninit();
-									args->uninit();
+									if (in == nullptr) { return nullptr; };
+									uninitProcInOut(in);
 									return nullptr;
 								} break;
 							};
 							eatNewlines(tokTypes, x);
+							if (tokTypes[x] == (Token_Type)'}') {
+								table->len = 0;
+								x += 1;
+								return (ASTBase*)proc;
+							};
+							table->init();
 							while (tokTypes[x] != (Token_Type)'}') {
 								ASTBase *node = parseBlock(lexer, file, x);
 								if (node == nullptr) {
 									table->uninit();
-									if (procArgs == nullptr) { return nullptr; };
-									procArgs->uninit();
-									args->uninit();
+									if (proc->rhs != nullptr) {uninitProcInOut((ProcInOut*)proc->rhs);};
+									if (in != nullptr) { uninitProcInOut(in); };
 									return nullptr;
 								};
 								table->push(node);
@@ -404,10 +404,10 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 				case (Token_Type)',': {
 					//multiple variable decleration
 					ASTlr *base = (ASTlr*)allocASTWithTable(sizeof(ASTlr), ASTType::MULTI_DECLERATION_T_KNOWN, NULL, file);
-					DynamicArray<ASTBase*> *table = getTable(base, sizeof(ASTlr));
+					DynamicArray<ASTBase*> *table = getTableLR(base);
 					table->init(4);
 					x = start;
-					s8 y = varDeclAddTableEntries(lexer, file, x, table);
+					s8 y = varDeclAddTableEntries(lexer, file, x, *table);
 					if (y == -1) { return nullptr; };
 					if (tokTypes[x] != (Token_Type)':') {
 						lexer.emitErr(tokOffs[x].off, "Expected ':'");
@@ -485,6 +485,27 @@ s64 string2int(String &str){
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
 
 namespace dbg {
+	void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding);
+	void dumpProcInOut(ProcInOut *pic, Lexer &lexer, u8 padding) {
+		DynamicArray<u32> &procTypesOff = pic->typeOffs;
+		DynamicArray<ASTBase*> &args = pic->args;
+		PAD;
+		for (u8 v=0; v < args.count; v += 1) {
+			padding += 1;
+			if (pic->typeOffs.count == 0) {
+				ASTBase *node = args[v];
+				u32 z = node->tokenOff;
+				printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
+			} else {
+				__dumpNodesWithoutEndPadding(args[v], lexer, padding);
+				PAD;
+				u32 z = procTypesOff[v];
+				printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
+			};
+			padding -= 1;
+			PAD;
+		};
+	};
 	void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 		BRING_TOKENS_TO_SCOPE;
 		PAD;
@@ -575,7 +596,7 @@ namespace dbg {
 				else { printf("multi_assignment_t_unkown"); };
 				PAD;
 				printf("LHS");
-				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
+				DynamicArray<ASTBase*> *table = getTableLR(lr);
 				for (u8 x=0; x<table->count; x +=1) {
 					__dumpNodesWithoutEndPadding(table->getElement(x), lexer, padding + 1);
 					PAD;
@@ -590,50 +611,17 @@ namespace dbg {
 				PAD;
 				printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 				PAD;
-				printf("[ARGS]");
-				DynamicArray<ASTBase*> *table = getTable(lr, sizeof(ASTlr));
-				Arguments *arguments = (Arguments*)lr->lhs;
-				if (arguments == nullptr) { 
-					PAD;
-					printf("null");
-					goto BODY;
-				};
-				DynamicArray<ProcArgs> &procArgs = arguments->argsMeta;
-				DynamicArray<ASTBase*> &args = arguments->args;
-				u8 argOff = 0;
-				ProcArgs procArg = procArgs[argOff];
-				for (u8 v=0; v < args.count; v += 1) {
-					padding += 1;
-					__dumpNodesWithoutEndPadding(args[v], lexer, padding);
-					PAD;
-					if (v == procArg.count) {
-						argOff += 1;
-						procArg = procArgs[argOff];
-					};
-					u32 z = procArg.typeOff;
-					printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
-					padding -= 1;
-					PAD;
-				};
-				BODY:
+				printf("[IN]");
+				if (lr->lhs != nullptr) { dumpProcInOut((ProcInOut*)lr->lhs, lexer, padding+1); };
 				PAD;
+				printf("[OUT]");
+				if (lr->rhs != nullptr) { dumpProcInOut((ProcInOut*)lr->rhs, lexer, padding+1); };
+				PAD;
+				DynamicArray<ASTBase*> *table = getTableLR(lr);
 				printf("[BODY]");
 				for (u32 v=0; v < table->count; v += 1) {
 					__dumpNodesWithoutEndPadding(table->getElement(v), lexer, padding + 1);
 					PAD;
-				};
-				PAD;
-				printf("[RETURN]");
-				DynamicArray<u32> *returnTypeOffs = (DynamicArray<u32>*)lr->rhs;
-				if (returnTypeOffs == nullptr) {
-					PAD;
-					printf("type: void");
-				} else {
-					for (u32 v=0; v<returnTypeOffs->count; v+=1) {
-						u32 z = returnTypeOffs->getElement(v);
-						PAD;
-						printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
-					};
 				};
 			} break;
 			default: DEBUG_UNREACHABLE;
