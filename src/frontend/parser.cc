@@ -370,7 +370,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 							};
 							eatNewlines(tokTypes, x);
 							if (tokTypes[x] == (Token_Type)'}') {
-								table->len = 0;
+								table->count = 0;
 								x += 1;
 								return (ASTBase*)proc;
 							};

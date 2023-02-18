@@ -12,6 +12,8 @@ foo :: 	proc(
 	a := 5 - 2
 }
 
+x :: proc() -> (s8, u32){}
+
 bar ::proc(){
 }
 
