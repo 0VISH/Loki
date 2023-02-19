@@ -83,15 +83,10 @@ bool isKeyword(Token_Type type) { return type > Token_Type::K_START && type < To
 
 Lexer createLexer(char *filePath) {
 	Lexer lexer;
-
-#if(XE_PLAT_WIN)
-	char fullFilePathBuff[1024];
-	u32 len = GetFullPathNameA(filePath, 1024, fullFilePathBuff, NULL);
-	lexer.fileName = (char*)mem::salloc(len);
-	memcpy(lexer.fileName, fullFilePathBuff, len + 1);
-#endif
 	
-	FILE *fp = fopen(fullFilePathBuff, "r");
+	lexer.fileName = os::getFileFullName(filePath);
+	
+	FILE *fp = fopen(lexer.fileName, "r");
 	if (fp == nullptr) {
 		lexer.fileContent = nullptr;
 		return lexer;
@@ -207,6 +202,11 @@ b32 genTokens(Lexer &lex) {
 					if (src[x] == '-' && src[x+1] == '>') {
 						type = Token_Type::ARROW;
 						x += 1;
+					} else if (src[x] == '/' && src[x + 1] == '/') {
+						while (src[x] != '\n') { x += 1; };
+						x += 1;
+						eatUnwantedChars(src, x);
+						continue;
 					};
 					TokenOffset offset;
 					offset.off = x;

@@ -25,6 +25,7 @@ namespace report{
 	};
 
 	void flushReports() {
+		os::setPrintColorToWhite();
 		if (errorOff == 0) { return; };
 		u8 err = 0;
 		//printf in FILO so that the usr can see first report first in the terminal
@@ -40,8 +41,15 @@ namespace report{
 				x += 1;
 			};
 			beg[x] = '\0';
-			printf("\n%s(%d:%d) Error: %s\n", rep.fileName, line, off, rep.msg);
-			printf("    %s\n____", beg);
+			printf("\n%s ", rep.fileName);
+			os::printErrorInRed();
+			printf(": %s\n", rep.msg);
+			printf("  %d|  %s\n_____", line, beg);
+			u32 n = line;
+			while (n > 0) {
+				printf("_");
+				n = n / 10;
+			}
 			while (off != 1) {
 				printf("_");
 				off -= 1;

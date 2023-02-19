@@ -6,8 +6,10 @@
 
 #include "xenon.hh"
 
+#include "mem.cc"
+
 #if(XE_PLAT_WIN)
-#include <windows.h>
+#include "windowsOS.cc"
 #endif
 
 #if(XE_DBG)
@@ -16,7 +18,6 @@
 
 #include "debug/timer.cc"
 #include "debug/exception.cc"
-#include "mem.cc"
 #include "ds.cc"
 #include "report.cc"
 #include "frontend/lexer.cc"

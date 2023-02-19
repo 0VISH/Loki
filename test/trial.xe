@@ -1,5 +1,5 @@
-
-
+//testing procedures and variable assignments
+    
 
 foo :: 	proc(
 		x,y,z: u32,
