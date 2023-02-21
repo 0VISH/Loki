@@ -237,21 +237,51 @@ b32 genTokens(Lexer &lex) {
 						u64 beg = x;
 						x += 3;
 						while (level != 0) {
-							switch (src[x]) {
-								case '\0': {
-									lex.emitErr(beg, "multi line comment not terminated at level %d", level);
-									return false;
-								} break;
-								case '*': {
-									x += 1;
-									if (src[x] == '/') { level -= 1; };
-								} break;
-								case '/': {
-									x += 1;
-									if (src[x] == '*') { level += 1; };
-								} break;
+							__m128i tocmp = _mm_set1_epi8('/');
+							__m128i chunk = _mm_load_si128 ((__m128i const*)(src+x));
+							__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
+							s32 frontslashMask = _mm_movemask_epi8(results);
+							tocmp = _mm_set1_epi8('*');
+							results =  _mm_cmpeq_epi8(chunk, tocmp);
+							s32 startMask = _mm_movemask_epi8(results);
+							tocmp = _mm_set1_epi8('\0');
+							results =  _mm_cmpeq_epi8(chunk, tocmp);
+							s32 nullbyteMask = _mm_movemask_epi8(results);
+							s32 mask = frontslashMask | startMask | nullbyteMask;
+							if (mask == 0){
+								x += 16;
+								continue;
 							};
-							x += 1;
+							u32 y = 0;
+							while (mask != 0) {
+								while (IS_BIT(mask, y) == 0) {
+									x += 1;
+									y += 1; };
+								CLEAR_BIT(mask, y);
+								y += 1;
+								switch (src[x]) {
+									case '\0': {
+										lex.emitErr(beg, "%d multi line comment%snot terminated", level, (level==1)?" ":"s ");
+										return false;
+									} break;
+									case '*': {
+										x += 1;
+										if (src[x] == '/') {
+											level -= 1;
+											CLEAR_BIT(mask, y);
+										};
+									} break;
+									case '/': {
+										x += 1;
+										if (src[x] == '*') {
+											level += 1;
+											CLEAR_BIT(mask, y);
+										};
+									} break;
+								};
+								x += 1;
+								y += 1;
+							};
 						};
 						eatUnwantedChars(src, x);
 						continue;
