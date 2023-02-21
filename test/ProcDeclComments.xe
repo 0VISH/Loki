@@ -1,5 +1,11 @@
-//testing procedures and variable assignments
+//testing procedures, variable assignments, and comments
     
+/*
+	/*
+		multi line comment
+	*/
+*/
+
 
 foo :: 	proc(
 		x,y,z: u32,

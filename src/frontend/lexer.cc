@@ -94,11 +94,11 @@ Lexer createLexer(char *filePath) {
 	fseek(fp, 0, SEEK_END);
 	u64 size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
-	lexer.fileContent = (char*)mem::alloc(size + 1);
+	lexer.fileContent = (char*)mem::alloc(size + 17); //one for newline in the start, and 16 for SIMD padding(comments,etc...)
 	lexer.fileContent[0] = '\n'; //padding for getLineAndOff
 	lexer.fileContent += 1;
 	size = fread(lexer.fileContent, sizeof(char), size, fp);
-	lexer.fileContent[size] = '\0';
+	memset(lexer.fileContent + size, '\0', 16);
 
 	//50% of the file size. @foodforthought: change percentage?
 	u32 tokenCount = (u32)((50 * size) / 100) + 1;
@@ -123,6 +123,30 @@ void eatUnwantedChars(char *mem, u64& x) {
 			default:
 				return;
 		};
+	};
+};
+s32 getOffOfChar(char *mem, char c) {
+	//Since the src buffer is padded we do not have to worry
+	u32 times = 0;
+	while (true) {
+		__m128i tocmp = _mm_set1_epi8(c);
+		__m128i chunk = _mm_load_si128 ((__m128i const*)mem);
+		__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
+		s32 mask = _mm_movemask_epi8(results);
+		if (mask == 0) {
+			tocmp = _mm_set1_epi8('\0');
+			results =  _mm_cmpeq_epi8(chunk, tocmp);
+			mask = _mm_movemask_epi8(results);
+			if (mask == 0) {
+				mem += 16;
+				times += 16;
+				continue;
+			};
+			return -1;
+		};
+		u32 x = 0;
+		while (IS_BIT(mask, x) == 0) { x += 1; };
+		return times + x;
 	};
 };
 void eatNewlines(DynamicArray<Token_Type> &tokTypes, u32 &x){
@@ -203,8 +227,32 @@ b32 genTokens(Lexer &lex) {
 						type = Token_Type::ARROW;
 						x += 1;
 					} else if (src[x] == '/' && src[x + 1] == '/') {
-						while (src[x] != '\n') { x += 1; };
-						x += 1;
+						s32 y = getOffOfChar(src + x, '\n');
+						if (y == -1) { continue;};
+						x += y+1;
+						eatUnwantedChars(src, x);
+						continue;
+					} else if (src[x] == '/' && src[x+1] == '*') {
+						u8 level = 1;
+						u64 beg = x;
+						x += 3;
+						while (level != 0) {
+							switch (src[x]) {
+								case '\0': {
+									lex.emitErr(beg, "multi line comment not terminated at level %d", level);
+									return false;
+								} break;
+								case '*': {
+									x += 1;
+									if (src[x] == '/') { level -= 1; };
+								} break;
+								case '/': {
+									x += 1;
+									if (src[x] == '*') { level += 1; };
+								} break;
+							};
+							x += 1;
+						};
 						eatUnwantedChars(src, x);
 						continue;
 					};
@@ -222,6 +270,10 @@ b32 genTokens(Lexer &lex) {
 	lex.tokenOffsets.push( { x, 0 });
 	return true;
 };
+
+	/*
+	asdf	
+	*/
 
 #if(XE_DBG)
 namespace dbg {

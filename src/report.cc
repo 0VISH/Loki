@@ -15,9 +15,23 @@ namespace report{
 	u32 reportBuffTop = 0;
 
 	char *getLineAndOff(char *mem, u64 offset, u32 &line, u32 &off) {
-		for (u64 i = 0; i < offset; i += 1) {
-			if (mem[i] == '\n') { line += 1; };
-		};
+		__m128i tocmp =  _mm_set1_epi8('\n');
+		u32 x = 0;
+		while (true) {
+			if (x + 16 > offset){
+				while (x<offset) {
+					if (mem[x] == '\n') { line += 1; };
+					x += 1;
+				};
+				break;
+			};
+			__m128i chunk = _mm_load_si128 ((__m128i const*)(mem+x));
+			__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
+			s32 mask = _mm_movemask_epi8(results);
+			line += __popcnt(mask);
+			x += 16;
+		}
+		
 		while (mem[offset-off] != '\n') {
 			off += 1;
 		};
@@ -41,9 +55,9 @@ namespace report{
 				x += 1;
 			};
 			beg[x] = '\0';
-			printf("\n%s ", rep.fileName);
+			printf("\n%s: ", rep.fileName);
 			os::printErrorInRed();
-			printf(": %s\n", rep.msg);
+			printf(" %s\n", rep.msg);
 			printf("  %d|  %s\n_____", line, beg);
 			u32 n = line;
 			while (n > 0) {

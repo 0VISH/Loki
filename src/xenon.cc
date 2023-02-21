@@ -6,13 +6,17 @@ bool compile(char *fileName){
 	};
 	u32 off = 0;
 	b32 x = genTokens(lexer);
+	if (report::errorOff != 0) {
+		report::flushReports();
+		return false;
+	};
 	eatNewlines(lexer.tokenTypes, off);
 	if (lexer.tokenTypes[off] == Token_Type::END_OF_FILE) {
 		destroyLexer(lexer);
 		return true;
 	};
 	dbg::dumpLexerStat(lexer);
-	dbg::dumpLexerTokens(lexer);
+	//dbg::dumpLexerTokens(lexer);
 	ASTFile astFile = createASTFile();
 	while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 		ASTBase *base = parseBlock(lexer, astFile, off);
