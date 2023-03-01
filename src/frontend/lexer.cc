@@ -125,30 +125,6 @@ void eatUnwantedChars(char *mem, u64& x) {
 	};
     };
 };
-s32 getOffOfChar(char *mem, char c) {
-    //Since the src buffer is padded we do not have to worry
-    u32 times = 0;
-    while (true) {
-	__m128i tocmp = _mm_set1_epi8(c);
-	__m128i chunk = _mm_load_si128 ((__m128i const*)mem);
-	__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
-	s32 mask = _mm_movemask_epi8(results);
-	if (mask == 0) {
-	    tocmp = _mm_set1_epi8('\0');
-	    results =  _mm_cmpeq_epi8(chunk, tocmp);
-	    mask = _mm_movemask_epi8(results);
-	    if (mask == 0) {
-		mem += 16;
-		times += 16;
-		continue;
-	    };
-	    return -1;
-	};
-	u32 x = 0;
-	while (IS_BIT(mask, x) == 0) { x += 1; };
-	return times + x;
-    };
-};
 void eatNewlines(DynamicArray<Token_Type> &tokTypes, u32 &x){
     while (tokTypes[x] == (Token_Type)'\n') { x += 1; };
 };
@@ -321,10 +297,6 @@ b32 genTokens(Lexer &lex) {
     lex.tokenOffsets.push( { x, 0 });
     return true;
 };
-
-/*
-  asdf	
-*/
 
 #if(XE_DBG)
 namespace dbg {

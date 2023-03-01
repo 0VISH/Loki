@@ -41,7 +41,6 @@ namespace report{
     void flushReports() {
 	os::setPrintColorToWhite();
 	if (errorOff == 0) { return; };
-	u8 err = 0;
 	//printf in FILO so that the usr can see first report first in the terminal
 	for (u8 i = errorOff; i != 0;) {
 	    i -= 1;
@@ -70,6 +69,6 @@ namespace report{
 	    };
 	    printf("^\n");
 	};
-	printf("\n\nflushed %d error%c\n", err, (err == 1)?' ':'s');
+	printf("\n\nflushed %d error%c\n", errorOff, (errorOff == 1)?' ':'s');
     };
 }

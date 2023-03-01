@@ -19,4 +19,18 @@ namespace os{
 	printf("ERROR");
 	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
     };
+
+    LARGE_INTEGER timeStart;
+    void compilerStartTimer(){
+	QueryPerformanceCounter(&timeStart);
+    };
+    f64 compilerEndTimer(){
+	LARGE_INTEGER end;
+	QueryPerformanceCounter(&end);
+	u64 diff = end.QuadPart - timeStart.QuadPart;
+	LARGE_INTEGER freq;
+	QueryPerformanceFrequency(&freq);
+	f64 time = diff / (f64)freq.QuadPart;
+	return time;
+    };
 }
