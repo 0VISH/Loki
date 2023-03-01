@@ -1,26 +1,26 @@
 #include "include.hh"
 
 s32 main(s32 argc, char **argv) {
-	if (argc < 2) {
-		printf("main file path not provided");
-		return EXIT_SUCCESS;
-	};
-	EXCEPTION_BLOCK_START
+    if (argc < 2) {
+	printf("main file path not provided");
+	return EXIT_SUCCESS;
+    };
+    EXCEPTION_BLOCK_START
 	if (strcmp(argv[1], "test") == 0) {
-		tester::getAllTestFiles();
-		tester::runTests();
-		return EXIT_SUCCESS;
+	    tester::getAllTestFiles();
+	    tester::runTests();
+	    return EXIT_SUCCESS;
 	};
-	dbg::initTimer();
-	initKeywords();
-	compile(argv[1]);
-	uninitKeywords();
-	dbg::dumpBlockTimes();
-	EXCEPTION_BLOCK_END
+    dbg::initTimer();
+    initKeywords();
+    compile(argv[1]);
+    uninitKeywords();
+    dbg::dumpBlockTimes();
+    EXCEPTION_BLOCK_END
 #if(XE_DBG)
 	printf("\ndone!");
 #endif
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 };
 
 

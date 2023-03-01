@@ -26,7 +26,7 @@ typedef double                  f64;
 
 #if(XE_DBG)
 void debugUnreachable(char *file, u32 line) {
-	printf("\n[ERROR] unreachable area reached: %s(%d)", file, line);
+    printf("\n[ERROR] unreachable area reached: %s(%d)", file, line);
 };
 #define DEBUG_UNREACHABLE debugUnreachable(__FILE__, __LINE__);
 #else
