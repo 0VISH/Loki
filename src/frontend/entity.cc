@@ -118,6 +118,17 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 		lexer.emitErr(tokOffs[node->tokenOff].off, "Procedure redecleration");
 		return false;
 	    };
+	    //TODO:checking in
+	    if(proc->in.args.count != 0){
+		Map inProc;
+		inProc.init(proc->in.args.count);
+		for(u16 x=0; x<proc->in.args.count; x+=1){
+		    
+		};
+	    };
+	    //TODO:checking out
+	    if(proc->out.typeOffs.count != 0){
+	    };
 	    se.procMap.insertValue(name, se.procCount);
 	    ProcEntity entity;
 	    entity.name = name;

@@ -38,6 +38,9 @@ struct ASTMultiVar : ASTBase{
 };
 struct ProcInOut {
     DynamicArray<ASTBase*> args;
+    /*
+      if typeOffs.count = 0, then out is provided with types
+     */
     DynamicArray<u32>      typeOffs;
 };
 struct ASTProcDef : ASTBase {
@@ -45,6 +48,9 @@ struct ASTProcDef : ASTBase {
     ProcInOut out;
     String name;
     DynamicArray<ASTBase*> body;
+};
+struct ASTVariable : ASTBase{
+    String name;
 };
 struct ASTFile {
     DynamicArray<char*> memPages;
@@ -229,7 +235,9 @@ s8 varDeclAddTableEntriesAST(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<A
 	    return -1;
 	};
 	varCount += 1;
-	table.push(allocAST(sizeof(ASTBase), ASTType::VARIABLE, x, file));
+	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, x, file);
+	var->name = makeStringFromTokOff(x, lexer);
+	table.push((ASTBase*)var);
 	x += 1;
 	if (tokTypes[x] == (Token_Type)',') {
 	    x += 1;
@@ -510,14 +518,12 @@ namespace dbg {
 	for (u8 v=0; v < args.count; v += 1) {
 	    padding += 1;
 	    if (pic.typeOffs.count == 0) {
-		ASTBase *node = args[v];
-		u32 z = node->tokenOff;
-		printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
+		ASTVariable *node = (ASTVariable*)args[v];
+		String name = node->name;
+		printf("type: %.*s", name.len, name.mem);
 	    } else {
-		__dumpNodesWithoutEndPadding(args[v], lexer, padding);
+	        __dumpNodesWithoutEndPadding(args[v], lexer, padding);
 		PAD;
-		u32 z = procTypesOff[v];
-		printf("type: %.*s", lexer.tokenOffsets[z].len, lexer.fileContent + lexer.tokenOffsets[z].off);
 	    };
 	    padding -= 1;
 	    PAD;
@@ -569,8 +575,9 @@ namespace dbg {
 	case ASTType::VARIABLE: {
 	    printf("variable");
 	    PAD;
-	    u32 x = node->tokenOff;
-	    printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+	    ASTVariable *var = (ASTVariable*)node;
+	    String name = var->name;
+	    printf("name: %.*s", name.len, name.mem);
 	}break;
 	case ASTType::UNI_DECLERATION_T_KNOWN: {
 	    u32 x = node->tokenOff - 1;
