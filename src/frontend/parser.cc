@@ -28,11 +28,11 @@ struct ASTBinOp : ASTBase{
     ASTBase *lhs;
     ASTBase *rhs;
 };
-struct ASTUniDecl : ASTBase{
+struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
 };
-struct ASTMultiDecl : ASTBase{
+struct ASTMultiVar : ASTBase{
     DynamicArray<String> names;
     ASTBase *rhs;
 };
@@ -45,11 +45,6 @@ struct ASTProcDef : ASTBase {
     ProcInOut out;
     String name;
     DynamicArray<ASTBase*> body;
-};
-//////////TODO: CLEANUP
-struct ASTlr : ASTBase {
-    ASTBase *lhs;
-    ASTBase *rhs;
 };
 struct ASTFile {
     DynamicArray<char*> memPages;
@@ -85,8 +80,6 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, u32 tokenOff, ASTFile &file) {
     node->tokenOff = tokenOff;
     return node;
 };
-//TODO:
-DynamicArray<ASTBase*> *getTableLR(void *ptr) { return (DynamicArray<ASTBase*>*)(((char*)ptr) + sizeof(ASTlr)); };
 
 void initProcInOut(ProcInOut &pic) {
     pic.args.init();
@@ -318,7 +311,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    case (Token_Type)'=': {
 		//single variable assignment
 		SINGLE_VARIABLE_ASSIGNMENT:
-		ASTUniDecl *assign = (ASTUniDecl*)allocAST(sizeof(ASTUniDecl), uniVarType, x, file);
+		ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), uniVarType, x, file);
 		assign->name = makeStringFromTokOff(start, lexer);
 		x += 1;
 		u32 end = getEndNewlineEOF(tokTypes, x);
@@ -339,9 +332,9 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		};
 		x += 1;
 		ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, start, file);
-		proc->out.args.len = 0;
+		proc->name = makeStringFromTokOff(start, lexer);
 		if (tokTypes[x] == (Token_Type)')') {
-		    proc->in.args.len = 0;
+		    proc->in.args.count = 0;
 		    goto PARSE_AFTER_ARGS;
 		};
 		initProcInOut(proc->in);
@@ -380,6 +373,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    x += 1;
 		} break;
 		case (Token_Type)'{': {
+		    proc->body.count = 0;
 		    x += 1;
 		} break;
 		default: {
@@ -414,8 +408,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    uniVarType = ASTType::UNI_ASSIGNMENT_T_KNOWN;
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') { goto SINGLE_VARIABLE_ASSIGNMENT; };
-		    ASTlr *assign = (ASTlr*)allocAST(sizeof(ASTlr), ASTType::UNI_DECLERATION_T_KNOWN, x, file);
-		    assign->lhs = allocAST(sizeof(ASTBase), ASTType::VARIABLE, start, file);
+		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION_T_KNOWN, x, file);
+		    assign->name = makeStringFromTokOff(start, lexer);
 		    return (ASTBase*)assign;
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected a type");
@@ -426,7 +420,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	} break;
 	case (Token_Type)',': {
 	    //multiple variable decleration
-	    ASTMultiDecl *multiAss = (ASTMultiDecl*)allocAST(sizeof(ASTMultiDecl), ASTType::MULTI_DECLERATION_T_KNOWN, NULL, file);
+	    ASTMultiVar *multiAss = (ASTMultiVar*)allocAST(sizeof(ASTMultiVar), ASTType::MULTI_DECLERATION_T_KNOWN, NULL, file);
 	    DynamicArray<String> &names = multiAss->names;
 	    names.init(3);
 	    x = start;
@@ -584,7 +578,7 @@ namespace dbg {
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	    PAD;
-	    ASTUniDecl *decl = (ASTUniDecl*)node;
+	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	} break;
 	case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
@@ -598,7 +592,7 @@ namespace dbg {
 	    if (flag) { flag = false; }
 	    else { printf("uni_assignment_t_unkown"); };	
 	    PAD;
-	    ASTUniDecl *decl = (ASTUniDecl*)node;
+	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	    PAD;
 	    printf("RHS");
@@ -616,7 +610,7 @@ namespace dbg {
 	    else { printf("multi_assignment_t_unkown"); };
 	    PAD;
 	    printf("names:");
-	    ASTMultiDecl *multiAss = (ASTMultiDecl*)node;
+	    ASTMultiVar *multiAss = (ASTMultiVar*)node;
 	    DynamicArray<String> &names = multiAss->names;
 	    for (u8 x=0; x<names.count; x +=1) {
 		String name = names[x];
@@ -635,10 +629,10 @@ namespace dbg {
 	    PAD;
 	    printf("[IN]");
 	    ASTProcDef *proc = (ASTProcDef*)node;
-	    if (proc->in.args.len != 0) { dumpProcInOut(proc->in, lexer, padding+1); };
+	    if (proc->in.args.count != 0) { dumpProcInOut(proc->in, lexer, padding+1); };
 	    PAD;
 	    printf("[OUT]");
-	    if (proc->out.args.len != 0) { dumpProcInOut(proc->out, lexer, padding+1); };
+	    if (proc->out.args.count != 0) { dumpProcInOut(proc->out, lexer, padding+1); };
 	    PAD;
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    printf("[BODY]");
