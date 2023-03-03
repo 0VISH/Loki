@@ -33,7 +33,7 @@ struct ASTUniDecl : ASTBase{
     ASTBase *rhs;
 };
 struct ASTMultiDecl : ASTBase{
-    DynamicArray<ASTBase*> names;
+    DynamicArray<String> names;
     ASTBase *rhs;
 };
 struct ProcInOut {
@@ -215,7 +215,15 @@ u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
 bool isType(Token_Type type) {
     return (type>Token_Type::K_START && type<Token_Type::K_PROC) || type == Token_Type::IDENTIFIER;
 };
-s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &table, bool typesIncluded=false) {
+String makeStringFromTokOff(u32 x, Lexer &lexer){
+    BRING_TOKENS_TO_SCOPE;
+    TokenOffset off = tokOffs[x];
+    String str;
+    str.len = off.len;
+    str.mem = lexer.fileContent + off.off;
+    return str;
+};
+s8 varDeclAddTableEntriesAST(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &table, bool typesIncluded=false) {
     BRING_TOKENS_TO_SCOPE;
     s8 varCount = 0;
     while (true) {
@@ -238,11 +246,31 @@ s8 varDeclAddTableEntries(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTB
     };
     return varCount;
 };
+s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<String> &table) {
+    BRING_TOKENS_TO_SCOPE;
+    s8 varCount = 0;
+    while (true) {
+	if (tokTypes[x] != Token_Type::IDENTIFIER) {
+	    lexer.emitErr(tokOffs[x].off, "Expected an identifier");
+	    table.uninit();
+	    return -1;
+	};
+	varCount += 1;
+	table.push(makeStringFromTokOff(x, lexer));
+	x += 1;
+	if (tokTypes[x] == (Token_Type)',') {
+	    x += 1;
+	    continue;
+	};
+	return varCount;
+    };
+    return varCount;
+};
 bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, ProcInOut &pic, bool typesIncludes) {
     BRING_TOKENS_TO_SCOPE;
     while (true) {
 	eatNewlines(tokTypes, x);
-	s8 count = varDeclAddTableEntries(lexer, file, x, pic.args, typesIncludes);
+	s8 count = varDeclAddTableEntriesAST(lexer, file, x, pic.args, typesIncludes);
 	if (count == -1) { return false; };
 	if (tokTypes[x] == (Token_Type)')' || tokTypes[x] == (Token_Type)'{' && typesIncludes) { return true; };
 	if (tokTypes[x] != (Token_Type)':') {
@@ -270,14 +298,6 @@ bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, ProcInOut &pic, bool ty
 	};
     };
     return true;
-};
-String makeStringFromTokOff(u32 x, Lexer &lexer){
-    BRING_TOKENS_TO_SCOPE;
-    TokenOffset off = tokOffs[x];
-    String str;
-    str.len = off.len;
-    str.mem = lexer.fileContent + off.off;
-    return str;
 };
 void uninitProcDef(ASTProcDef *node){
     if(node->in.args.len != 0)  {uninitProcInOut(node->in);};
@@ -407,10 +427,10 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	case (Token_Type)',': {
 	    //multiple variable decleration
 	    ASTMultiDecl *multiAss = (ASTMultiDecl*)allocAST(sizeof(ASTMultiDecl), ASTType::MULTI_DECLERATION_T_KNOWN, NULL, file);
-	    DynamicArray<ASTBase*> &names = multiAss->names;
+	    DynamicArray<String> &names = multiAss->names;
 	    names.init(3);
 	    x = start;
-	    s8 y = varDeclAddTableEntries(lexer, file, x, names);
+	    s8 y = varDeclAddTableEntriesStr(lexer, file, x, names);
 	    if (y == -1) { return nullptr; };
 	    if (tokTypes[x] != (Token_Type)':') {
 		lexer.emitErr(tokOffs[x].off, "Expected ':'");
@@ -597,10 +617,11 @@ namespace dbg {
 	    PAD;
 	    printf("names:");
 	    ASTMultiDecl *multiAss = (ASTMultiDecl*)node;
-	    DynamicArray<ASTBase*> &table = multiAss->names;
-	    for (u8 x=0; x<table.count; x +=1) {
-		__dumpNodesWithoutEndPadding(table[x], lexer, padding + 1);
+	    DynamicArray<String> &names = multiAss->names;
+	    for (u8 x=0; x<names.count; x +=1) {
+		String name = names[x];
 		PAD;
+		printf("      %.*s", name.len, name.mem);
 	    };
 	    PAD;
 	    printf("RHS");
