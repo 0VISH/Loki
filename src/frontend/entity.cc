@@ -4,7 +4,6 @@ struct VariableEntity{
     u8 flag;
 };
 struct ProcEntity {
-    DynamicArray<ProcArgs> *args;
     String name;
 };
 
@@ -121,7 +120,6 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 	    se.procMap.insertValue(name, se.procCount);
 	    ProcEntity entity;
 	    entity.name = name;
-	    entity.args = (DynamicArray<ProcArgs>*)lr->lhs;
 	    se.procEntities[se.procCount] = entity;
 	    se.procCount += 1;
 	    ScopeEntities pse;
