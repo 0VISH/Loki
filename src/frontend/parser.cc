@@ -20,10 +20,13 @@ enum class ASTType {
 
 struct ASTBase {
     ASTType type;
+};
+struct ASTNumInt : ASTBase{
     u32 tokenOff;
 };
-struct ASTNumInt : ASTBase{};
-struct ASTNumDec : ASTBase{};
+struct ASTNumDec : ASTBase{
+    u32 tokenOff;
+};
 struct ASTBinOp : ASTBase{
     ASTBase *lhs;
     ASTBase *rhs;
@@ -31,10 +34,12 @@ struct ASTBinOp : ASTBase{
 struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
+    u32 tokenOff;
 };
 struct ASTMultiVar : ASTBase{
     DynamicArray<String> names;
     ASTBase *rhs;
+    u32 tokenOff;
 };
 struct ProcInOut {
     DynamicArray<ASTBase*> args;
@@ -46,8 +51,9 @@ struct ProcInOut {
 struct ASTProcDef : ASTBase {
     ProcInOut in;
     ProcInOut out;
-    String name;
     DynamicArray<ASTBase*> body;
+    String name;
+    u32 tokenOff;
 };
 struct ASTVariable : ASTBase{
     String name;
@@ -73,7 +79,7 @@ void destroyASTFile(ASTFile &file) {
     };
     file.memPages.uninit();
 };
-ASTBase *allocAST(u32 nodeSize, ASTType type, u32 tokenOff, ASTFile &file) {
+ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     if (file.pageBrim+nodeSize >= AST_PAGE_SIZE) {
 	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
 	file.memPages.push(page);
@@ -83,7 +89,6 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, u32 tokenOff, ASTFile &file) {
     ASTBase *node = (ASTBase*)(file.memPages[memPageOff] + file.pageBrim);
     file.pageBrim += nodeSize;
     node->type = type;
-    node->tokenOff = tokenOff;
     return node;
 };
 
@@ -102,7 +107,8 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, char *fileContent, ASTFile &file, s
     Token_Type type = tokTypes[x];
     switch (type) {
     case Token_Type::INTEGER: {
-	ASTNumInt *numNode = (ASTNumInt*)allocAST(sizeof(ASTNumInt), ASTType::NUM_INTEGER, x, file);
+	ASTNumInt *numNode = (ASTNumInt*)allocAST(sizeof(ASTNumInt), ASTType::NUM_INTEGER, file);
+	numNode->tokenOff = x;
 	x += 1;
 	return (ASTBase*)numNode;
     } break;
@@ -143,7 +149,7 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 x, ASTFile &file) {
     case '/': type = ASTType::BIN_DIV; break;
     default: DEBUG_UNREACHABLE;
     };
-    return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, x, file);
+    return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
 };
 ASTBinOp *genRHSExpr(Lexer &lexer, ASTFile &file, u32 &curPos, u32 y, s16 &bracket) {
     BRING_TOKENS_TO_SCOPE;
@@ -235,7 +241,7 @@ s8 varDeclAddTableEntriesAST(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<A
 	    return -1;
 	};
 	varCount += 1;
-	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, x, file);
+	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
 	var->name = makeStringFromTokOff(x, lexer);
 	table.push((ASTBase*)var);
 	x += 1;
@@ -319,7 +325,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    case (Token_Type)'=': {
 		//single variable assignment
 		SINGLE_VARIABLE_ASSIGNMENT:
-		ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), uniVarType, x, file);
+		ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), uniVarType, file);
+		assign->tokenOff = x;
 		assign->name = makeStringFromTokOff(start, lexer);
 		x += 1;
 		u32 end = getEndNewlineEOF(tokTypes, x);
@@ -339,7 +346,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    return nullptr;
 		};
 		x += 1;
-		ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, start, file);
+		ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, file);
+		proc->tokenOff = start;
 		proc->name = makeStringFromTokOff(start, lexer);
 		if (tokTypes[x] == (Token_Type)')') {
 		    proc->in.args.count = 0;
@@ -416,7 +424,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    uniVarType = ASTType::UNI_ASSIGNMENT_T_KNOWN;
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') { goto SINGLE_VARIABLE_ASSIGNMENT; };
-		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION_T_KNOWN, x, file);
+		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION_T_KNOWN, file);
+		    assign->tokenOff = x;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    return (ASTBase*)assign;
 		}else{
@@ -428,7 +437,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	} break;
 	case (Token_Type)',': {
 	    //multiple variable decleration
-	    ASTMultiVar *multiAss = (ASTMultiVar*)allocAST(sizeof(ASTMultiVar), ASTType::MULTI_DECLERATION_T_KNOWN, NULL, file);
+	    ASTMultiVar *multiAss = (ASTMultiVar*)allocAST(sizeof(ASTMultiVar), ASTType::MULTI_DECLERATION_T_KNOWN, file);
+	    multiAss->tokenOff = x;
 	    DynamicArray<String> &names = multiAss->names;
 	    names.init(3);
 	    x = start;
@@ -454,7 +464,6 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		names.uninit();
 		return nullptr;
 	    };
-	    multiAss->tokenOff = x;
 	    x += 1;
 	    u32 end = getEndNewlineEOF(tokTypes, x);
 	    multiAss->rhs = genASTExprTree(lexer, file, x, end);
@@ -534,16 +543,15 @@ namespace dbg {
 	PAD;
 	printf("[NODE]");
 	PAD;
-	printf("tokenOff: %d", node->tokenOff);
-	PAD;
 	printf("type: ");
 	ASTType type = node->type;
 	char c = NULL;
 	u8 flag = false;
 	switch (type) {
 	case ASTType::NUM_INTEGER: {
+	    ASTNumInt *numInt = (ASTNumInt*)node;
 	    printf("num_integer");
-	    String str = makeStringFromTokOff(node->tokenOff, lexer);
+	    String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	    s64 num = string2int(str);
 	    PAD;
 	    printf("num: %lld", num);
@@ -580,16 +588,17 @@ namespace dbg {
 	    printf("name: %.*s", name.len, name.mem);
 	}break;
 	case ASTType::UNI_DECLERATION_T_KNOWN: {
-	    u32 x = node->tokenOff - 1;
+	    ASTUniVar *decl = (ASTUniVar*)node;
+	    u32 x = decl->tokenOff - 1;
 	    printf("uni_decleration_t_known");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	    PAD;
-	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	} break;
 	case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
-	    u32 x = node->tokenOff - 1;
+	    ASTUniVar *decl = (ASTUniVar*)node;
+	    u32 x = decl->tokenOff - 1;
 	    printf("uni_assignment_t_known");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
@@ -606,7 +615,8 @@ namespace dbg {
 	    if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
 	} break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
-	    u32 x = node->tokenOff - 1;
+	    ASTMultiVar *decl = (ASTMultiVar*)node;
+	    u32 x = decl->tokenOff - 1;
 	    printf("multi_assignment_t_known");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
@@ -629,13 +639,12 @@ namespace dbg {
 	    if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
 	} break;
 	case ASTType::PROC_DEFENITION: {
-	    u32 x = node->tokenOff;
+	    ASTProcDef *proc = (ASTProcDef*)node;
 	    printf("proc_defenition");
 	    PAD;
-	    printf("name: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
 	    printf("[IN]");
-	    ASTProcDef *proc = (ASTProcDef*)node;
 	    if (proc->in.args.count != 0) { dumpProcInOut(proc->in, lexer, padding+1); };
 	    PAD;
 	    printf("[OUT]");

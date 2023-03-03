@@ -46,7 +46,16 @@ bool compile(char *fileName){
 			varCount += 1;
 		    };
 		};
-		lexer.emitErr(lexer.tokenOffsets[astFile.nodes[nodeOff-1]->tokenOff].off, "Variable at global scope is not comptime");
+		ASTBase *node = astFile.nodes[nodeOff-1];
+		u32 off;
+		if(node->type >= ASTType::MULTI_DECLERATION_T_KNOWN && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
+		    ASTMultiVar *multiAss = (ASTMultiVar*)node;
+		    off = multiAss->tokenOff;
+		}else{
+		    ASTUniVar *uniAss = (ASTUniVar*)node;
+		    off = uniAss->tokenOff;
+		};
+		lexer.emitErr(lexer.tokenOffsets[off].off, "Variable at global scope is not comptime");
 	    };
 	};
     };

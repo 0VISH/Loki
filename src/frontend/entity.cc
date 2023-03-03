@@ -60,7 +60,15 @@ bool checkVariableEntity(ASTBase *base, u32 x, Lexer &lexer, ScopeEntities &se, 
 	};
 	if (treeType != Type::COMP_VOID && treeType != Type::COMP_DECIMAL && treeType != Type::COMP_INTEGER) {
 	    if (givenType != treeType) {
-		lexer.emitErr(tokOffs[base->tokenOff].off, "Tree type and given type do not match");
+		u32 off;
+		if(multi){
+		    ASTMultiVar *multiAss = (ASTMultiVar*)base;
+		    off = multiAss->tokenOff;
+		}else{
+		    ASTUniVar *uniAss = (ASTUniVar*)base;
+		    off = uniAss->tokenOff;
+		};
+		lexer.emitErr(tokOffs[off].off, "Tree type and given type do not match");
 		return false;
 	    };
 	};
@@ -115,7 +123,7 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 	    ASTProcDef *proc = (ASTProcDef*)node;
 	    String name = proc->name;
 	    if (se.procMap.getValue(name) != -1) {
-		lexer.emitErr(tokOffs[node->tokenOff].off, "Procedure redecleration");
+		lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 		return false;
 	    };
 	    //TODO:checking in
