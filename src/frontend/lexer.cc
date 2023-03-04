@@ -80,6 +80,9 @@ void initKeywords() {
 void uninitKeywords() { keywords.uninit(); };
 
 bool isKeyword(Token_Type type) { return type > Token_Type::K_START && type < Token_Type::K_END; };
+bool isType(Token_Type type) {
+    return (type>Token_Type::K_START && type<Token_Type::K_PROC) || type == Token_Type::IDENTIFIER;
+};
 
 Lexer createLexer(char *filePath) {
     Lexer lexer;
