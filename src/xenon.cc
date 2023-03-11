@@ -15,8 +15,9 @@ bool compile(char *fileName){
 	destroyLexer(lexer);
 	return true;
     };
-    dbg::dumpLexerStat(lexer);
+    //dbg::dumpLexerStat(lexer);
     //dbg::dumpLexerTokens(lexer);
+    
     ASTFile astFile = createASTFile();
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
@@ -30,7 +31,7 @@ bool compile(char *fileName){
 	destroyLexer(lexer);
 	return false;
     };
-    dbg::dumpASTFile(astFile, lexer);
+    //dbg::dumpASTFile(astFile, lexer);
 #if 0
     ScopeEntities fileScopeEntities;
     if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) {

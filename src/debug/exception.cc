@@ -1,9 +1,9 @@
-#if(XE_DBG && XE_PLAT_WIN)
+#if(XE_DBG && XE_PLAT_WIN && MSVC_COMPILER)
 
-#define EXCEPTION_BLOCK_START			\
+#define SEH_EXCEPTION_BLOCK_START		\
     __try{					\
 
-#define EXCEPTION_BLOCK_END			\
+#define SEH_EXCEPTION_BLOCK_END			\
     } __except(EXCEPTION_EXECUTE_HANDLER) {	\
 	printf("\n[EXCEPTION] ");		\
 	auto code = GetExceptionCode();		\
@@ -22,6 +22,6 @@
       };					\
 
 #else
-#define EXCEPTION_BLOCK_START
-#define EXCEPTION_BLOCK_END
+#define SEH_EXCEPTION_BLOCK_START
+#define SEH_EXCEPTION_BLOCK_END
 #endif

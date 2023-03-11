@@ -1,8 +1,10 @@
 #pragma once
 
-#define XE_DBG       true
+//#define XE_DBG
+//#define XE_TEST
+//#define MSVC_COMPILER
+//#define ZIG_COMPILER
 #define XE_PLAT_WIN  true
-#define XE_TEST      true
 
 #define ARRAY_LENGTH(x)   sizeof(x)/sizeof(x[0])
 #define SET_BIT(x, pos)   x |=  (1 << (u32)pos)

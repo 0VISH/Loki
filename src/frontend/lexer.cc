@@ -49,7 +49,7 @@ struct Lexer {
 Map keywords;
 const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
 
-constexpr void registerKeywords() {
+void registerKeywords() {
     struct KeywordData {
 	const char *str;
 	const Token_Type type;
@@ -213,7 +213,8 @@ b32 genTokens(Lexer &lex) {
 		    s32 mask;
 		    while (true) {
 			__m128i tocmp = _mm_set1_epi8('\n');
-			__m128i chunk = _mm_load_si128 ((__m128i const*)mem);
+			//TODO: this causes a crash while compiling with zig c++
+			__m128i chunk = _mm_load_si128((const __m128i*)mem);
 			__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
 			mask = _mm_movemask_epi8(results);
 			if (mask != 0) {break;};

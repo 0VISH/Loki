@@ -1,7 +1,8 @@
 #include "include.hh"
 
 s32 main(s32 argc, char **argv) {
-    EXCEPTION_BLOCK_START;
+    SEH_EXCEPTION_BLOCK_START;
+	
     if (argc < 2) {
 	printf("main file path not provided");
 	return EXIT_SUCCESS;
@@ -29,8 +30,10 @@ s32 main(s32 argc, char **argv) {
     dbg::dumpBlockTimes();
     printf("\ndone!");
 #endif
+    
     return EXIT_SUCCESS;
-    EXCEPTION_BLOCK_END;
+    
+    SEH_EXCEPTION_BLOCK_END;
 };
 
 

@@ -1,5 +1,9 @@
 #define MAX_REPORTS 30
 
+#if(MSVC_COMPILER)
+#define __builtin_popcount __popcnt
+#endif
+
 namespace report{
 
     struct Error {
@@ -28,7 +32,7 @@ namespace report{
 	    __m128i chunk = _mm_load_si128 ((__m128i const*)(mem+x));
 	    __m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
 	    s32 mask = _mm_movemask_epi8(results);
-	    line += __popcnt(mask);
+	    line += __builtin_popcount(mask);
 	    x += 16;
 	}
 		
