@@ -29,7 +29,7 @@ namespace report{
 		};
 		break;
 	    };
-	    __m128i chunk = _mm_load_si128 ((__m128i const*)(mem+x));
+	    __m128i chunk = _mm_loadu_si128 ((__m128i const*)(mem+x));
 	    __m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
 	    s32 mask = _mm_movemask_epi8(results);
 	    line += __builtin_popcount(mask);

@@ -6,8 +6,7 @@ enum class Token_Type {
     DECIMAL,
     SINGLE_QUOTES,
     DOUBLE_QUOTES,
-    //keywords start
-    K_START,
+    K_START,  //keywords start
     K_U8,
     K_U16,
     K_U32,
@@ -15,9 +14,8 @@ enum class Token_Type {
     K_S16,
     K_S32,
     K_PROC,
-    K_END,
+    K_END,    //keywords end
     ARROW,
-    //keywords end
     END_OF_FILE,
 };
 
@@ -47,9 +45,11 @@ struct Lexer {
 };
 
 Map keywords;
-const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
 
-void registerKeywords() {
+void initKeywords() {
+    const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
+    keywords.init(keywordCount);
+    
     struct KeywordData {
 	const char *str;
 	const Token_Type type;
@@ -72,10 +72,6 @@ void registerKeywords() {
 	};
 #endif
     };
-};
-void initKeywords() {
-    keywords.init(keywordCount);
-    registerKeywords();
 };
 void uninitKeywords() { keywords.uninit(); };
 
@@ -213,7 +209,6 @@ b32 genTokens(Lexer &lex) {
 		    s32 mask;
 		    while (true) {
 			__m128i tocmp = _mm_set1_epi8('\n');
-			//TODO: this causes a crash while compiling with zig c++
 			__m128i chunk = _mm_loadu_si128((const __m128i*)mem);
 			__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
 			mask = _mm_movemask_epi8(results);

@@ -42,13 +42,9 @@ struct ASTMultiVar : ASTBase{
     ASTBase *rhs;
     u32 tokenOff;
 };
-//TODO: remove
-struct ProcInOut {
-    DynamicArray<ASTBase*> args;
-};
 struct ASTProcDef : ASTBase {
-    ProcInOut in;
-    ProcInOut out;
+    DynamicArray<ASTBase*> in;
+    DynamicArray<ASTBase*> out;
     DynamicArray<ASTBase*> body;
     String name;
     u32 tokenOff;
@@ -91,13 +87,6 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     file.pageBrim += nodeSize;
     node->type = type;
     return node;
-};
-
-void initProcInOut(ProcInOut &pic) {
-    pic.args.init();
-};
-void uninitProcInOut(ProcInOut &pic) {
-    pic.args.uninit();
 };
 
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, char *fileContent, ASTFile &file, s16 &bracket) {
@@ -270,11 +259,11 @@ s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<S
     return varCount;
 };
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x);
-bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, ProcInOut &pic, bool typesIncludes) {
+bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> inout, bool typesIncludes) {
     BRING_TOKENS_TO_SCOPE;
     while (true) {
 	eatNewlines(tokTypes, x);
-	pic.args.push(parseBlock(lexer, file, x));
+	inout.push(parseBlock(lexer, file, x));
 	if(tokTypes[x] == (Token_Type)','){
 	    x += 1;
 	    continue;
@@ -284,8 +273,8 @@ bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, ProcInOut &pic, bool ty
     return true;
 };
 void uninitProcDef(ASTProcDef *node){
-    if(node->in.args.len != 0)  {uninitProcInOut(node->in);};
-    if(node->out.args.len != 0) {uninitProcInOut(node->out);};
+    if(node->in.len != 0)  {node->in.uninit();};
+    if(node->out.len != 0) {node->out.uninit();};
 };
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
@@ -327,10 +316,10 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		proc->tokenOff = start;
 		proc->name = makeStringFromTokOff(start, lexer);
 		if (tokTypes[x] == (Token_Type)')') {
-		    proc->in.args.count = 0;
+		    proc->in.count = 0;
 		    goto PARSE_AFTER_ARGS;
 		};
-		initProcInOut(proc->in);
+		proc->in.init();
 		parseProcInOut(lexer, file, x, proc->in, false);
 		if(tokTypes[x] != (Token_Type)')'){
 		    lexer.emitErr(tokOffs[x].off, "Expected ')'");
@@ -342,7 +331,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		switch (tokTypes[x]) {
 		case Token_Type::ARROW: {
 		    x += 1;
-		    initProcInOut(proc->out);
+		    proc->out.init();
 		    bool bracket = false;
 		    if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
 		    if (parseProcInOut(lexer, file, x, proc->out, true) == false) {
@@ -530,8 +519,7 @@ s64 string2int(String &str){
 
 namespace dbg {
     void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding);
-    void dumpProcInOut(ProcInOut &pic, Lexer &lexer, u8 padding) {
-	DynamicArray<ASTBase*> &args = pic.args;
+    void dumpProcInOut(DynamicArray<ASTBase*> &args, Lexer &lexer, u8 padding) {
 	PAD;
 	padding += 1;
 	for (u8 v=0; v < args.count; v += 1) {
@@ -663,10 +651,10 @@ namespace dbg {
 	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
 	    printf("[IN]");
-	    if (proc->in.args.count != 0) { dumpProcInOut(proc->in, lexer, padding+1); };
+	    if (proc->in.count != 0) { dumpProcInOut(proc->in, lexer, padding+1); };
 	    PAD;
 	    printf("[OUT]");
-	    if (proc->out.args.count != 0) { dumpProcInOut(proc->out, lexer, padding+1); };
+	    if (proc->out.count != 0) { dumpProcInOut(proc->out, lexer, padding+1); };
 	    PAD;
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    printf("[BODY]");

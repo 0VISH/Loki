@@ -127,11 +127,11 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 		return false;
 	    };
 	    //TODO:checking in
-	    if(proc->in.args.count != 0){
+	    if(proc->in.count != 0){
 		Map inProc;
-		inProc.init(proc->in.args.count);
-		for(u16 x=0; x<proc->in.args.count; x+=1){
-		    ASTBase *node = proc->in.args[x];
+		inProc.init(proc->in.count);
+		for(u16 x=0; x<proc->in.count; x+=1){
+		    ASTBase *node = proc->in[x];
 		    if(node->type == ASTType::VARIABLE){
 			ASTVariable *var = (ASTVariable*)node;
 			if(inProc.getValue(var->name) == -1){
