@@ -51,8 +51,6 @@ Map keywords;
 
 void initKeywords() {
     const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
-    keywords.init(keywordCount, &defaultHashFunc);
-    
     struct KeywordData {
 	const char *str;
 	const Token_Type type;
@@ -69,6 +67,8 @@ void initKeywords() {
 	{"struct", Token_Type::K_STRUCT},
 	{"for", Token_Type::K_FOR},
     };
+    keywords.init(keywordCount);
+    
     for (u8 i = 0; i < keywordCount; i += 1) {
 	s32 k = keywords.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
 #if(XE_DBG)

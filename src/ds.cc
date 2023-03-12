@@ -93,21 +93,11 @@ struct DynamicArray {
 };
 
 //hash map
-typedef u32 HashFunc(String &str);
-//default hash func
-u32 defaultHashFunc(String &str){
-    //fnv_hash_1a_32
-    char *key = str.mem;
-    u32 len = str.len;
-    u32 h = 0x811c9dc5;
-    for(u32 i=0; i<len; i+=1){h = (h^key[i]) * 0x01000193;};
-    return h;
-}
 struct Map{
 public:
     s32 insertValue(String str, u16 value){
 	if(isFull()){return -1;};
-	u32 hash = hf(str) % len;
+	u32 hash = hashFunc(str) % len;
 	while(status[hash] == true){
 	    hash += 1;   //TODO: check if reprobing by someother value than 1 is faster
 	    if(hash >= len){hash = 0;};
@@ -119,7 +109,7 @@ public:
 	return hash;
     };
     s32 getValue(String str){
-	u32 startHash = hf(str) % len;
+	u32 startHash = hashFunc(str) % len;
 	u32 hash = startHash;
 	while(status[hash] == true){
 	    if(cmpString(str, keys[hash]) == true) { return values[hash]; };
@@ -129,9 +119,8 @@ public:
 	};
 	return -1;
     };
-    void init(u32 length, HashFunc *hashFunc) {
+    void init(u32 length) {
 	len = length;
-	hf = hashFunc;
 	count = 0;
 	char *mem = (char*)mem::alloc(length * (sizeof(String)+sizeof(u16)+sizeof(u8)));
 	keys = (String*)mem;
@@ -159,7 +148,14 @@ private:
     String *keys;
     u16 *values;
     bool *status;
-    HashFunc *hf;
     u32 count;
     u32 len;
+    u32 hashFunc(String &str){
+	//fnv_hash_1a_32
+	char *key = str.mem;
+	u32 len = str.len;
+	u32 h = 0x811c9dc5;
+	for(u32 i=0; i<len; i+=1){h = (h^key[i]) * 0x01000193;};
+	return h;
+    }
 };
