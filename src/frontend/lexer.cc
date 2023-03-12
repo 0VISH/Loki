@@ -14,6 +14,9 @@ enum class Token_Type {
     K_S16,
     K_S32,
     K_PROC,
+    K_IF,
+    K_STRUCT,
+    K_FOR,
     K_END,    //keywords end
     ARROW,
     END_OF_FILE,
@@ -48,7 +51,7 @@ Map keywords;
 
 void initKeywords() {
     const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
-    keywords.init(keywordCount);
+    keywords.init(keywordCount, &defaultHashFunc);
     
     struct KeywordData {
 	const char *str;
@@ -62,6 +65,9 @@ void initKeywords() {
 	{"s16", Token_Type::K_S16},
 	{"s32", Token_Type::K_S32 },
 	{"proc", Token_Type::K_PROC},
+	{"if", Token_Type::K_IF},
+	{"struct", Token_Type::K_STRUCT},
+	{"for", Token_Type::K_FOR},
     };
     for (u8 i = 0; i < keywordCount; i += 1) {
 	s32 k = keywords.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);

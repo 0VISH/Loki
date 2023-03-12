@@ -103,8 +103,8 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
 	    varCount += multi->names.count;
 	};
     };
-    se.varMap.init(varCount);
-    se.procMap.init(procCount);
+    se.varMap.init(varCount, &defaultHashFunc);
+    se.procMap.init(procCount, &defaultHashFunc);
     se.varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
     se.procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
     se.varCount = 0;

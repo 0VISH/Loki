@@ -47,6 +47,7 @@ struct String {
 };
 bool cmpString(String str1, String str2) {
     if (str1.len != str2.len) { return false; };
+    //TODO: SIMD??
     return memcmp(str1.mem, str2.mem, str1.len) == 0;
 };
 
@@ -92,55 +93,73 @@ struct DynamicArray {
 };
 
 //hash map
-struct Map {
-private:
-    DynamicArray<u16> values;
-    DynamicArray<String> keys;
-    DynamicArray<b8>  empty;
+typedef u32 HashFunc(String &str);
+//default hash func
+u32 defaultHashFunc(String &str){
+    //fnv_hash_1a_32
+    char *key = str.mem;
+    u32 len = str.len;
+    u32 h = 0x811c9dc5;
+    for(u32 i=0; i<len; i+=1){h = (h^key[i]) * 0x01000193;};
+    return h;
+}
+struct Map{
 public:
-    void init(u32 count=5) {
-	keys.init(count);
-	values.init(count);
-	empty.init(count);
-	memset(empty.mem, true, sizeof(u8)*count);
-    };
-    void uninit() {
-	keys.uninit();
-	values.uninit();
-	empty.uninit();
-    };
-    s32 insertValue(String str, u16 value) {
-	if (empty.count == empty.len) { return -1; };
-	u32 startHash = fnv_hash_1a_32(str.mem, str.len) % empty.len;
-	u32 hash = startHash;
-	while (empty[hash] == false) {
-	    hash += 1;
-	    if (hash >= empty.len) {
-		hash = 0;
-		continue;
-	    };
-	}
-	empty[hash] = false;
-	values[hash] = value;
+    s32 insertValue(String str, u16 value){
+	if(isFull()){return -1;};
+	u32 hash = hf(str) % len;
+	while(status[hash] == true){
+	    hash += 1;   //TODO: check if reprobing by someother value than 1 is faster
+	    if(hash >= len){hash = 0;};
+	};
+	status[hash] = true;
+	count += 1;
 	keys[hash] = str;
+	values[hash] = value;
 	return hash;
     };
-    s32 getValue(String str) {
-	u32 startHash = fnv_hash_1a_32(str.mem, str.len) % empty.len;
+    s32 getValue(String str){
+	u32 startHash = hf(str) % len;
 	u32 hash = startHash;
-	while (empty[hash] == false) {
-	    if (cmpString(str, keys[hash]) == true) { return values[hash]; };
-	    if (hash == startHash){ return -1; };
+	while(status[hash] == true){
+	    if(cmpString(str, keys[hash]) == true) { return values[hash]; };
 	    hash += 1;
-	    if (hash == empty.len) { hash = 0; };
+	    if(hash >= len){hash = 0;};
+	    if (hash == startHash){ return -1; };
 	};
 	return -1;
     };
-    bool isFull() { return empty.count == empty.len; };
+    void init(u32 length, HashFunc *hashFunc) {
+	len = length;
+	hf = hashFunc;
+	count = 0;
+	char *mem = (char*)mem::alloc(length * (sizeof(String)+sizeof(u16)+sizeof(u8)));
+	keys = (String*)mem;
+	values = (u16*) ((char*)keys   + (length*sizeof(String)));
+	status = (bool*)  ((char*)values + (length*sizeof(u16)));
+	memset(status, false, sizeof(u8)*length);
+    };
+    void uninit() {
+	mem::free(keys);
+    };
+    bool isFull() { return count == len; };
+#if(XE_DBG)
+    void dumpMap(){
+	for(u32 x=0; x<len; x+=1){
+	    printf("%d: ", x);
+	    if(status[x] == false){printf("---\n", x);}
+	    else{
+		printf("\n  KEY: %.*s", keys[x].len, keys[x].mem);
+		printf("\n  VAL: %d\n", values[x]);
+	    };
+	};
+    };
+#endif
 private:
-    u32 fnv_hash_1a_32(char *key, u32 len){
-	u32 h = 0x811c9dc5;
-	for(u32 i=0; i<len; i+=1){h = (h^key[i]) * 0x01000193;};
-	return h;
-    }
+    String *keys;
+    u16 *values;
+    bool *status;
+    HashFunc *hf;
+    u32 count;
+    u32 len;
 };
