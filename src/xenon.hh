@@ -3,7 +3,7 @@
 //#define XE_DBG
 //#define XE_TEST
 //#define MSVC_COMPILER
-//#define ZIG_COMPILER
+//#define CLANG_COMPILER
 #define XE_PLAT_WIN  true
 
 #define ARRAY_LENGTH(x)   sizeof(x)/sizeof(x[0])

@@ -214,7 +214,7 @@ b32 genTokens(Lexer &lex) {
 		    while (true) {
 			__m128i tocmp = _mm_set1_epi8('\n');
 			//TODO: this causes a crash while compiling with zig c++
-			__m128i chunk = _mm_load_si128((const __m128i*)mem);
+			__m128i chunk = _mm_loadu_si128((const __m128i*)mem);
 			__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
 			mask = _mm_movemask_epi8(results);
 			if (mask != 0) {break;};
@@ -239,7 +239,7 @@ b32 genTokens(Lexer &lex) {
 		    x += 3;
 		    while (level != 0) {
 			__m128i tocmp = _mm_set1_epi8('/');
-			__m128i chunk = _mm_load_si128 ((__m128i const*)(src+x));
+			__m128i chunk = _mm_loadu_si128((const __m128i*)(src+x));
 			__m128i results =  _mm_cmpeq_epi8(chunk, tocmp);
 			s32 frontslashMask = _mm_movemask_epi8(results);
 			tocmp = _mm_set1_epi8('*');

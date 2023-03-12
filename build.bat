@@ -10,6 +10,6 @@ if "%1" == "dbg" (
 
 if "%1" == "rls" (
    if not exist bin\rls\ (mkdir bin\rls\)
-   set ZIGCLFlags= -w -D ZIG_COMPILER=true -D XE_DBG=false -D XE_TEST=false
-   zig c++ %ZIGCLFlags% src\main.cc -o bin\rls\xenon.exe
+   set CLANGCLFlags= -Ofast -D CLANG_COMPILER=true -D XE_DBG=false -D XE_TEST=false
+   clang++ %CLANGCLFlags% src\main.cc -o bin\rls\xenon.exe
 )

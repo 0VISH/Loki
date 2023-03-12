@@ -1,8 +1,15 @@
+//@ignore
+#if(CLANG_COMPILER)
+#pragma clang diagnostic ignored "-Wwritable-strings"
+#pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #include "include.hh"
 
 s32 main(s32 argc, char **argv) {
     SEH_EXCEPTION_BLOCK_START;
-	
+
     if (argc < 2) {
 	printf("main file path not provided");
 	return EXIT_SUCCESS;
