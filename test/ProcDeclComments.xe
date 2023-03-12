@@ -11,7 +11,7 @@
 
 foo :: 	proc(
 		x,y,z: u32,
-		a: s8, b: u8)
+		a: s8, x: u8)
 		-> (a,b: u32, c: u8)
 		{
 	

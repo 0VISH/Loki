@@ -126,23 +126,7 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 		lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 		return false;
 	    };
-	    //TODO:checking in
-	    if(proc->in.count != 0){
-		Map inProc;
-		inProc.init(proc->in.count);
-		for(u16 x=0; x<proc->in.count; x+=1){
-		    ASTBase *node = proc->in[x];
-		    if(node->type == ASTType::VARIABLE){
-			ASTVariable *var = (ASTVariable*)node;
-			if(inProc.getValue(var->name) == -1){
-			    inProc.insertValue(var->name, x);
-			}else{
-			    //TODO: report error
-			};
-		    };
-		};
-	    };
-	    //TODO:checking out
+	    //TODO:check in and out
 	    se.procMap.insertValue(name, se.procCount);
 	    ProcEntity entity;
 	    entity.name = name;

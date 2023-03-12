@@ -259,7 +259,7 @@ s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<S
     return varCount;
 };
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x);
-bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> inout, bool typesIncludes) {
+bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &inout, bool typesIncludes) {
     BRING_TOKENS_TO_SCOPE;
     while (true) {
 	eatNewlines(tokTypes, x);
