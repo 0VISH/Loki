@@ -11,7 +11,7 @@ s32 main(s32 argc, char **argv) {
     SEH_EXCEPTION_BLOCK_START;
 
     if (argc < 2) {
-	printf("main file path not provided");
+	printf("main file path not provided\n");
 	return EXIT_SUCCESS;
     };
 #if(XE_DBG)

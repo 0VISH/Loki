@@ -115,6 +115,7 @@ void eatUnwantedChars(char *mem, u64& x) {
     while (true) {
 	switch (mem[x]) {
 	case ' ':
+	case '\r':
 	case '\t':
 	    x += 1;
 	    break;

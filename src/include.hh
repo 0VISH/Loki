@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <immintrin.h>
@@ -11,6 +12,8 @@
 
 #if(XE_PLAT_WIN)
 #include "windowsOS.cc"
+#elif(XE_PLAT_LIN)
+#include "linuxOS.cc"
 #endif
 
 #if(XE_DBG)

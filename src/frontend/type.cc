@@ -11,8 +11,8 @@ Type getTreeType(ASTBase *base, Flag &flag) {
     case ASTType::BIN_MUL:
     case ASTType::BIN_DIV: {
 	ASTBinOp *node = (ASTBinOp*)base;
-	Flag lhsFlag = NULL;
-	Flag rhsFlag = NULL;
+	Flag lhsFlag = 0;
+	Flag rhsFlag = 0;
 	Type lhsType = getTreeType(node->lhs, lhsFlag);
 	Type rhsType = getTreeType(node->rhs, rhsFlag);
 	flag = lhsFlag & rhsFlag;

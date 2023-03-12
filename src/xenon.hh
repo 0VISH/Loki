@@ -1,11 +1,5 @@
 #pragma once
 
-//#define XE_DBG
-//#define XE_TEST
-//#define MSVC_COMPILER
-//#define CLANG_COMPILER
-#define XE_PLAT_WIN  true
-
 #define ARRAY_LENGTH(x)   sizeof(x)/sizeof(x[0])
 #define SET_BIT(x, pos)   x |=  (1 << (u32)pos)
 #define CLEAR_BIT(x, pos) x &= ~(1 << (u32)pos)
@@ -34,3 +28,11 @@ void debugUnreachable(char *file, u32 line) {
 #else
 #define DEBUG_UNREACHABLE
 #endif
+
+//@NOTE: these are defined in the cmd line scripts
+//#define XE_DBG
+//#define XE_TEST
+//#define MSVC_COMPILER
+//#define CLANG_COMPILER
+//#define XE_PLAT_WIN
+//#define XE_PLAT_LIN
