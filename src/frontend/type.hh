@@ -1,4 +1,5 @@
 enum class Type{
+    UNKOWN = 0,
     COMP_VOID = 1,
     S_64,
     U_64,

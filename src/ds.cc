@@ -144,7 +144,7 @@ public:
 	};
     };
 #endif
-private:
+public:
     String *keys;
     u16 *values;
     bool *status;

@@ -27,9 +27,26 @@ Type getTreeType(ASTBase *base, Flag &flag) {
     };
     return Type::COMP_VOID;
 };
+Type getType(Lexer &lexer, u32 off){
+    BRING_TOKENS_TO_SCOPE;
+    switch (tokTypes[off]) {
+    case Token_Type::K_U8:  return Type::U_8;
+    case Token_Type::K_U16: return Type::U_16;
+    case Token_Type::K_U32: return Type::U_32;
+    case Token_Type::K_S8:  return Type::S_8;
+    case Token_Type::K_S16: return Type::S_16;
+    case Token_Type::K_S32: return Type::S_32;
+    default:
+	printf("%d", tokTypes[off]);
+	DEBUG_UNREACHABLE;
+	break;
+    };
+    return Type::UNKOWN;
+};
 
 #if(XE_DBG)
 char *Type2CString[] =  {
+    "unkown",
     "comp_void",
     "s_64",
     "u_64",
@@ -42,7 +59,7 @@ char *Type2CString[] =  {
     "comp_decimal",
     "comp_integer",
 };
-static_assert((u16)Type::TYPE_COUNT-1 == ARRAY_LENGTH(Type2CString), "Type and Type2CString not one-to-one");
+static_assert((u16)Type::TYPE_COUNT == ARRAY_LENGTH(Type2CString), "Type and Type2CString not one-to-one");
 namespace dbg {
     char *getTypeName(Type type) { return Type2CString[(u16)(type)-1]; };
 };

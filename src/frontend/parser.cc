@@ -8,10 +8,10 @@ enum class ASTType {
     BIN_SUB,
     BIN_MUL,
     BIN_DIV,
-    UNI_DECLERATION_T_KNOWN,
+    UNI_DECLERATION,
     UNI_ASSIGNMENT_T_UNKNOWN,
     UNI_ASSIGNMENT_T_KNOWN,
-    MULTI_DECLERATION_T_KNOWN,
+    MULTI_DECLERATION,
     MULTI_ASSIGNMENT_T_UNKNOWN,
     MULTI_ASSIGNMENT_T_KNOWN,
     PROC_DEFENITION,
@@ -36,11 +36,13 @@ struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
     u32 tokenOff;
+    u8 flag;
 };
 struct ASTMultiVar : ASTBase{
     DynamicArray<String> names;
     ASTBase *rhs;
     u32 tokenOff;
+    u8 flag;
 };
 struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> in;
@@ -394,8 +396,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    uniVarType = ASTType::UNI_ASSIGNMENT_T_KNOWN;
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') { goto SINGLE_VARIABLE_ASSIGNMENT; };
-		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION_T_KNOWN, file);
-		    assign->tokenOff = x-1;
+		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION, file);
+		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    return (ASTBase*)assign;
 		}else{
@@ -426,7 +428,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		};
 	    };
 	    //it is multi var decl
-	    ASTMultiVar *multiAss = (ASTMultiVar*)allocAST(sizeof(ASTMultiVar), ASTType::MULTI_DECLERATION_T_KNOWN, file);
+	    ASTMultiVar *multiAss = (ASTMultiVar*)allocAST(sizeof(ASTMultiVar), ASTType::MULTI_DECLERATION, file);
 	    DynamicArray<String> &names = multiAss->names;
 	    names.init(3);
 	    x = start;
@@ -437,12 +439,12 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		names.uninit();
 		return nullptr;
 	    };
+	    multiAss->tokenOff = x-1;
 	    x += 1;
 	    if (isType(tokTypes[x])) {
-		multiAss->tokenOff = x;
 		x += 1;
 		if (tokTypes[x] != (Token_Type)'=') {
-		    multiAss->type = ASTType::MULTI_DECLERATION_T_KNOWN;
+		    multiAss->type = ASTType::MULTI_DECLERATION;
 		    return (ASTBase*)multiAss;
 		};
 		multiAss->type = ASTType::MULTI_ASSIGNMENT_T_KNOWN;
@@ -577,7 +579,7 @@ namespace dbg {
 	    String name = var->name;
 	    printf("name: %.*s", name.len, name.mem);
 	}break;
-	case ASTType::UNI_DECLERATION_T_KNOWN: {
+	case ASTType::UNI_DECLERATION: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    u32 x = decl->tokenOff;
 	    printf("uni_decleration_t_known");
@@ -586,6 +588,22 @@ namespace dbg {
 	    PAD;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	} break;
+	case ASTType::MULTI_DECLERATION:{
+	    ASTMultiVar *decl = (ASTMultiVar*)node;
+	    u32 x = decl->tokenOff;
+	    printf("multi_decleration_t_known");
+	    PAD;
+	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+	    PAD;
+	    printf("names:");
+	    ASTMultiVar *multiAss = (ASTMultiVar*)node;
+	    DynamicArray<String> &names = multiAss->names;
+	    for (u8 x=0; x<names.count; x +=1) {
+		String name = names[x];
+		PAD;
+		printf("      %.*s", name.len, name.mem);
+	    };
+	}break;
 	case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    u32 x = decl->tokenOff;
@@ -604,22 +622,6 @@ namespace dbg {
 	    printf("RHS");
 	    if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
 	} break;
-	case ASTType::MULTI_DECLERATION_T_KNOWN:{
-	    ASTMultiVar *decl = (ASTMultiVar*)node;
-	    u32 x = decl->tokenOff;
-	    printf("multi_decleration_t_known");
-	    PAD;
-	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-	    PAD;
-	    printf("names:");
-	    ASTMultiVar *multiAss = (ASTMultiVar*)node;
-	    DynamicArray<String> &names = multiAss->names;
-	    for (u8 x=0; x<names.count; x +=1) {
-		String name = names[x];
-		PAD;
-		printf("      %.*s", name.len, name.mem);
-	    };
-	}break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
 	    ASTMultiVar *decl = (ASTMultiVar*)node;
 	    u32 x = decl->tokenOff;

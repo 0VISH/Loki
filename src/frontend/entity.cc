@@ -1,11 +1,11 @@
-struct VariableEntity{
+struct Entity{
     String name;
-    Type type;
     u8 flag;
 };
-struct ProcEntity {
-    String name;
+struct VariableEntity : Entity{
+    Type type;
 };
+struct ProcEntity : Entity{};
 
 struct ScopeEntities{
     Map varMap;
@@ -22,71 +22,33 @@ void destroyFileEntities(ScopeEntities &se) {
     se.varMap.uninit();
     se.procMap.uninit();
 };
-bool checkVariablePresentInScopeElseReg(Lexer &lexer, Type type, String name, u32 off, ScopeEntities &se, Flag flag) {
+bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, Type type, ScopeEntities &se) {
+    Map &map = se.varMap;
     BRING_TOKENS_TO_SCOPE;
-    if (se.varMap.getValue(name) != -1) {
-	lexer.emitErr(tokOffs[off].off, "Variable redecleration");
+    if (map.getValue(name) != -1) {
 	return false;
     };
-    se.varMap.insertValue(name, se.varCount);
+    u32 id = map.count;
+    map.insertValue(name,id);
     VariableEntity entity;
     entity.name = name;
     entity.type = type;
     entity.flag = flag;
-    se.varEntities[se.varCount] = entity;
-    se.varCount += 1;
+    se.varEntities[id] = entity;
     return true;
 };
-bool checkVariableEntity(ASTBase *base, u32 x, Lexer &lexer, ScopeEntities &se, b8 t_known, b8 multi) {
+bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, ScopeEntities &se) {
+    Map &map = se.procMap;
     BRING_TOKENS_TO_SCOPE;
-    Flag flag;
-    Type treeType;
-    if(multi){
-	ASTMultiVar *multiAss = (ASTMultiVar*)base;
-	treeType = getTreeType(multiAss->rhs, flag);
-    }else{
-	ASTUniVar *uniAss = (ASTUniVar*)base;
-	treeType = getTreeType(uniAss->rhs, flag);
+    if (map.getValue(name) != -1) {
+	return false;
     };
-    Type givenType;
-    if (t_known) {
-	switch (tokTypes[x-1]) {
-	case Token_Type::K_U8:  givenType = Type::U_8; break;
-	case Token_Type::K_U16: givenType = Type::U_16; break;
-	case Token_Type::K_U32: givenType = Type::U_32; break;
-	case Token_Type::K_S8:  givenType = Type::S_8; break;
-	case Token_Type::K_S16: givenType = Type::S_16; break;
-	case Token_Type::K_S32: givenType = Type::S_32; break;
-	};
-	if (treeType != Type::COMP_VOID && treeType != Type::COMP_DECIMAL && treeType != Type::COMP_INTEGER) {
-	    if (givenType != treeType) {
-		u32 off;
-		if(multi){
-		    ASTMultiVar *multiAss = (ASTMultiVar*)base;
-		    off = multiAss->tokenOff;
-		}else{
-		    ASTUniVar *uniAss = (ASTUniVar*)base;
-		    off = uniAss->tokenOff;
-		};
-		lexer.emitErr(tokOffs[off].off, "Tree type and given type do not match");
-		return false;
-	    };
-	};
-    };
-    if (multi) {
-	ASTMultiVar *multiAss = (ASTMultiVar*)base;
-	DynamicArray<String> &names = multiAss->names;;
-	for (u8 x = 0; x < names.count; x += 1) {
-	    if (checkVariablePresentInScopeElseReg(lexer, givenType, names[x], x, se, flag) == false) {
-		return false;
-	    };
-	};
-    } else {
-	ASTUniVar *uniAss = (ASTUniVar*)base;
-	if (checkVariablePresentInScopeElseReg(lexer, givenType, uniAss->name, uniAss->tokenOff, se, flag) == false) {
-	    return false;
-	};
-    };
+    u32 id = map.count;
+    map.insertValue(name,id);
+    ProcEntity entity;
+    entity.name = name;
+    entity.flag = flag;
+    se.procEntities[id] = entity;
     return true;
 };
 void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntities &se) {
@@ -96,9 +58,9 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
 	ASTBase *node = entities[x];
 	if (node->type == ASTType::PROC_DEFENITION) {
 	    procCount += 1;
-	} else if (node->type >= ASTType::UNI_DECLERATION_T_KNOWN && node->type <= ASTType::UNI_ASSIGNMENT_T_KNOWN) {
+	} else if (node->type >= ASTType::UNI_DECLERATION && node->type <= ASTType::UNI_ASSIGNMENT_T_KNOWN) {
 	    varCount += 1;
-	} else if (node->type >= ASTType::MULTI_DECLERATION_T_KNOWN && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
+	} else if (node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
 	    ASTMultiVar *multi = (ASTMultiVar*)node;
 	    varCount += multi->names.count;
 	};
@@ -109,6 +71,29 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
     se.procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
     se.varCount = 0;
     se.procCount = 0;
+};
+bool checkDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle){
+    if(isSingle){
+	ASTUniVar *var = (ASTUniVar*)base;
+	Type type = getType(lexer, var->tokenOff+2);
+	if(checkVarEntityPresentInScopeElseReg(lexer, var->name, var->flag, type, se) == false){
+	    BRING_TOKENS_TO_SCOPE;
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
+	    return false;
+	};
+	return true;
+    };
+    ASTMultiVar *var = (ASTMultiVar*)base;
+    Type type = getType(lexer, var->tokenOff+2);
+    for(u32 x=0; x!=var->names.count; x+=1){
+	String &name = var->names[x];
+	if(checkVarEntityPresentInScopeElseReg(lexer, name, var->flag, type, se) == false){
+	    BRING_TOKENS_TO_SCOPE;
+	    lexer.emitErr(tokOffs[var->tokenOff - var->names.count - var->names.count + x*2 + 2].off, "Variable redecleration");
+	    return false;
+	};
+    };
+    return true;
 };
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se){
     TIME_BLOCK;
@@ -122,32 +107,31 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 	case ASTType::PROC_DEFENITION: {
 	    ASTProcDef *proc = (ASTProcDef*)node;
 	    String name = proc->name;
-	    if (se.procMap.getValue(name) != -1) {
+	    if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se) == false){
 		lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 		return false;
 	    };
 	    //TODO:check in and out
-	    se.procMap.insertValue(name, se.procCount);
-	    ProcEntity entity;
-	    entity.name = name;
-	    se.procEntities[se.procCount] = entity;
-	    se.procCount += 1;
 	    ScopeEntities pse;
 	    if (checkEntities(proc->body, lexer, pse) == false) { return false; };
 	} break;
-	case ASTType::UNI_DECLERATION_T_KNOWN:
-	case ASTType::MULTI_DECLERATION_T_KNOWN: {
-	} break;
-	case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
-	    t_known = true;
+	case ASTType::UNI_DECLERATION:{
+	    if(checkDecl(node, lexer, se, true) == false){ return false;};
+	}break;
+	case ASTType::MULTI_DECLERATION:{
+	    if(checkDecl(node, lexer, se, false) == false){ return false;};
+	}break;
+	case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
+	    
+	}break;
 	case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
-	    multi = true;
-	    if (checkVariableEntity(node, x, lexer, se, t_known, multi) == false) { return false; };
+	    
 	} break;
-	case ASTType::UNI_ASSIGNMENT_T_KNOWN:
-	    t_known = true;
+	case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
+	    
+	}break;
 	case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
-	    if (checkVariableEntity(node, x, lexer, se, t_known, multi) == false) { return false; };
+	    
 	} break;
 	default: DEBUG_UNREACHABLE;
 	};

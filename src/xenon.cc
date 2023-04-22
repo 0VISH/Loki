@@ -49,7 +49,7 @@ bool compile(char *fileName){
 		};
 		ASTBase *node = astFile.nodes[nodeOff-1];
 		u32 off;
-		if(node->type >= ASTType::MULTI_DECLERATION_T_KNOWN && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
+		if(node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
 		    ASTMultiVar *multiAss = (ASTMultiVar*)node;
 		    off = multiAss->tokenOff;
 		}else{
