@@ -7,8 +7,9 @@
 #include <immintrin.h>
 
 #include "xenon.hh"
-
 #include "mem.cc"
+#include "ds.cc"
+#include "threadpool.hh"
 
 #if(XE_PLAT_WIN)
 #include "windowsOS.cc"
@@ -22,8 +23,8 @@
 
 #include "debug/timer.cc"
 #include "debug/exception.cc"
-#include "ds.cc"
 #include "report.cc"
+#include "threadpool.cc"
 #include "frontend/lexer.cc"
 #include "frontend/type.hh"
 #include "frontend/parser.cc"

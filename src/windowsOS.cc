@@ -33,4 +33,19 @@ namespace os{
 	f64 time = diff / (f64)freq.QuadPart;
 	return time;
     };
+
+    struct Thread{
+	HANDLE hdle;
+    };
+    DWORD WINAPI WinThreadFunc(LPVOID lpParam){
+	TPool *pool = (TPool*)lpParam;
+	return 0;
+    };
+    void createThreads(TPool &pool){
+	for(u32 x=0; x<pool.threads.len; x+=1){
+	    Thread t;
+	    t.hdle = CreateThread(NULL, 0, WinThreadFunc, &pool, 0, nullptr);
+	    pool.threads[x] = t;
+	};
+    };
 }
