@@ -72,7 +72,7 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
     se.varCount = 0;
     se.procCount = 0;
 };
-bool checkDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle){
+bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle){
     if(isSingle){
 	ASTUniVar *var = (ASTUniVar*)base;
 	Type type = getType(lexer, var->tokenOff+2);
@@ -90,6 +90,54 @@ bool checkDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle){
 	if(checkVarEntityPresentInScopeElseReg(lexer, name, var->flag, type, se) == false){
 	    BRING_TOKENS_TO_SCOPE;
 	    lexer.emitErr(tokOffs[var->tokenOff - var->names.count - var->names.count + x*2 + 2].off, "Variable redecleration");
+	    return false;
+	};
+    };
+    return true;
+};
+bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, bool isSingle){
+    BRING_TOKENS_TO_SCOPE;
+    if(isSingle){
+	ASTUniVar *var = (ASTUniVar*)base;
+	Type type;
+	Flag &flag = var->flag;
+	Flag treeFlag;
+	Type treeType = getTreeType(var->rhs, treeFlag);
+	if(tKown){
+	    type = getType(lexer, var->tokenOff+2);
+	    if((u32)treeType < (u32)type){
+		lexer.emitErr(tokOffs[var->tokenOff].off, "Size of expression is greater than declared size");
+		return false;
+	    };
+	}else{
+	    type = treeType;
+	};
+	flag |= treeFlag;
+	if(checkVarEntityPresentInScopeElseReg(lexer, var->name, flag, type, se) == false){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefenition");
+	    return false;
+	};
+	return true;
+    };
+    ASTMultiVar *var = (ASTMultiVar*)base;
+    Type type;
+    Flag &flag = var->flag;
+    Flag treeFlag = 0;
+    Type treeType = getTreeType(var->rhs, treeFlag);
+    if(tKown){
+	type = getType(lexer, var->tokenOff+2);
+	if((u32)treeType < (u32)type){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Size of expression is greater than declared size");
+	    return false;
+	};
+    }else{
+	type = treeType;
+    };
+    flag |= treeFlag;
+    DynamicArray<String> &names = var->names;
+    for(u32 x=0; x<names.count; x+=1){
+	if(checkVarEntityPresentInScopeElseReg(lexer, names[x], flag, type, se) == false){
+	    lexer.emitErr(tokOffs[var->tokenOff - var->names.count - var->names.count + x*2 + 2].off, "Variable redefenition");
 	    return false;
 	};
     };
@@ -116,22 +164,22 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 	    if (checkEntities(proc->body, lexer, pse) == false) { return false; };
 	} break;
 	case ASTType::UNI_DECLERATION:{
-	    if(checkDecl(node, lexer, se, true) == false){ return false;};
+	    if(checkVarDecl(node, lexer, se, true) == false){ return false;};
 	}break;
 	case ASTType::MULTI_DECLERATION:{
-	    if(checkDecl(node, lexer, se, false) == false){ return false;};
+	    if(checkVarDecl(node, lexer, se, false) == false){ return false;};
 	}break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
-	    
+	    if(checkVarDef(node, lexer, se, true, false) == false){return false;};
 	}break;
 	case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
-	    
+	    if(checkVarDef(node, lexer, se, false, false) == false){return false;};
 	} break;
 	case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
-	    
+	    if(checkVarDef(node, lexer, se, true, true) == false){return false;};
 	}break;
 	case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
-	    
+	    if(checkVarDef(node, lexer, se, false, true) == false){return false;};
 	} break;
 	default: DEBUG_UNREACHABLE;
 	};

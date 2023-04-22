@@ -38,7 +38,7 @@ bool compile(char *fileName){
     } else {
 	for (u16 x = 0; x < fileScopeEntities.varCount; x += 1) {
 	    VariableEntity &entity = fileScopeEntities.varEntities[x];
-	    if (!IS_BIT(entity.flag, VarFlags::CONSTANT)) {
+	    if (!IS_BIT(entity.flag, Flags::CONSTANT)) {
 		u32 nodeOff = 0;
 		for (u32 varCount = 0; nodeOff < astFile.nodes.count; nodeOff += 1) {
 		    if (varCount == x+1) { break; };

@@ -19,10 +19,10 @@ Type getTreeType(ASTBase *base, Flag &flag) {
 	return (Type)((u16)lhsType | (u16)rhsType);
     } break;
     case ASTType::NUM_INTEGER:
-	SET_BIT(flag, VarFlags::CONSTANT);
+	SET_BIT(flag, Flags::CONSTANT);
 	return Type::COMP_INTEGER;
     case ASTType::NUM_DECIMAL:
-	SET_BIT(flag, VarFlags::CONSTANT);
+	SET_BIT(flag, Flags::CONSTANT);
 	return Type::COMP_DECIMAL;
     };
     return Type::COMP_VOID;

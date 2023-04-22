@@ -8,6 +8,7 @@
 */
 */
 
+const a, z, b := 34
 
 foo :: 	proc(
 		x,y,z: u32,
@@ -23,11 +24,10 @@ foo :: 	proc(
 
 x :: proc() -> (s8, u32){}
 
-bar ::proc(){
+comptime bar ::proc (){
 }
 
 x :s32= 2 + 2
   xz,y := 2 + 2
-
 
 //asd

@@ -50,6 +50,7 @@ struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> body;
     String name;
     u32 tokenOff;
+    u8 flag;
 };
 struct ASTVariable : ASTBase{
     String name;
@@ -265,7 +266,9 @@ bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> 
     BRING_TOKENS_TO_SCOPE;
     while (true) {
 	eatNewlines(tokTypes, x);
-	inout.push(parseBlock(lexer, file, x));
+	ASTBase *base = parseBlock(lexer, file, x);
+	if(base == nullptr){return false;};
+	inout.push(base);
 	if(tokTypes[x] == (Token_Type)','){
 	    x += 1;
 	    continue;
@@ -278,9 +281,18 @@ void uninitProcDef(ASTProcDef *node){
     if(node->in.len != 0)  {node->in.uninit();};
     if(node->out.len != 0) {node->out.uninit();};
 };
-ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
+ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &flagStart) {
     BRING_TOKENS_TO_SCOPE;
     eatNewlines(tokTypes, x);
+    flagStart = x;
+    while(tokTypes[x] == Token_Type::K_CONSTANT || tokTypes[x] == Token_Type::K_COMPTIME){
+	if(tokTypes[x] == Token_Type::K_CONSTANT){
+	    SET_BIT(flag, Flags::CONSTANT);
+	}else if(tokTypes[x] == Token_Type::K_COMPTIME){
+	    SET_BIT(flag, Flags::COMPTIME);
+	};
+	x += 1;
+    };
     u32 start = x;
     switch (tokTypes[x]) {
     case Token_Type::IDENTIFIER: {
@@ -294,11 +306,13 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		//single variable assignment
 		SINGLE_VARIABLE_ASSIGNMENT:
 		ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), uniVarType, file);
-		assign->tokenOff = x-1;
+		assign->tokenOff = start;
 		assign->name = makeStringFromTokOff(start, lexer);
 		x += 1;
 		u32 end = getEndNewlineEOF(tokTypes, x);
 		assign->rhs = genASTExprTree(lexer, file, x, end);
+		assign->flag = flag;
+		flag = 0;
 		return (ASTBase*)assign;
 	    } break;
 	    case (Token_Type)':': {
@@ -316,13 +330,18 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		x += 1;
 		ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, file);
 		proc->tokenOff = start;
+		proc->flag = flag;
+		flag = 0;
 		proc->name = makeStringFromTokOff(start, lexer);
 		if (tokTypes[x] == (Token_Type)')') {
 		    proc->in.count = 0;
 		    goto PARSE_AFTER_ARGS;
 		};
 		proc->in.init();
-		parseProcInOut(lexer, file, x, proc->in, false);
+		if(parseProcInOut(lexer, file, x, proc->in, false) == false){
+		    uninitProcDef(proc);
+		    return nullptr;
+		};
 		if(tokTypes[x] != (Token_Type)')'){
 		    lexer.emitErr(tokOffs[x].off, "Expected ')'");
 		    return nullptr;
@@ -399,6 +418,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION, file);
 		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
+		    assign->flag = flag;
+		    flag = 0;
 		    return (ASTBase*)assign;
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected a type");
@@ -458,6 +479,8 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    x += 1;
 	    u32 end = getEndNewlineEOF(tokTypes, x);
 	    multiAss->rhs = genASTExprTree(lexer, file, x, end);
+	    multiAss->flag = flag;
+	    flag = 0;
 	    return (ASTBase*)multiAss;
 	} break;
 	} break;
@@ -478,6 +501,17 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
     } break;
     };
     return nullptr;
+};
+ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x){
+    Flag flag = 0;
+    u32 flagStart = 0;
+    ASTBase *base = parseBlockInner(lexer, file, x, flag, flagStart);
+    if(flag != 0){
+	BRING_TOKENS_TO_SCOPE;
+	lexer.emitErr(tokOffs[flagStart].off, "Unexpected flags");
+	return nullptr;
+    };
+    return base;
 };
 
 u32 pow(u32 base, u32 exp){

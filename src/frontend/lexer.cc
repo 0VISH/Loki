@@ -17,6 +17,8 @@ enum class Token_Type {
     K_IF,
     K_STRUCT,
     K_FOR,
+    K_CONSTANT,
+    K_COMPTIME,
     K_END,    //keywords end
     ARROW,
     END_OF_FILE,
@@ -66,6 +68,8 @@ void initKeywords() {
 	{"if", Token_Type::K_IF},
 	{"struct", Token_Type::K_STRUCT},
 	{"for", Token_Type::K_FOR},
+	{"const", Token_Type::K_CONSTANT},
+	{"comptime", Token_Type::K_COMPTIME},
     };
     keywords.init(keywordCount);
     

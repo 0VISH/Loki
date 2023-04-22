@@ -13,8 +13,9 @@ enum class Type{
     COMP_INTEGER,
     TYPE_COUNT
 };
-enum class VarFlags {
+enum class Flags {
     CONSTANT = 1,
+    COMPTIME,
 };
 
 typedef u16 TypeId;
