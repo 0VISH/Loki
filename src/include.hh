@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <immintrin.h>
+#include <mutex>
 
 #include "xenon.hh"
 #include "mem.cc"

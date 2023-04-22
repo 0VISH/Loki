@@ -7,6 +7,12 @@
 
 #include "include.hh"
 
+void add(void *args){
+    int x = 2;
+    int y = 4;
+    printf("X: %d, Y: %d", x, y);
+};
+
 s32 main(s32 argc, char **argv) {
     SEH_EXCEPTION_BLOCK_START;
     

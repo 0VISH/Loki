@@ -85,6 +85,10 @@ struct DynamicArray {
 	mem[count] = t;
 	count += 1;
     };
+    T pop(){
+	count -= 1;
+	return mem[count];
+    };
 #if(XE_DBG)
     void dumpStat() {
 	printf("\n[DYNAMIC_ARRAY] mem: %p; count: %d; len: %d\n", mem, count, len);
