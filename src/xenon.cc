@@ -60,6 +60,14 @@ bool compile(char *fileName){
 	    };
 	};
     };
+    BytecodeFile bf;
+    bf.init();
+    BytecodeContext bc;
+    bc.init(fileScopeEntities.varCount);
+    compileASTNodesToBytecode(astFile.nodes, lexer, fileScopeEntities, bc, bf);
+    dbg::dumpBytecodePages(bf.bytecodePages);
+    bc.uninit();
+    bf.uninit();
     report::flushReports();
     destroyASTFile(astFile);
     destroyLexer(lexer);

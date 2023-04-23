@@ -8,6 +8,7 @@
 */
 */
 
+zz := 69
 const a, z, b := 34
 
 foo :: 	proc(
