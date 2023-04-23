@@ -21,5 +21,5 @@ enum class Flags {
     COMPTIME,
 };
 
-typedef u16 TypeId;
+typedef u16 TypeID;
 typedef u8 Flag;

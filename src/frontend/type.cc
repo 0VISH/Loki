@@ -1,10 +1,15 @@
-Type getType(TypeId type) {
+Type getType(TypeID type) {
     u16 x = 1;
     while (IS_BIT(type, x) == 0) { x += 1; };
     return (Type)x;
 };
+Type greaterType(Type t1, Type t2){
+    if(t1 < t2){return t1;};
+    return t2;
+};
 
-Type getTreeType(ASTBase *base, Flag &flag) {
+TypeID getTreeTypeID(ASTBase *base, Flag &flag) {
+    TypeID id = 0;
     switch (base->type) {
     case ASTType::BIN_ADD:
     case ASTType::BIN_SUB:
@@ -13,19 +18,22 @@ Type getTreeType(ASTBase *base, Flag &flag) {
 	ASTBinOp *node = (ASTBinOp*)base;
 	Flag lhsFlag = 0;
 	Flag rhsFlag = 0;
-	Type lhsType = getTreeType(node->lhs, lhsFlag);
-	Type rhsType = getTreeType(node->rhs, rhsFlag);
+	TypeID lhsTypeID = getTreeTypeID(node->lhs, lhsFlag);
+	TypeID rhsTypeID = getTreeTypeID(node->rhs, rhsFlag);
 	flag = lhsFlag & rhsFlag;
-	return (Type)((u16)lhsType | (u16)rhsType);
+	return (TypeID)((u16)lhsTypeID | (u16)rhsTypeID);
     } break;
     case ASTType::NUM_INTEGER:
 	SET_BIT(flag, Flags::CONSTANT);
-	return Type::COMP_INTEGER;
+	SET_BIT(id, Type::COMP_INTEGER);
+	return id;
     case ASTType::NUM_DECIMAL:
 	SET_BIT(flag, Flags::CONSTANT);
-	return Type::COMP_DECIMAL;
+	SET_BIT(id, Type::COMP_DECIMAL);
+	return id;
     };
-    return Type::COMP_VOID;
+    SET_BIT(id, Type::COMP_VOID);
+    return id;
 };
 Type getType(Lexer &lexer, u32 off){
     BRING_TOKENS_TO_SCOPE;

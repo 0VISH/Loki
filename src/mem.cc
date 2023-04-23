@@ -1,6 +1,14 @@
 namespace mem {
     //TODO: write an allocator
-    void *alloc(u64 size) {return malloc(size);};
+    void *alloc(u64 size) {
+#if(XE_DBG)
+	if(size == 0){
+	    printf("\n[ERROR]: trying to allocate memory of size 0");
+	    return nullptr;
+	};
+#endif
+	return malloc(size);
+    };
     void free(void *mem) {
 #if(XE_DBG)
 	if (mem == nullptr) {

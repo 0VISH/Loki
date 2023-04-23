@@ -36,7 +36,7 @@ bool compile(char *fileName){
     if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) {
 	printf("\nchecking entites failed\n");
     } else {
-	for (u16 x = 0; x < fileScopeEntities.varCount; x += 1) {
+	for (u16 x = 0; x < fileScopeEntities.varMap.len; x += 1) {
 	    VariableEntity &entity = fileScopeEntities.varEntities[x];
 	    if (!IS_BIT(entity.flag, Flags::CONSTANT)) {
 		u32 nodeOff = 0;
@@ -63,7 +63,7 @@ bool compile(char *fileName){
     BytecodeFile bf;
     bf.init();
     BytecodeContext bc;
-    bc.init(fileScopeEntities.varCount);
+    bc.init(fileScopeEntities.varMap.len);
     compileASTNodesToBytecode(astFile.nodes, lexer, fileScopeEntities, bc, bf);
     dbg::dumpBytecodePages(bf.bytecodePages);
     bc.uninit();

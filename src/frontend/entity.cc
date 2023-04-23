@@ -12,15 +12,17 @@ struct ScopeEntities{
     Map procMap;
     VariableEntity* varEntities;
     ProcEntity* procEntities;
-    u16 varCount;
-    u16 procCount;
 };
 
 void destroyFileEntities(ScopeEntities &se) {
-    mem::free(se.varEntities);
-    mem::free(se.procEntities);
-    se.varMap.uninit();
-    se.procMap.uninit();
+    if(se.varMap.len != 0){
+	mem::free(se.varEntities);
+	se.varMap.uninit();
+    };
+    if(se.procMap.len != 0){
+	mem::free(se.procEntities);
+	se.procMap.uninit();
+    };
 };
 bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, Type type, ScopeEntities &se) {
     Map &map = se.varMap;
@@ -65,12 +67,16 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
 	    varCount += multi->names.count;
 	};
     };
-    se.varMap.init(varCount);
-    se.procMap.init(procCount);
-    se.varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
-    se.procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
-    se.varCount = 0;
-    se.procCount = 0;
+    se.varMap.len = 0;
+    se.procMap.len = 0;
+    if(varCount != 0){
+	se.varMap.init(varCount);
+	se.varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
+    };
+    if(procCount != 0){
+	se.procMap.init(procCount);
+	se.procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
+    };
 };
 bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle){
     if(isSingle){
@@ -102,7 +108,7 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, boo
 	Type type;
 	Flag &flag = var->flag;
 	Flag treeFlag;
-	Type treeType = getTreeType(var->rhs, treeFlag);
+	Type treeType = getType(getTreeTypeID(var->rhs, treeFlag));
 	if(tKown){
 	    type = getType(lexer, var->tokenOff+2);
 	    if((u32)treeType < (u32)type){
@@ -123,7 +129,7 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, boo
     Type type;
     Flag &flag = var->flag;
     Flag treeFlag = 0;
-    Type treeType = getTreeType(var->rhs, treeFlag);
+    Type treeType = getType(getTreeTypeID(var->rhs, treeFlag));
     if(tKown){
 	type = getType(lexer, var->tokenOff+2);
 	if((u32)treeType < (u32)type){
@@ -143,56 +149,70 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, boo
     };
     return true;
 };
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se);
+bool checkEntity(ASTBase* node, Lexer &lexer, ScopeEntities &se){
+    switch (node->type) {
+    case ASTType::PROC_DEFENITION: {
+	ASTProcDef *proc = (ASTProcDef*)node;
+	String name = proc->name;
+	if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se) == false){
+	    BRING_TOKENS_TO_SCOPE;
+	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
+	    return false;
+	};
+	//TODO:check in and out
+	ScopeEntities pse;
+	if (checkEntities(proc->body, lexer, pse) == false) { return false; };
+    } break;
+    case ASTType::UNI_DECLERATION:{
+	if(checkVarDecl(node, lexer, se, true) == false){ return false;};
+    }break;
+    case ASTType::MULTI_DECLERATION:{
+	if(checkVarDecl(node, lexer, se, false) == false){ return false;};
+    }break;
+    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
+	ASTMultiVar *var = (ASTMultiVar*)node;
+	if(checkVarDef(node, lexer, se, true, false) == false){return false;};
+	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+    }break;
+    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
+	ASTMultiVar *var = (ASTMultiVar*)node;
+	if(checkVarDef(node, lexer, se, false, false) == false){return false;};
+	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+    } break;
+    case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
+	ASTUniVar *var = (ASTUniVar*)node;
+	if(checkVarDef(node, lexer, se, true, true) == false){return false;};
+	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+    }break;
+    case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
+	ASTUniVar *var = (ASTUniVar*)node;
+	if(checkVarDef(node, lexer, se, false, true) == false){return false;};
+	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+    } break;
+    case ASTType::BIN_SUB:
+    case ASTType::BIN_ADD:{
+	ASTBinOp *op = (ASTBinOp*)node;
+	Flag flag;
+	Type lhsType = getType(getTreeTypeID(op->lhs, flag));
+	Type rhsType = getType(getTreeTypeID(op->rhs, flag));
+	op->lhsType = lhsType;
+	op->rhsType = rhsType;
+	//TODO: check if types are compatible?
+    }break;
+    case ASTType::NUM_INTEGER:
+    case ASTType::NUM_DECIMAL: break;
+    default: DEBUG_UNREACHABLE;return false;
+    };
+    return true;
+};
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se){
     TIME_BLOCK;
     BRING_TOKENS_TO_SCOPE;
     goThroughEntitiesAndInitMaps(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
-	u8 t_known = false;
-	u8 multi = false;
-	switch (node->type) {
-	case ASTType::PROC_DEFENITION: {
-	    ASTProcDef *proc = (ASTProcDef*)node;
-	    String name = proc->name;
-	    if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se) == false){
-		lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
-		return false;
-	    };
-	    //TODO:check in and out
-	    ScopeEntities pse;
-	    if (checkEntities(proc->body, lexer, pse) == false) { return false; };
-	} break;
-	case ASTType::UNI_DECLERATION:{
-	    if(checkVarDecl(node, lexer, se, true) == false){ return false;};
-	}break;
-	case ASTType::MULTI_DECLERATION:{
-	    if(checkVarDecl(node, lexer, se, false) == false){ return false;};
-	}break;
-	case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
-	    if(checkVarDef(node, lexer, se, true, false) == false){return false;};
-	}break;
-	case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
-	    if(checkVarDef(node, lexer, se, false, false) == false){return false;};
-	} break;
-	case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
-	    if(checkVarDef(node, lexer, se, true, true) == false){return false;};
-	}break;
-	case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
-	    if(checkVarDef(node, lexer, se, false, true) == false){return false;};
-	} break;
-	case ASTType::BIN_SUB:
-	case ASTType::BIN_ADD:{
-	    ASTBinOp *op = (ASTBinOp*)node;
-	    Flag flag;
-	    Type lhsType = getTreeType(op->lhs, flag);
-	    Type rhsType = getTreeType(op->rhs, flag);
-	    op->lhsType = lhsType;
-	    op->rhsType = rhsType;
-	    //TODO: check if types are compatible?
-	}break;
-	default: DEBUG_UNREACHABLE;
-	};
+	if(checkEntity(node, lexer, se) == false){return false;};
     };
     return true;
 };
