@@ -48,10 +48,13 @@ Type getType(Lexer &lexer, u32 off){
 char *Type2CString[] =  {
     "unkown",
     "comp_void",
+    "f_64",
     "s_64",
     "u_64",
+    "f_32",
     "s_32",
     "u_32",
+    "f_16",
     "s_16",
     "u_16",
     "s_8",

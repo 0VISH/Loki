@@ -181,6 +181,16 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities
 	case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 	    if(checkVarDef(node, lexer, se, false, true) == false){return false;};
 	} break;
+	case ASTType::BIN_SUB:
+	case ASTType::BIN_ADD:{
+	    ASTBinOp *op = (ASTBinOp*)node;
+	    Flag flag;
+	    Type lhsType = getTreeType(op->lhs, flag);
+	    Type rhsType = getTreeType(op->rhs, flag);
+	    op->lhsType = lhsType;
+	    op->rhsType = rhsType;
+	    //TODO: check if types are compatible?
+	}break;
 	default: DEBUG_UNREACHABLE;
 	};
     };

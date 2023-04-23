@@ -1,10 +1,13 @@
 enum class Type{
     UNKOWN = 0,
     COMP_VOID = 1,
+    F_64,
     S_64,
     U_64,
+    F_32,
     S_32,
     U_32,
+    F_16,
     S_16,
     U_16,
     S_8,

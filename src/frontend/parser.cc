@@ -31,6 +31,8 @@ struct ASTNumDec : ASTBase{
 struct ASTBinOp : ASTBase{
     ASTBase *lhs;
     ASTBase *rhs;
+    Type lhsType;
+    Type rhsType;
 };
 struct ASTUniVar : ASTBase{
     String name;
@@ -104,6 +106,12 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, char *fileContent, ASTFile &file, s
 	x += 1;
 	return (ASTBase*)numNode;
     } break;
+    case Token_Type::DECIMAL:{
+	ASTNumDec *numNode = (ASTNumDec*)allocAST(sizeof(ASTNumDec), ASTType::NUM_DECIMAL, file);
+	numNode->tokenOff = x;
+	x += 1;
+	return (ASTBase*)numNode;
+    }break;
     case (Token_Type)'(': {
 	while (tokTypes[x] == (Token_Type)'(') {
 	    bracket += 10;
@@ -549,6 +557,16 @@ s64 string2int(String &str){
     };
     return num;
 }
+f64 string2float(String &str){
+    u32 decimal = 0;
+    while(str[decimal] != '.'){decimal += 1;};
+    u32 postDecimalBadChar = 0;
+    for(u32 x=decimal+1; x<str.len; x+=1){
+	if(str[x] == '_'){postDecimalBadChar += 1;};
+    };
+    s64 num = string2int(str);
+    return (f64)num/pow(10, str.len-decimal-1-postDecimalBadChar);
+};
 
 #if(XE_DBG)
 
@@ -585,8 +603,11 @@ namespace dbg {
 	} break;
 	case ASTType::NUM_DECIMAL: {
 	    printf("num_decimal");
+	    ASTNumDec *numDec = (ASTNumDec*)node;
+	    String str = makeStringFromTokOff(numDec->tokenOff, lexer);
+	    f64 num = string2float(str);
 	    PAD;
-	    printf("num: %f", 69.69);
+	    printf("num: %f", num);
 	} break;
 	case ASTType::BIN_ADD: if (c == NULL) { c = '+'; printf("bin_add"); };
 	case ASTType::BIN_SUB: if (c == NULL) { c = '-'; printf("bin_sub"); };

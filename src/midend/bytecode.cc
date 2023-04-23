@@ -4,10 +4,13 @@ enum class Bytecode : u16{
     NONE = 0,                             //internal
     //Types from enum class Type
     NEXT_PAGE = (u16)Type::TYPE_COUNT,    //internal
-    VAR,
     REG,
     CONST_INT,
+    CONST_DEC,
     MOVI,
+    MOVF,
+    ADDI,
+    ADDF,
     BYTECODE_COUNT,                       //internal
 };
 
@@ -31,6 +34,10 @@ struct BytecodeFile{
 	page[pageBrim] = bc;
 	pageBrim += 1;
     };
+    void emitReg(u32 regID){
+	emit(Bytecode::REG);
+	emit((Bytecode)regID);
+    };
     //encoding constant into bytecode page cause why not?
     void emitConstInt(s64 num){
 	const u16 sizeReq = sizeof(s64) / sizeof(Bytecode);
@@ -43,6 +50,20 @@ struct BytecodeFile{
 	};
 	Bytecode *page = bytecodePages[bytecodePages.count-1];
 	s64 *mem = (s64*)(page + pageBrim);
+	*mem = num;
+	pageBrim += sizeReq;
+    };
+    void emitConstDec(f64 num){
+	const u16 sizeReq = sizeof(f64) / sizeof(Bytecode);
+	if(pageBrim+sizeReq >= BYTECODE_PAGE_COUNT){
+	    if(pageBrim+1 < BYTECODE_PAGE_COUNT){
+		Bytecode *page = bytecodePages[bytecodePages.count-1];
+		page[pageBrim] = Bytecode::NEXT_PAGE;
+	    };
+	    newBytecodePage();
+	};
+	Bytecode *page = bytecodePages[bytecodePages.count-1];
+	f64 *mem = (f64*)(page + pageBrim);
 	*mem = num;
 	pageBrim += sizeReq;
     };
@@ -64,7 +85,7 @@ struct BytecodeContext{
     void uninit(){
 	varToReg.uninit();
     };
-    u32 emitReg(){
+    u32 newReg(){
 	u32 reg = registerID;
 	registerID += 1;
 	return reg;
@@ -76,17 +97,46 @@ s64 getConstInt(Bytecode *bytes, u32 &x){
     s64 *mem = (s64*)bytes;
     return *mem;
 };
+f64 getConstDec(Bytecode *bytes, u32 &x){
+    x += sizeof(f64) / sizeof(Bytecode);
+    f64 *mem = (f64*)bytes;
+    return *mem;
+};
 
-//bytecode starts with a const or a register
-void compileExprToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeContext &bc, BytecodeFile &bf){
+void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeContext &bc, BytecodeFile &bf){
     ASTType type = node->type;
     switch(type){
     case ASTType::NUM_INTEGER:{
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	s64 num = string2int(str);
+	bf.emit(Bytecode::MOVI);
+	bf.emitReg(outputRegister);
 	bf.emit(Bytecode::CONST_INT);
 	bf.emitConstInt(num);
+    }break;
+    case ASTType::NUM_DECIMAL:{
+	ASTNumDec *numDec = (ASTNumDec*)node;
+	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
+	f64 num = string2float(str);
+	bf.emit(Bytecode::MOVF);
+	bf.emitReg(outputRegister);
+	bf.emit(Bytecode::CONST_DEC);
+	bf.emitConstDec(num);
+    }break;
+    case ASTType::BIN_ADD:{
+	ASTBinOp *op = (ASTBinOp*)node;
+	Type ansType = (Type)((u32)op->lhsType | (u32)op->rhsType);
+	u32 lhsReg = bc.newReg();
+	u32 rhsReg = bc.newReg();
+	compileExprToBytecode(lhsReg, op->lhs, lexer, se, bc, bf);
+	compileExprToBytecode(rhsReg, op->rhs, lexer, se, bc, bf);
+	if(ansType == Type::F_64 || ansType == Type::F_32 || ansType == Type::F_16){
+	    bf.emit(Bytecode::ADDF);
+	}else{bf.emit(Bytecode::ADDI);};
+	bf.emitReg(outputRegister);
+	bf.emitReg(lhsReg);
+	bf.emitReg(rhsReg);
     }break;
     default:
 	DEBUG_UNREACHABLE;
@@ -101,40 +151,28 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeC
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se.varMap.getValue(var->name);
 	const VariableEntity &entity = se.varEntities[id];
-	u32 regID = bc.emitReg();
+	u32 regID = bc.newReg();
+	u32 ansReg = bc.newReg();
+	compileExprToBytecode(ansReg, var->rhs, lexer, se, bc, bf);
 	bc.varToReg.insertValue(entity.name, regID);
-	bf.emit(Bytecode::VAR);
-	bf.emit((Bytecode)entity.type);
-	bf.emit(Bytecode::REG);
-	bf.emit((Bytecode)regID);
 	bf.emit(Bytecode::MOVI);
-	bf.emit(Bytecode::REG);
-	bf.emit((Bytecode)regID);
-	compileExprToBytecode(var->rhs, lexer, se, bc, bf);
+	bf.emitReg(regID);
+	bf.emitReg(ansReg);
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	DynamicArray<String> &names = var->names;
-	u32 ansReg = bc.emitReg();
-	bf.emit(Bytecode::MOVI);
-	bf.emit(Bytecode::REG);
-	bf.emit((Bytecode)ansReg);
-	compileExprToBytecode(var->rhs, lexer, se, bc, bf);
+	u32 ansReg = bc.newReg();
+	compileExprToBytecode(ansReg, var->rhs, lexer, se, bc, bf);
 	for(u32 x=0; x<names.count; x+=1){
 	    u32 id = se.varMap.getValue(names[x]);
 	    const VariableEntity &entity = se.varEntities[id];
-	    u32 regID = bc.emitReg();
+	    u32 regID = bc.newReg();
 	    bc.varToReg.insertValue(entity.name, regID);
-	    bf.emit(Bytecode::VAR);
-	    bf.emit((Bytecode)entity.type);
-	    bf.emit(Bytecode::REG);
-	    bf.emit((Bytecode)regID);
 	    bf.emit(Bytecode::MOVI);
-	    bf.emit(Bytecode::REG);
-	    bf.emit((Bytecode)regID);
-	    bf.emit(Bytecode::REG);
-	    bf.emit((Bytecode)ansReg);
+	    bf.emitReg(regID);
+	    bf.emitReg(ansReg);
 	};
     }break;
     default:
@@ -157,13 +195,6 @@ namespace dbg{
 	switch(page[x]){
 	case Bytecode::NONE: printf("NONE");return true;
 	case Bytecode::NEXT_PAGE: printf("NEXT_PAGE");break;
-	case Bytecode::VAR:{
-	    printf("var");
-	    x += 1;
-	    dumpBytecode(page, x);
-	    x += 1;
-	    dumpBytecode(page, x);
-	}break;
 	case (Bytecode)Type::COMP_VOID: printf("void");break;
 	case (Bytecode)Type::S_64: printf("s64");break;
 	case (Bytecode)Type::U_64: printf("u64");break;
@@ -187,11 +218,33 @@ namespace dbg{
 	    printf(" ");
 	    dumpBytecode(page, x);
 	}break;
+	case Bytecode::MOVF:{
+	    printf("movf");
+	    x += 1;
+	    dumpBytecode(page, x);
+	    x += 1;
+	    printf(" ");
+	    dumpBytecode(page, x);
+	}break;
 	case Bytecode::CONST_INT:{
 	    s64 num = getConstInt(page+x+1, x);
 	    printf("%lld", num);
 	}break;
+	case Bytecode::CONST_DEC:{
+	    f64 num = getConstDec(page+x+1, x);
+	    printf("%f", num);
+	}break;
+	case Bytecode::ADDI:{
+	    printf("addi");
+	    x += 1;
+	    dumpBytecode(page, x);
+	    x += 1;
+	    dumpBytecode(page, x);
+	    x += 1;
+	    dumpBytecode(page, x);
+	}break;
 	default:
+	    printf("%d", page[x]);
 	    DEBUG_UNREACHABLE;
 	    return false;
 	};
