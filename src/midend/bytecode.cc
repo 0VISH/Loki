@@ -1,4 +1,5 @@
 #define BYTECODE_PAGE_COUNT 100
+#define REGISTER_COUNT      100
 
 enum class Bytecode : u16{
     NONE = 0,                             //internal
@@ -87,7 +88,7 @@ struct BytecodeContext{
     void init(u32 varCount){
 	registerID = 0;
 	varToReg.init(varCount);
-	types = (Type*)mem::alloc(sizeof(Type)*varCount);
+	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
     };
     void uninit(){
 	varToReg.uninit();
@@ -96,7 +97,7 @@ struct BytecodeContext{
     u32 newReg(Type type){
 	u32 reg = registerID;
 	registerID += 1;
-	types[reg] = type;//FIXME: causing crash why tho?
+	types[reg] = type;
 	return reg;
     };
 };

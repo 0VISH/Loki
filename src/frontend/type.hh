@@ -1,4 +1,4 @@
-enum class Type{
+enum class Type : u16{
     UNKOWN = 0,
     COMP_VOID = 1,
     F_64,
