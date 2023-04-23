@@ -31,6 +31,7 @@
 #include "frontend/parser.cc"
 #include "frontend/type.cc"
 #include "frontend/entity.cc"
+#include "midend/bytecode.cc"
 #include "xenon.cc"
 
 #if(XE_DBG)

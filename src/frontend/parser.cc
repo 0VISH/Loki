@@ -78,6 +78,7 @@ void destroyASTFile(ASTFile &file) {
 	mem::free(file.memPages[i]);
     };
     file.memPages.uninit();
+    file.nodes.uninit();
 };
 ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     if (file.pageBrim+nodeSize >= AST_PAGE_SIZE) {
