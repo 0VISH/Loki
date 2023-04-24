@@ -18,11 +18,12 @@ void destroyVM(VM &vm){
     mem::free(vm.registers);
 };
 
-//NOTE: these 5 functions are for continuity
+//NOTE: these functions are for continuity
 s8 none(Bytecode *page, Type *regTypes, VM &vm){return 0;};
 s8 next_page(Bytecode *page, Type *regTypes, VM &vm){return 0;};
 s8 reg(Bytecode *page, Type *regTypes, VM &vm){return 0;};
-s8 const_int(Bytecode *page, Type *regTypes, VM &vm){return 0;};
+s8 const_ints(Bytecode *page, Type *regTypes, VM &vm){return 0;};
+s8 const_intu(Bytecode *page, Type *regTypes, VM &vm){return 0;};
 s8 const_dec(Bytecode *page, Type *regTypes, VM &vm){return 0;};
 
 s8 cast(Bytecode *page, Type *regTypes, VM &vm){
@@ -70,8 +71,24 @@ s8 movi(Bytecode *page, Type *regTypes, VM &vm){
 	vm.registers[dest].sint = vm.registers[src].sint;
 	x += reg_in_stream;
     }break;
-    case Bytecode::CONST_INT:{
+    case Bytecode::CONST_INTS:{
 	vm.registers[dest].sint = getConstInt(page + 4);
+	x += const_in_stream + 1;
+    }break;
+    };
+    return x;
+};
+s8 movu(Bytecode *page, Type *regTypes, VM &vm){
+    u32 dest = (u16)page[2];
+    s8 x = 2;
+    switch(page[3]){
+    case Bytecode::REG:{
+	u32 src = (u16)page[4];
+	vm.registers[dest].sint = vm.registers[src].sint;
+	x += reg_in_stream;
+    }break;
+    case Bytecode::CONST_INTU:{
+	vm.registers[dest].uint = getConstInt(page + 4);
 	x += const_in_stream + 1;
     }break;
     };
@@ -100,6 +117,13 @@ s8 addi(Bytecode *page, Type *regTypes, VM &vm){
     vm.registers[dest].sint = vm.registers[lhs].sint + vm.registers[rhs].sint;
     return 6;
 };
+s8 addu(Bytecode *page, Type *regTypes, VM &vm){
+    u32 dest = (u16)page[2];
+    u32 lhs = (u16)page[4];
+    u32 rhs = (u16)page[6];
+    vm.registers[dest].uint = vm.registers[lhs].uint + vm.registers[rhs].uint;
+    return 6;
+};
 s8 addf(Bytecode *page, Type *regTypes, VM &vm){
     u32 dest = (u16)page[2];
     u32 lhs = (u16)page[4];
@@ -111,10 +135,12 @@ s8 addf(Bytecode *page, Type *regTypes, VM &vm){
 s8 (*byteProc[])(Bytecode *page, Type *regTypes, VM &vm) = {
     none, next_page, reg,
     cast,
-    const_int, const_dec,
+    const_ints, const_intu, const_dec,
     movi,
+    movu,
     movf,
     addi,
+    addu,
     addf,
 };
 

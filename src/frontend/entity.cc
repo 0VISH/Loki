@@ -112,7 +112,7 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, boo
 	if(tKown){
 	    type = getType(lexer, var->tokenOff+2);
 	    if((u32)treeType < (u32)type){
-		lexer.emitErr(tokOffs[var->tokenOff].off, "Size of expression is greater than declared size");
+		lexer.emitErr(tokOffs[var->tokenOff].off, "Type of expression tree does not match declared type");
 		return false;
 	    };
 	}else{
