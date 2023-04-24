@@ -252,24 +252,17 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Scop
 namespace dbg{
     bool dumpBytecode(Bytecode *page, u32 &x){
 	printf(" ");
+	bool flag = true;
 	switch(page[x]){
 	case Bytecode::NONE: printf("NONE");return false;
 	case Bytecode::REG:{
 	    x += 1;
 	    printf("%%%d", page[x]);
 	}break;
-	case Bytecode::MOVI:{
-	    printf("movi");
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	}break;
-	case Bytecode::MOVU:{
-	    printf("movu");
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	}break;
+	case Bytecode::MOVI: printf("movi");flag = false;
+	case Bytecode::MOVU: if(flag){printf("movu");flag = false;};
 	case Bytecode::MOVF:{
-	    printf("movf");
+	    if(flag){printf("movf");};
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;
@@ -288,20 +281,10 @@ namespace dbg{
 	    x += const_in_stream;
 	    printf("%f", num);
 	}break;
-	case Bytecode::ADDI:{
-	    printf("addi");
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	}break;
-	case Bytecode::ADDU:{
-	    printf("addu");
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	}break;
+	case Bytecode::ADDI: printf("addi");flag = false;
+	case Bytecode::ADDU: if(flag){printf("addu");flag = false;};
 	case Bytecode::ADDF:{
-	    printf("addf");
+	    if(flag){printf("addf");};
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
