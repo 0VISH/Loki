@@ -66,6 +66,9 @@ bool compile(char *fileName){
     bc.init(fileScopeEntities.varMap.len);
     compileASTNodesToBytecode(astFile.nodes, lexer, fileScopeEntities, bc, bf);
     dbg::dumpBytecodePages(bf.bytecodePages);
+    VM vm = createVM();
+    execBytecode(bf, 0, 0, 1000000, bc.types, vm);
+    destroyVM(vm);
     bc.uninit();
     bf.uninit();
     report::flushReports();
