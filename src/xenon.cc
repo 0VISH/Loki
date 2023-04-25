@@ -32,8 +32,10 @@ bool compile(char *fileName){
 	return false;
     };
     dbg::dumpASTFile(astFile, lexer);
-    ScopeEntities fileScopeEntities;
-    if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) {
+    DynamicArray<ScopeEntities> see;
+    see.init(3);
+    ScopeEntities &fileScopeEntities = see.newElem();
+    if (checkEntities(astFile.nodes, lexer, see) == false) {
 	printf("\nchecking entites failed\n");
     } else {
 	for (u16 x = 0; x < fileScopeEntities.varMap.len; x += 1) {
@@ -60,6 +62,9 @@ bool compile(char *fileName){
 	    };
 	};
     };
+    report::flushReports();
+    printf("LKSJDFKLSDFJS");
+    return true;
     BytecodeFile bf;
     bf.init();
     BytecodeContext bc;

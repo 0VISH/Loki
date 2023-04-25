@@ -89,6 +89,11 @@ struct DynamicArray {
 	count -= 1;
 	return mem[count];
     };
+    T& newElem(){
+	if (count == len) { realloc(len + len / 2); };
+	count += 1;
+	return mem[count-1];
+    };
 #if(XE_DBG)
     void dumpStat() {
 	printf("\n[DYNAMIC_ARRAY] mem: %p; count: %d; len: %d\n", mem, count, len);

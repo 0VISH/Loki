@@ -5,7 +5,9 @@ struct Entity{
 struct VariableEntity : Entity{
     Type type;
 };
-struct ProcEntity : Entity{};
+struct ProcEntity : Entity{
+    
+};
 
 struct ScopeEntities{
     Map varMap;
@@ -149,8 +151,13 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, boo
     };
     return true;
 };
-bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se);
-bool checkEntity(ASTBase* node, Lexer &lexer, ScopeEntities &se){
+bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities> &see){
+    //TODO: 
+    return true;
+};
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities> &see);
+bool checkEntityForOneScope(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities> &see, u32 off){
+    ScopeEntities &se = see[off];
     switch (node->type) {
     case ASTType::PROC_DEFENITION: {
 	BRING_TOKENS_TO_SCOPE;
@@ -160,35 +167,21 @@ bool checkEntity(ASTBase* node, Lexer &lexer, ScopeEntities &se){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};
-	//TODO: create new scoped entity
-	u32 startProcInID = se.varMap.count;
-	proc->startProcInID = startProcInID;
-        for(u32 x=0; x<proc->in.count; x+=1){
-	    ASTBase *node = proc->in[x];
-	    switch(node->type){
-	    case ASTType::UNI_DECLERATION:
-	    case ASTType::MULTI_DECLERATION:{
-		checkEntity(node, lexer, se);
-	    }break;
-	    default:
-		lexer.emitErr(tokOffs[proc->tokenOff].off, "Invalid input statement for procedure defenition");
-		return false;
-	    };
-	};
 	for(u32 x=0; x<proc->out.count; x+=1){
 	    ASTBase *node = proc->out[x];
 	    switch(node->type){
 	    case ASTType::UNI_DECLERATION:
 	    case ASTType::MULTI_DECLERATION:{
-		checkEntity(node, lexer, se);
+		checkType(node, lexer, see);
 	    }break;
 	    default:
 		lexer.emitErr(tokOffs[proc->tokenOff].off, "Invalid output statement for procedure defenition");
 		return false;
 	    };
 	};
-	ScopeEntities pse;
-	if (checkEntities(proc->body, lexer, pse) == false) { return false; };
+	ScopeEntities &procBodySe = see.newElem();
+	//NOTE: checking body checks the input also
+	if (checkEntities(proc->body, lexer, see) == false) { return false; };
     } break;
     case ASTType::UNI_DECLERATION:{
 	if(checkVarDecl(node, lexer, se, true) == false){ return false;};
@@ -199,22 +192,22 @@ bool checkEntity(ASTBase* node, Lexer &lexer, ScopeEntities &se){
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	if(checkVarDef(node, lexer, se, true, false) == false){return false;};
-	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	if(checkVarDef(node, lexer, se, false, false) == false){return false;};
-	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
     } break;
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, se, true, true) == false){return false;};
-	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, se, false, true) == false){return false;};
-	if(checkEntity(var->rhs, lexer, se) == false){return false;};
+	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
     } break;
     case ASTType::BIN_SUB:
     case ASTType::BIN_ADD:{
@@ -232,13 +225,23 @@ bool checkEntity(ASTBase* node, Lexer &lexer, ScopeEntities &se){
     };
     return true;
 };
-bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, ScopeEntities &se){
+bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities> &see){
+    for(u32 x=see.count; x>0; x-=1){
+	x -= 1;
+	if(checkEntityForOneScope(node, lexer, see, x) == true){
+	    return true;
+	};
+    };
+    return false;
+};
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities> &see){
     TIME_BLOCK;
     BRING_TOKENS_TO_SCOPE;
+    ScopeEntities &se = see[see.count-1];
     goThroughEntitiesAndInitMaps(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
-	if(checkEntity(node, lexer, se) == false){return false;};
+	if(checkEntity(node, lexer, see) == false){return false;};
     };
     return true;
 };

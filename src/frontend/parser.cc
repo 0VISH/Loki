@@ -47,13 +47,13 @@ struct ASTMultiVar : ASTBase{
     u8 flag;
 };
 struct ASTProcDef : ASTBase {
-    DynamicArray<ASTBase*> in;
+    DynamicArray<ASTBase*> body;    //NOTE: also includes input
     DynamicArray<ASTBase*> out;
-    DynamicArray<ASTBase*> body;
     String name;
     u32 startProcInID;
     u32 tokenOff;
     u32 inCount;
+    u32 inCommaCount;
     u8 flag;
 };
 struct ASTVariable : ASTBase{
@@ -276,7 +276,7 @@ s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<S
     return varCount;
 };
 void uninitProcDef(ASTProcDef *node){
-    if(node->in.len != 0)  {node->in.uninit();};
+    if(node->body.len != 0)  {node->body.uninit();};
     if(node->out.len != 0) {node->out.uninit();};
 };
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x);
@@ -338,14 +338,15 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		proc->flag = flag;
 		flag = 0;
 		proc->name = makeStringFromTokOff(start, lexer);
+		proc->body.init();
 		if (tokTypes[x] == (Token_Type)')') {
-		    proc->in.count = 0;
 		    goto PARSE_AFTER_ARGS;
 		};
-		proc->in.init();
 		u32 inCount = 0;
+		u32 inCommaCount = 0;
 		//parse input
 		while (true) {
+		    inCommaCount += 1;
 		    eatNewlines(tokTypes, x);
 		    ASTBase *base = parseBlock(lexer, file, x);
 		    if(base == nullptr){
@@ -359,14 +360,15 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 			inCount += multiVar->names.count;
 			break;
 		    };
-		    proc->in.push(base);
+		    proc->body.push(base);
 		    if(tokTypes[x] == (Token_Type)','){
 			x += 1;
 			continue;
 		    };
 		    break;
 		};
-		proc->inCount = varCount;
+		proc->inCount = inCount;
+		proc->inCommaCount = inCommaCount;
 		if(tokTypes[x] != (Token_Type)')'){
 		    lexer.emitErr(tokOffs[x].off, "Expected ')'");
 		    return nullptr;
@@ -388,6 +390,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 			    uninitProcDef(proc);
 			    return nullptr;
 			};
+			x += 1;
 			proc->out.push(typeNode);
 			if(tokTypes[x] == (Token_Type)','){
 			    x += 1;
@@ -416,7 +419,6 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		    x += 1;
 		} break;
 		case (Token_Type)'{': {
-		    proc->body.count = 0;
 		    x += 1;
 		} break;
 		default: {
@@ -427,12 +429,10 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		};
 		eatNewlines(tokTypes, x);
 		if (tokTypes[x] == (Token_Type)'}') {
-		    proc->body.count = 0;
 		    x += 1;
 		    return (ASTBase*)proc;
 		};
 		DynamicArray<ASTBase*> *table = &(proc->body);
-		table->init();
 		while (tokTypes[x] != (Token_Type)'}') {
 		    ASTBase *node = parseBlock(lexer, file, x);
 		    if (node == nullptr) {
@@ -571,16 +571,6 @@ f64 string2float(String &str){
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
 
 namespace dbg {
-    void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding);
-    void dumpProcInOut(DynamicArray<ASTBase*> &args, Lexer &lexer, u8 padding) {
-	PAD;
-	padding += 1;
-	for (u8 v=0; v < args.count; v += 1) {
-	    __dumpNodesWithoutEndPadding(args[v], lexer, padding);
-	    PAD;
-	};
-	padding -= 1;
-    };
     void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 	BRING_TOKENS_TO_SCOPE;
 	PAD;
@@ -707,15 +697,23 @@ namespace dbg {
 	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
 	    printf("[IN]");
-	    if (proc->in.count != 0) { dumpProcInOut(proc->in, lexer, padding+1); };
+	    for(u32 x=0; x<proc->inCommaCount; x+=1){
+		ASTBase *node = proc->body[x];
+		PAD;
+		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
+	    };
 	    PAD;
 	    printf("[OUT]");
-	    if (proc->out.count != 0) { dumpProcInOut(proc->out, lexer, padding+1); };
+	    for(u32 x=0; x<proc->out.count; x+=1){
+		ASTBase *node = proc->out[x];
+		PAD;
+		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
+	    };
 	    PAD;
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    printf("[BODY]");
 	    if(table.count != 0){
-		for (u32 v=0; v < table.count; v += 1) {
+		for (u32 v=0; v < table.count-proc->inCommaCount; v += 1) {
 		    __dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 		    PAD;
 		};

@@ -251,8 +251,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeC
 	u32 procID = bc.procID;
 	bc.procToID.insertValue(proc->name, procID);
 	bc.procID += 1;
-	// DEF + bc_context_id + proc_id + IN_START  + in_count + OUT_START  + out_count + BODY_START
-	u32 reserveCount = 1 + 1 + 1 + 1 + (proc->in.count * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
 	
     }break;
     default:
