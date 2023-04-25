@@ -6,6 +6,7 @@ enum class Bytecode : u16{
     NEXT_PAGE,
     REG,
     CAST,
+    TYPE,
     CONST_INTS,
     CONST_INTU,
     CONST_DEC,
@@ -15,6 +16,7 @@ enum class Bytecode : u16{
     ADDI,
     ADDU,
     ADDF,
+    BYTECODE_COUNT,
 };
 enum class BytecodeType : u16{
     INTEGER_S,
@@ -24,6 +26,7 @@ enum class BytecodeType : u16{
 
 const u16 const_in_stream = (sizeof(s64) / sizeof(Bytecode));
 const u16 reg_in_stream = 2;
+const u16 type_in_stream = 2;
 
 struct BytecodeFile{
     DynamicArray<Bytecode*> bytecodePages;
@@ -51,6 +54,10 @@ struct BytecodeFile{
 	emit(Bytecode::REG);
 	emit((Bytecode)regID);
     };
+    void emitType(Type type){
+	emit(Bytecode::TYPE);
+	emit((Bytecode)type);
+    };
     //encoding constant into bytecode page cause why not?
     void emitConstInt(s64 num){
 	Bytecode *page = bytecodePages[bytecodePages.count-1];
@@ -72,7 +79,7 @@ struct BytecodeFile{
     };
 private:
     void newBytecodePage(){
-	Bytecode *page = (Bytecode*)mem::alloc(sizeof(Bytecode) * BYTECODE_PAGE_COUNT + 1); //NOTE: +1 for NEXT_PAGE
+	Bytecode *page = (Bytecode*)mem::alloc(sizeof(Bytecode) * BYTECODE_PAGE_COUNT + 1); //NOTE: +1 for NEXT_PAGE if there is no more space left
 	bytecodePages.push(page);
 	pageBrim = 0;
     };
@@ -159,14 +166,16 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Scop
 	compileExprToBytecode(rhsReg, op->rhs, lexer, se, bc, bf, isExprU);
 	if(lbt != rbt){
 	    u32 newReg = bc.newReg(ansType);
-	    bf.emitNextPageIfReq(1 + reg_in_stream *2);
+	    bf.emitNextPageIfReq(1 + reg_in_stream *2 + type_in_stream*2);
 	    bf.emit(Bytecode::CAST);
+	    bf.emitType(ansType);
 	    bf.emitReg(newReg);
 	    if(lbt != abt){
+		bf.emitType(lhsType);
 		bf.emitReg(lhsReg);
 		lhsReg = newReg;
-	    }
-	    else{;
+	    }else{
+		bf.emitType(rhsType);
 		bf.emitReg(rhsReg);
 		rhsReg = newReg;
 	    };
@@ -266,6 +275,22 @@ namespace dbg{
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;
+	case Bytecode::TYPE:{
+	    x += 1;
+	    switch(page[x]){
+	    case (Bytecode)Type::COMP_VOID: printf("void");break;
+	    case (Bytecode)Type::S_64: printf("s64");break;
+	    case (Bytecode)Type::U_64: printf("u64");break;
+	    case (Bytecode)Type::S_32: printf("s32");break;
+	    case (Bytecode)Type::U_32: printf("u32");break;
+	    case (Bytecode)Type::S_16: printf("s16");break;
+	    case (Bytecode)Type::U_16: printf("u16");break;
+	    case (Bytecode)Type::S_8: printf("s8");break;
+	    case (Bytecode)Type::U_8: printf("u8");break;
+	    case (Bytecode)Type::COMP_INTEGER: printf("comp_int");break;
+	    case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
+	    };
+	}break;
 	case Bytecode::CONST_INTS:{
 	    s64 num = getConstInt(page+x+1);
 	    x += const_in_stream;
@@ -291,6 +316,8 @@ namespace dbg{
 	}break;
 	case Bytecode::CAST:{
 	    printf("cast");
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;
