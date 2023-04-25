@@ -16,6 +16,8 @@ enum class Bytecode : u16{
     ADDI,
     ADDU,
     ADDF,
+    DEF,
+    RET,
     BYTECODE_COUNT,
 };
 enum class BytecodeType : u16{
@@ -85,14 +87,19 @@ private:
     };
 };
 struct BytecodeContext{
-    u32 registerID;
     Map varToReg;
+    Map procToID;
     Type *types;
+    u32 registerID;
+    u32 procID;
+    u8 contextID;
 
     void init(u32 varCount){
 	registerID = 0;
 	varToReg.init(varCount);
 	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
+	procID = 0;
+	contextID = 0;  //TODO: change while multithreading
     };
     void uninit(){
 	varToReg.uninit();
@@ -238,6 +245,15 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeC
 	    bf.emitReg(regID);
 	    bf.emitReg(ansReg);
 	};
+    }break;
+    case ASTType::PROC_DEFENITION:{
+	ASTProcDef *proc = (ASTProcDef*)node;
+	u32 procID = bc.procID;
+	bc.procToID.insertValue(proc->name, procID);
+	bc.procID += 1;
+	// DEF + bc_context_id + proc_id + IN_START  + in_count + OUT_START  + out_count + BODY_START
+	u32 reserveCount = 1 + 1 + 1 + 1 + (proc->in.count * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
+	
     }break;
     default:
 	DEBUG_UNREACHABLE;

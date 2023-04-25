@@ -51,14 +51,19 @@ struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> out;
     DynamicArray<ASTBase*> body;
     String name;
+    u32 startProcInID;
     u32 tokenOff;
+    u32 inCount;
     u8 flag;
 };
 struct ASTVariable : ASTBase{
     String name;
 };
 struct AST_Type : ASTBase{
-    u32 tokenOff;
+    union{
+	u32 tokenOff;
+	Type type;
+    };
 };
 struct ASTFile {
     DynamicArray<char*> memPages;
@@ -270,25 +275,16 @@ s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<S
     };
     return varCount;
 };
-ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x);
-bool parseProcInOut(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &inout, bool typesIncludes) {
-    BRING_TOKENS_TO_SCOPE;
-    while (true) {
-	eatNewlines(tokTypes, x);
-	ASTBase *base = parseBlock(lexer, file, x);
-	if(base == nullptr){return false;};
-	inout.push(base);
-	if(tokTypes[x] == (Token_Type)','){
-	    x += 1;
-	    continue;
-	};
-        break;
-    };
-    return true;
-};
 void uninitProcDef(ASTProcDef *node){
     if(node->in.len != 0)  {node->in.uninit();};
     if(node->out.len != 0) {node->out.uninit();};
+};
+ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x);
+ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
+    BRING_TOKENS_TO_SCOPE;
+    AST_Type *type = (AST_Type*)allocAST(sizeof(AST_Type), ASTType::TYPE, file);
+    type->tokenOff = x;
+    return (ASTBase*)type;
 };
 ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &flagStart) {
     BRING_TOKENS_TO_SCOPE;
@@ -347,10 +343,30 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		    goto PARSE_AFTER_ARGS;
 		};
 		proc->in.init();
-		if(parseProcInOut(lexer, file, x, proc->in, false) == false){
-		    uninitProcDef(proc);
-		    return nullptr;
+		u32 inCount = 0;
+		//parse input
+		while (true) {
+		    eatNewlines(tokTypes, x);
+		    ASTBase *base = parseBlock(lexer, file, x);
+		    if(base == nullptr){
+			uninitProcDef(proc);
+			return nullptr;
+		    };
+		    switch(base->type){
+		    case ASTType::UNI_DECLERATION: inCount += 1;break;
+		    case ASTType::MULTI_DECLERATION:
+			ASTMultiVar *multiVar = (ASTMultiVar*)base;
+			inCount += multiVar->names.count;
+			break;
+		    };
+		    proc->in.push(base);
+		    if(tokTypes[x] == (Token_Type)','){
+			x += 1;
+			continue;
+		    };
+		    break;
 		};
+		proc->inCount = varCount;
 		if(tokTypes[x] != (Token_Type)')'){
 		    lexer.emitErr(tokOffs[x].off, "Expected ')'");
 		    return nullptr;
@@ -364,9 +380,20 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		    proc->out.init();
 		    bool bracket = false;
 		    if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
-		    if (parseProcInOut(lexer, file, x, proc->out, true) == false) {
-		        uninitProcDef(proc);
-			return nullptr;
+		    //parse output
+		    while (true) {
+			eatNewlines(tokTypes, x);
+			ASTBase *typeNode = parseType(x, lexer, file);
+			if(typeNode == nullptr){
+			    uninitProcDef(proc);
+			    return nullptr;
+			};
+			proc->out.push(typeNode);
+			if(tokTypes[x] == (Token_Type)','){
+			    x += 1;
+			    continue;
+			};
+			break;
 		    };
 		    if (tokTypes[x] == (Token_Type)')') {
 			if (bracket == false) {
@@ -438,26 +465,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    } break;
 	} break;
 	case (Token_Type)',': {
-	    //check if multiple variable decleration
-	    u32 b = x + 1;
-	    while(true){
-		if(tokTypes[b] == (Token_Type)'\n' || tokTypes[b] == Token_Type::END_OF_FILE){
-		    x = start;
-		    goto PARSE_TYPE;
-		};
-		if(tokTypes[b] == Token_Type::IDENTIFIER){b += 1;}
-		else{
-		    x = start;
-		    goto PARSE_TYPE;
-		};
-		if(tokTypes[b] == (Token_Type)','){b += 1;}
-		else if(tokTypes[b] == (Token_Type)':'){break;}
-		else{
-		    x = start;
-		    goto PARSE_TYPE;
-		};
-	    };
-	    //it is multi var decl
+	    //multi var def/decl
 	    ASTMultiVar *multiAss = (ASTMultiVar*)allocAST(sizeof(ASTMultiVar), ASTType::MULTI_DECLERATION, file);
 	    DynamicArray<String> &names = multiAss->names;
 	    names.init(3);
@@ -495,16 +503,6 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	} break;
     } break;
     default: {
-	if(tokTypes[x] >= Token_Type::K_U8 && tokTypes[x] <= Token_Type::K_S32){
-	    //parsing type
-	    PARSE_TYPE:
-	    AST_Type *type = (AST_Type*)allocAST(sizeof(AST_Type), ASTType::TYPE, file);
-	    type->tokenOff = x;
-	    while(isType(tokTypes[x])){
-		x += 1;
-	    };
-	    return (ASTBase*)type;
-	};
 	u32 end = getEndNewlineEOF(tokTypes, x);
 	return genASTExprTree(lexer, file, x, end);
     } break;
@@ -637,8 +635,8 @@ namespace dbg {
 	}break;
 	case ASTType::UNI_DECLERATION: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
-	    u32 x = decl->tokenOff;
-	    printf("uni_decleration_t_known");
+	    u32 x = decl->tokenOff+2;
+	    printf("uni_decleration");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	    PAD;
@@ -646,8 +644,8 @@ namespace dbg {
 	} break;
 	case ASTType::MULTI_DECLERATION:{
 	    ASTMultiVar *decl = (ASTMultiVar*)node;
-	    u32 x = decl->tokenOff;
-	    printf("multi_decleration_t_known");
+	    u32 x = decl->tokenOff+2;
+	    printf("multi_decleration");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	    PAD;
@@ -662,7 +660,7 @@ namespace dbg {
 	}break;
 	case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
-	    u32 x = decl->tokenOff;
+	    u32 x = decl->tokenOff + 2;
 	    printf("uni_assignment_t_known");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
@@ -680,7 +678,7 @@ namespace dbg {
 	} break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
 	    ASTMultiVar *decl = (ASTMultiVar*)node;
-	    u32 x = decl->tokenOff;
+	    u32 x = decl->tokenOff + 2;
 	    printf("multi_assignment_t_known");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
@@ -725,15 +723,6 @@ namespace dbg {
 	} break;
 	case ASTType::TYPE:{
 	    printf("type");
-	    PAD;
-	    AST_Type *type = (AST_Type*)node;
-	    u32 x = type->tokenOff;
-	    printf("type:");
-	    while(isType(tokTypes[x])){
-		String str = makeStringFromTokOff(x, lexer);
-		printf(" %.*s", str.len, str.mem);
-		x += 1;
-	    };
 	    PAD;
 	}break;
 	default: DEBUG_UNREACHABLE;

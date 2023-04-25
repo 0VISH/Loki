@@ -26,6 +26,9 @@ s8 type(Bytecode *page, VM &vm){return 0;};
 s8 const_ints(Bytecode *page, VM &vm){return 0;};
 s8 const_intu(Bytecode *page, VM &vm){return 0;};
 s8 const_dec(Bytecode *page, VM &vm){return 0;};
+s8 def(Bytecode *page, VM &vm){return 0;};
+
+s8 ret(Bytecode *page, VM &vm){return 0;};
 
 s8 cast(Bytecode *page, VM &vm){
     /*
@@ -144,6 +147,8 @@ s8 (*byteProc[])(Bytecode *page, VM &vm) = {
     addi,
     addu,
     addf,
+    def,
+    ret,
 };
 
 bool execBytecode(BytecodeFile &bf, u32 pageOff, u32 curOff, u32 endOff, VM &vm){

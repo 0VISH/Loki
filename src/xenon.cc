@@ -31,7 +31,7 @@ bool compile(char *fileName){
 	destroyLexer(lexer);
 	return false;
     };
-    //dbg::dumpASTFile(astFile, lexer);
+    dbg::dumpASTFile(astFile, lexer);
     ScopeEntities fileScopeEntities;
     if (checkEntities(astFile.nodes, lexer, fileScopeEntities) == false) {
 	printf("\nchecking entites failed\n");

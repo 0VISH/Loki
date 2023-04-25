@@ -5,7 +5,9 @@ struct Entity{
 struct VariableEntity : Entity{
     Type type;
 };
-struct ProcEntity : Entity{};
+struct ProcEntity : Entity{
+    
+};
 
 struct ScopeEntities{
     Map varMap;

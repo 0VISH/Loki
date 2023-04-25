@@ -8,5 +8,8 @@
 */
 */
 
-x := 5. + 3
+main :: proc(a: u32, b,c: u8){
+
+}
+//foo :: proc() ->(u32){}
 //asd
