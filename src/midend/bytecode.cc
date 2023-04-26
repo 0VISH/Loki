@@ -94,10 +94,15 @@ struct BytecodeContext{
     u32 procID;
     u8 contextID;
 
-    void init(u32 varCount){
+    void init(u32 varCount, u32 procCount){
 	registerID = 0;
-	varToReg.init(varCount);
-	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
+	if(varCount != 0){
+	    varToReg.init(varCount);
+	    types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
+	};
+	if(procCount != 0){
+	    procToID.init(procCount);
+	};
 	procID = 0;
 	contextID = 0;  //TODO: change while multithreading
     };
@@ -201,7 +206,8 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Scop
 	break;
     };
 };
-void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, BytecodeContext &bc, BytecodeFile &bf){
+void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+    BytecodeContext &bc = bca[bca.count-1];
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
@@ -249,20 +255,25 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
     }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
-	u32 procID = bc.procID;
-	bc.procToID.insertValue(proc->name, procID);
+	u32 procBytecodeID = bc.procID;
+	bc.procToID.insertValue(proc->name, procBytecodeID);
 	bc.procID += 1;
-	
+	u32 procID = se->procMap.getValue(proc->name);
+	ScopeEntities *procSE = se->procEntities[procID].se;
+	BytecodeContext &procBC = bca.newElem();
+        procBC.init(procSE->varMap.count, procSE->procMap.count);
+	// DEF + bc_context_id + proc_id + IN_START  + in_count + OUT_START  + out_count + BODY_START
+	u32 reserveCount = 1 + 1 + 1 + 1 + (proc->inCommaCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
     }break;
     default:
 	DEBUG_UNREACHABLE;
 	break;
     };
 };
-void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, DynamicArray<ScopeEntities*> &see, BytecodeContext &bc, BytecodeFile &bf){
+void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     for(u32 x=0; x<nodes.count; x+=1){
 	ASTBase *node = nodes[x];
-	compileToBytecode(node, lexer, see, bc, bf);
+	compileToBytecode(node, lexer, see, bca, bf);
     };
     bf.emit(Bytecode::NONE);
 };

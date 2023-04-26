@@ -48,7 +48,7 @@ bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, T
     se->varEntities[id] = entity;
     return true;
 };
-bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, ScopeEntities *se) {
+bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, ScopeEntities *se, ScopeEntities *procSe) {
     Map &map = se->procMap;
     BRING_TOKENS_TO_SCOPE;
     if (map.getValue(name) != -1) {
@@ -59,6 +59,7 @@ bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, 
     ProcEntity entity;
     entity.name = name;
     entity.flag = flag;
+    entity.se = procSe;
     se->procEntities[id] = entity;
     return true;
 };
@@ -184,7 +185,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	BRING_TOKENS_TO_SCOPE;
 	ASTProcDef *proc = (ASTProcDef*)node;
 	String name = proc->name;
-	if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se) == false){
+	if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se, pushNewScope(see)) == false){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};
@@ -200,8 +201,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    };
 	};
 	//NOTE: checking body checks the input also
-	pushNewScope(see);
 	if (checkEntities(proc->body, lexer, see) == false) { return false; };
+	see.pop();
     } break;
     case ASTType::UNI_DECLERATION:{
 	if(checkVarDecl(node, lexer, se, true) == false){ return false;};
@@ -243,7 +244,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::NUM_DECIMAL: break;
     default: DEBUG_UNREACHABLE;return false;
     };
-    return false;
+    return true;
 };
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     TIME_BLOCK;
