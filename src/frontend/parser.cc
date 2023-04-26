@@ -339,6 +339,8 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		flag = 0;
 		proc->name = makeStringFromTokOff(start, lexer);
 		proc->body.init();
+		proc->out.count = 0;
+		proc->inCommaCount = 0;
 		if (tokTypes[x] == (Token_Type)')') {
 		    goto PARSE_AFTER_ARGS;
 		};
@@ -712,15 +714,15 @@ namespace dbg {
 	    PAD;
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    printf("[BODY]");
-	    if(table.count != 0){
-		for (u32 v=0; v < table.count-proc->inCommaCount; v += 1) {
-		    __dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
-		    PAD;
-		};
+	    for (u32 v=0; v < table.count-proc->inCommaCount; v += 1) {
+		PAD;
+		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
+	    PAD;
 	} break;
 	case ASTType::TYPE:{
-	    printf("type");
+	    AST_Type *type = (AST_Type*)node;
+	    printf("%d", type->type);
 	    PAD;
 	}break;
 	default: DEBUG_UNREACHABLE;

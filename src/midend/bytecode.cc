@@ -134,7 +134,7 @@ BytecodeType typeToBytecodeType(Type type){
     default: return BytecodeType::INTEGER_U;
     }
 };
-void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeContext &bc, BytecodeFile &bf, bool isExprU=false){
+void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, ScopeEntities *se, BytecodeContext &bc, BytecodeFile &bf, bool isExprU=false){
     ASTType type = node->type;
     switch(type){
     case ASTType::NUM_INTEGER:{
@@ -201,14 +201,15 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Scop
 	break;
     };
 };
-void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeContext &bc, BytecodeFile &bf){
+void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, BytecodeContext &bc, BytecodeFile &bf){
+    ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	u32 id = se.varMap.getValue(var->name);
-	const VariableEntity &entity = se.varEntities[id];
+	u32 id = se->varMap.getValue(var->name);
+	const VariableEntity &entity = se->varEntities[id];
 	u32 regID = bc.newReg(entity.type);
 	u32 ansReg = bc.newReg(entity.type);
 	compileExprToBytecode(ansReg, var->rhs, lexer, se, bc, bf, typeToBytecodeType(entity.type)==BytecodeType::INTEGER_U);
@@ -225,8 +226,8 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeC
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	DynamicArray<String> &names = var->names;
-	u32 firstID = se.varMap.getValue(names[0]);
-	const VariableEntity &firstEntityID = se.varEntities[firstID];
+	u32 firstID = se->varMap.getValue(names[0]);
+	const VariableEntity &firstEntityID = se->varEntities[firstID];
 	Type firstEntityType = firstEntityID.type;
 	u32 ansReg = bc.newReg(firstEntityType);
 	compileExprToBytecode(ansReg, var->rhs, lexer, se, bc, bf, typeToBytecodeType(firstEntityType)==BytecodeType::INTEGER_U);
@@ -236,8 +237,8 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeC
 	else if(type == BytecodeType::INTEGER_S){byte = Bytecode::MOVI;}
 	else{byte = Bytecode::MOVU;};
 	for(u32 x=0; x<names.count; x+=1){
-	    u32 id = se.varMap.getValue(names[x]);
-	    const VariableEntity &entity = se.varEntities[id];
+	    u32 id = se->varMap.getValue(names[x]);
+	    const VariableEntity &entity = se->varEntities[id];
 	    u32 regID = bc.newReg(firstEntityType);
 	    bc.varToReg.insertValue(entity.name, regID);
 	    bf.emitNextPageIfReq(1 + reg_in_stream*2);
@@ -258,10 +259,10 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, ScopeEntities &se, BytecodeC
 	break;
     };
 };
-void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, ScopeEntities &se, BytecodeContext &bc, BytecodeFile &bf){
+void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, DynamicArray<ScopeEntities*> &see, BytecodeContext &bc, BytecodeFile &bf){
     for(u32 x=0; x<nodes.count; x+=1){
 	ASTBase *node = nodes[x];
-	compileToBytecode(node, lexer, se, bc, bf);
+	compileToBytecode(node, lexer, see, bc, bf);
     };
     bf.emit(Bytecode::NONE);
 };

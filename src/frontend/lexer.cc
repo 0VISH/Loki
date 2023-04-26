@@ -8,7 +8,12 @@ enum class Token_Type {
     DOUBLE_QUOTES,
     K_START,  //keywords start
     K_U8,
+    K_F16,
+    K_F32,
+    K_F64,
     K_U16,
+    K_U64,
+    K_S64,
     K_U32,
     K_S8,
     K_S16,
@@ -59,8 +64,13 @@ void initKeywords() {
     };
     KeywordData data[keywordCount] = {
 	{"u8", Token_Type::K_U8},
+	{"f16", Token_Type::K_F16},
+	{"f32", Token_Type::K_F32},
+	{"f64", Token_Type::K_F64},
 	{"u16", Token_Type::K_U16},
 	{"u32", Token_Type::K_U32},
+	{"u64", Token_Type::K_U64},
+	{"s64", Token_Type::K_S64},
 	{"s8", Token_Type::K_S8},
 	{"s16", Token_Type::K_S16},
 	{"s32", Token_Type::K_S32 },

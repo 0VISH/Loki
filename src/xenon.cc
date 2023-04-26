@@ -32,14 +32,14 @@ bool compile(char *fileName){
 	return false;
     };
     dbg::dumpASTFile(astFile, lexer);
-    DynamicArray<ScopeEntities> see;
+    DynamicArray<ScopeEntities*> see;
     see.init(3);
-    ScopeEntities &fileScopeEntities = see.newElem();
+    ScopeEntities *fileScopeEntities = pushNewScope(see);;
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	printf("\nchecking entites failed\n");
     } else {
-	for (u16 x = 0; x < fileScopeEntities.varMap.len; x += 1) {
-	    VariableEntity &entity = fileScopeEntities.varEntities[x];
+	for (u16 x = 0; x < fileScopeEntities->varMap.len; x += 1) {
+	    VariableEntity &entity = fileScopeEntities->varEntities[x];
 	    if (!IS_BIT(entity.flag, Flags::CONSTANT)) {
 		u32 nodeOff = 0;
 		for (u32 varCount = 0; nodeOff < astFile.nodes.count; nodeOff += 1) {
@@ -68,8 +68,8 @@ bool compile(char *fileName){
     BytecodeFile bf;
     bf.init();
     BytecodeContext bc;
-    bc.init(fileScopeEntities.varMap.len);
-    compileASTNodesToBytecode(astFile.nodes, lexer, fileScopeEntities, bc, bf);
+    bc.init(fileScopeEntities->varMap.len);
+    compileASTNodesToBytecode(astFile.nodes, lexer, see, bc, bf);
     dbg::dumpBytecodePages(bf.bytecodePages);
     VM vm = createVM();
     execBytecode(bf, 0, 0, 1000000, vm);

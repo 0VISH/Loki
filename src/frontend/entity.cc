@@ -1,3 +1,4 @@
+struct ScopeEntities;
 struct Entity{
     String name;
     u8 flag;
@@ -6,7 +7,7 @@ struct VariableEntity : Entity{
     Type type;
 };
 struct ProcEntity : Entity{
-    
+    ScopeEntities *se;
 };
 
 struct ScopeEntities{
@@ -16,18 +17,24 @@ struct ScopeEntities{
     ProcEntity* procEntities;
 };
 
-void destroyFileEntities(ScopeEntities &se) {
-    if(se.varMap.len != 0){
-	mem::free(se.varEntities);
-	se.varMap.uninit();
+ScopeEntities* pushNewScope(DynamicArray<ScopeEntities*> &see){
+    ScopeEntities *se = (ScopeEntities*)mem::alloc(sizeof(ScopeEntities));
+    see.push(se);
+    return se;
+};
+
+void destroyFileEntities(ScopeEntities *se) {
+    if(se->varMap.len != 0){
+	mem::free(se->varEntities);
+	se->varMap.uninit();
     };
-    if(se.procMap.len != 0){
-	mem::free(se.procEntities);
-	se.procMap.uninit();
+    if(se->procMap.len != 0){
+	mem::free(se->procEntities);
+	se->procMap.uninit();
     };
 };
-bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, Type type, ScopeEntities &se) {
-    Map &map = se.varMap;
+bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, Type type, ScopeEntities *se) {
+    Map &map = se->varMap;
     BRING_TOKENS_TO_SCOPE;
     if (map.getValue(name) != -1) {
 	return false;
@@ -38,11 +45,11 @@ bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, T
     entity.name = name;
     entity.type = type;
     entity.flag = flag;
-    se.varEntities[id] = entity;
+    se->varEntities[id] = entity;
     return true;
 };
-bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, ScopeEntities &se) {
-    Map &map = se.procMap;
+bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, ScopeEntities *se) {
+    Map &map = se->procMap;
     BRING_TOKENS_TO_SCOPE;
     if (map.getValue(name) != -1) {
 	return false;
@@ -52,10 +59,10 @@ bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, 
     ProcEntity entity;
     entity.name = name;
     entity.flag = flag;
-    se.procEntities[id] = entity;
+    se->procEntities[id] = entity;
     return true;
 };
-void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntities &se) {
+void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntities *se) {
     u32 procCount = 0;
     u32 varCount = 0;
     for (u32 x = 0; x < entities.count; x += 1) {
@@ -69,18 +76,18 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
 	    varCount += multi->names.count;
 	};
     };
-    se.varMap.len = 0;
-    se.procMap.len = 0;
+    se->varMap.len = 0;
+    se->procMap.len = 0;
     if(varCount != 0){
-	se.varMap.init(varCount);
-	se.varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
+	se->varMap.init(varCount);
+	se->varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
     };
     if(procCount != 0){
-	se.procMap.init(procCount);
-	se.procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
+	se->procMap.init(procCount);
+	se->procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
     };
 };
-bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle){
+bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle){
     if(isSingle){
 	ASTUniVar *var = (ASTUniVar*)base;
 	Type type = getType(lexer, var->tokenOff+2);
@@ -103,7 +110,7 @@ bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool isSingle)
     };
     return true;
 };
-bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, bool isSingle){
+bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool tKown, bool isSingle){
     BRING_TOKENS_TO_SCOPE;
     if(isSingle){
 	ASTUniVar *var = (ASTUniVar*)base;
@@ -151,13 +158,27 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities &se, bool tKown, boo
     };
     return true;
 };
-bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities> &see){
-    //TODO: 
+bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+    BRING_TOKENS_TO_SCOPE;
+    AST_Type *typeNode = (AST_Type*)node;
+    Token_Type tokType = tokTypes[typeNode->tokenOff];
+    Type type;
+    switch(tokType){
+    case Token_Type::K_U8: type = Type::U_8; break;
+    case Token_Type::K_S8: type = Type::S_8; break;
+    case Token_Type::K_U16: type = Type::U_16; break;
+    case Token_Type::K_S16: type = Type::S_16; break;
+    case Token_Type::K_F16: type = Type::F_16; break;
+    case Token_Type::K_U32: type = Type::U_32; break;
+    case Token_Type::K_S32: type = Type::S_32; break;
+    case Token_Type::K_F32: type = Type::F_32; break;
+    };
+    typeNode->type = type;
     return true;
 };
-bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities> &see);
-bool checkEntityForOneScope(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities> &see, u32 off){
-    ScopeEntities &se = see[off];
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
+bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+    ScopeEntities *se = see[see.count-1];
     switch (node->type) {
     case ASTType::PROC_DEFENITION: {
 	BRING_TOKENS_TO_SCOPE;
@@ -170,8 +191,7 @@ bool checkEntityForOneScope(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntit
 	for(u32 x=0; x<proc->out.count; x+=1){
 	    ASTBase *node = proc->out[x];
 	    switch(node->type){
-	    case ASTType::UNI_DECLERATION:
-	    case ASTType::MULTI_DECLERATION:{
+	    case ASTType::TYPE:{
 		checkType(node, lexer, see);
 	    }break;
 	    default:
@@ -179,8 +199,8 @@ bool checkEntityForOneScope(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntit
 		return false;
 	    };
 	};
-	ScopeEntities &procBodySe = see.newElem();
 	//NOTE: checking body checks the input also
+	pushNewScope(see);
 	if (checkEntities(proc->body, lexer, see) == false) { return false; };
     } break;
     case ASTType::UNI_DECLERATION:{
@@ -192,22 +212,22 @@ bool checkEntityForOneScope(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntit
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	if(checkVarDef(node, lexer, se, true, false) == false){return false;};
-	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
+	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	if(checkVarDef(node, lexer, se, false, false) == false){return false;};
-	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
+	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, se, true, true) == false){return false;};
-	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
+	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, se, false, true) == false){return false;};
-	if(checkEntityForOneScope(var->rhs, lexer, see, off) == false){return false;};
+	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
     case ASTType::BIN_SUB:
     case ASTType::BIN_ADD:{
@@ -223,21 +243,12 @@ bool checkEntityForOneScope(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntit
     case ASTType::NUM_DECIMAL: break;
     default: DEBUG_UNREACHABLE;return false;
     };
-    return true;
-};
-bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities> &see){
-    for(u32 x=see.count; x>0; x-=1){
-	x -= 1;
-	if(checkEntityForOneScope(node, lexer, see, x) == true){
-	    return true;
-	};
-    };
     return false;
 };
-bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities> &see){
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     TIME_BLOCK;
     BRING_TOKENS_TO_SCOPE;
-    ScopeEntities &se = see[see.count-1];
+    ScopeEntities *se = see[see.count-1];
     goThroughEntitiesAndInitMaps(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
