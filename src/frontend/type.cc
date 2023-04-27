@@ -21,7 +21,9 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	Flag lhsFlag = 0;
 	Flag rhsFlag = 0;
 	TypeID lhsTypeID = getTreeTypeID(node->lhs, lhsFlag, see, lexer);
+	if(lhsTypeID == 0){return 0;};
 	TypeID rhsTypeID = getTreeTypeID(node->rhs, rhsFlag, see, lexer);
+	if(rhsTypeID == 0){return 0;};
 	flag = lhsFlag & rhsFlag;
 	return (TypeID)((u16)lhsTypeID | (u16)rhsTypeID);
     } break;
@@ -40,8 +42,7 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	ASTVariable *var = (ASTVariable*)base;
 	Type type = Type::UNKOWN;
 	for(u32 x=see.count; x>0; x-=1){
-	    x -= 1;
-	    ScopeEntities *se = see[x];
+	    ScopeEntities *se = see[x-1];
 	    s32 id = se->varMap.getValue(var->name);
 	    if(id != -1){
 		const VariableEntity &e = se->varEntities[id];

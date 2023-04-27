@@ -7,8 +7,8 @@
 	*/
 */
 */
-
+vb := 4
 add :: proc(a: s32, b: s32){
-    c:= a + b
+    c:= vb + b
 }
 //asd

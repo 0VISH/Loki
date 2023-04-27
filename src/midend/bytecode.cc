@@ -174,7 +174,7 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	Type type;
 	u32 off = see.count;
 	s32 id;
-	for(; off>0; off-=1){
+	while(off>0){
 	    off -= 1;
 	    ScopeEntities *se = see[off];
 	    id = se->varMap.getValue(var->name);
@@ -190,7 +190,7 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	else{bf.emit(Bytecode::MOVU);};
 	BytecodeContext &procBC = bca[off];
 	bf.emitReg(outputRegister);
-	bf.emitReg(procBC.varToReg[id]);
+	bf.emitReg(bca[off].varToReg[id]);
     }break;
     case ASTType::BIN_ADD:{
 	ASTBinOp *op = (ASTBinOp*)node;
@@ -330,7 +330,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	};
 	bf.emit(Bytecode::PROC_START);
 	see.push(procSE);
-	for(u32 x=proc->inCount-1; x<proc->body.count; x+=1){
+	for(u32 x=proc->inCount; x<proc->body.count; x+=1){
 	    compileToBytecode(proc->body[x], lexer, see, bca, bf);
 	};
 	see.pop();

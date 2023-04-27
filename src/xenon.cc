@@ -37,6 +37,7 @@ bool compile(char *fileName){
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	printf("\nchecking entites failed\n");
 	report::flushReports();
+	printf("LSKDFJLSDKFJ");
 	return false;
     } else {
 	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
