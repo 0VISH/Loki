@@ -30,7 +30,7 @@ enum class BytecodeType : u16{
 };
 
 const u16 const_in_stream = (sizeof(s64) / sizeof(Bytecode));
-const u16 reg_in_stream = 2;
+const u16 reg_in_stream = 3;
 const u16 type_in_stream = 2;
 
 struct BytecodeFile{
@@ -55,8 +55,9 @@ struct BytecodeFile{
 	page[pageBrim] = bc;
 	pageBrim += 1;
     };
-    void emitReg(u32 regID){
+    void emitReg(u32 bytecodeContextID, u32 regID){
 	emit(Bytecode::REG);
+	emit((Bytecode)bytecodeContextID);
 	emit((Bytecode)regID);
     };
     void emitType(Type type){
@@ -89,6 +90,9 @@ private:
 	pageBrim = 0;
     };
 };
+
+static u32 BytecodeContextID = 0;
+
 struct BytecodeContext{
     Map procToID;
     u32 *varToReg;
@@ -107,7 +111,8 @@ struct BytecodeContext{
 	    procToID.init(procCount);
 	};
 	procID = 0;
-	contextID = 0;  //TODO: change while multithreading
+	contextID = BytecodeContextID;
+	BytecodeContextID += 1;
     };
     void uninit(){
 	mem::free(varToReg);
@@ -143,7 +148,7 @@ BytecodeType typeToBytecodeType(Type type){
     default: return BytecodeType::INTEGER_U;
     }
 };
-void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, bool isExprU=false){
+void compileExprToBytecode(u32 outputBytecodeContextID, u32 outputRegister, ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, bool isExprU=false){
     ASTType type = node->type;
     BytecodeContext &bc = bca[bca.count - 1];
     switch(type){
@@ -154,7 +159,7 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	bf.emitNextPageIfReq(1 + reg_in_stream + 1 + const_in_stream);
 	if(isExprU){bf.emit(Bytecode::MOVU);}
 	else{bf.emit(Bytecode::MOVS);};
-	bf.emitReg(outputRegister);
+	bf.emitReg(bc.contextID, outputRegister);
 	if(isExprU){bf.emit(Bytecode::CONST_INTU);}
 	else{bf.emit(Bytecode::CONST_INTS);};
 	bf.emitConstInt(num);
@@ -165,7 +170,7 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	f64 num = string2float(str);
 	bf.emitNextPageIfReq(1 + reg_in_stream + 1 + const_in_stream);
 	bf.emit(Bytecode::MOVF);
-	bf.emitReg(outputRegister);
+	bf.emitReg(bc.contextID, outputRegister);
 	bf.emit(Bytecode::CONST_DEC);
 	bf.emitConstDec(num);
     }break;
@@ -188,9 +193,9 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	if(isExprU){bf.emit(Bytecode::MOVU);}
 	else if(bytecodeType == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
 	else{bf.emit(Bytecode::MOVU);};
-	BytecodeContext &procBC = bca[off];
-	bf.emitReg(outputRegister);
-	bf.emitReg(bca[off].varToReg[id]);
+	BytecodeContext &correctBC = bca[off];
+	bf.emitReg(outputBytecodeContextID, outputRegister);
+	bf.emitReg(correctBC.contextID, correctBC.varToReg[id]);
     }break;
     case ASTType::BIN_ADD:{
 	ASTBinOp *op = (ASTBinOp*)node;
@@ -202,21 +207,21 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	BytecodeType abt = typeToBytecodeType(ansType);
 	u32 lhsReg = bc.newReg(lhsType);
 	u32 rhsReg = bc.newReg(rhsType);
-	compileExprToBytecode(lhsReg, op->lhs, lexer, see, bca, bf, isExprU);
-	compileExprToBytecode(rhsReg, op->rhs, lexer, see, bca, bf, isExprU);
+	compileExprToBytecode(bc.contextID, lhsReg, op->lhs, lexer, see, bca, bf, isExprU);
+	compileExprToBytecode(bc.contextID, rhsReg, op->rhs, lexer, see, bca, bf, isExprU);
 	if(lbt != rbt){
 	    u32 newReg = bc.newReg(ansType);
 	    bf.emitNextPageIfReq(1 + reg_in_stream *2 + type_in_stream*2);
 	    bf.emit(Bytecode::CAST);
 	    bf.emitType(ansType);
-	    bf.emitReg(newReg);
+	    bf.emitReg(bc.contextID, newReg);
 	    if(lbt != abt){
 		bf.emitType(lhsType);
-		bf.emitReg(lhsReg);
+		bf.emitReg(bc.contextID, lhsReg);
 		lhsReg = newReg;
 	    }else{
 		bf.emitType(rhsType);
-		bf.emitReg(rhsReg);
+		bf.emitReg(bc.contextID, rhsReg);
 		rhsReg = newReg;
 	    };
 	};
@@ -225,9 +230,9 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	if(isExprU){bf.emit(Bytecode::ADDU);}
 	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::ADDS);}
 	else{bf.emit(Bytecode::ADDF);};
-	bf.emitReg(outputRegister);
-	bf.emitReg(lhsReg);
-	bf.emitReg(rhsReg);
+	bf.emitReg(bc.contextID, outputRegister);
+	bf.emitReg(bc.contextID, lhsReg);
+	bf.emitReg(bc.contextID, rhsReg);
     }break;
     default:
 	DEBUG_UNREACHABLE;
@@ -246,15 +251,15 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	const VariableEntity &entity = se->varEntities[id];
 	u32 regID = bc.newReg(entity.type);
 	u32 ansReg = bc.newReg(entity.type);
-	compileExprToBytecode(ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(entity.type)==BytecodeType::INTEGER_U);
+	compileExprToBytecode(bc.contextID, ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(entity.type)==BytecodeType::INTEGER_U);
 	bc.varToReg[id] = regID;
 	bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	BytecodeType type = typeToBytecodeType(entity.type);
 	if(type == BytecodeType::DECIMAL){bf.emit(Bytecode::MOVF);}
 	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
 	else{bf.emit(Bytecode::MOVU);};
-	bf.emitReg(regID);
-	bf.emitReg(ansReg);
+	bf.emitReg(bc.contextID, regID);
+	bf.emitReg(bc.contextID, ansReg);
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
@@ -264,7 +269,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	const VariableEntity &firstEntityID = se->varEntities[firstID];
 	Type firstEntityType = firstEntityID.type;
 	u32 ansReg = bc.newReg(firstEntityType);
-	compileExprToBytecode(ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(firstEntityType)==BytecodeType::INTEGER_U);
+	compileExprToBytecode(bc.contextID, ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(firstEntityType)==BytecodeType::INTEGER_U);
 	Bytecode byte;
 	BytecodeType type = typeToBytecodeType(firstEntityType);
 	if(type == BytecodeType::DECIMAL){byte = Bytecode::MOVF;}
@@ -277,8 +282,8 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bc.varToReg[id] = regID;
 	    bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	    bf.emit(byte);
-	    bf.emitReg(regID);
-	    bf.emitReg(ansReg);
+	    bf.emitReg(bc.contextID, regID);
+	    bf.emitReg(bc.contextID, ansReg);
 	};
     }break;
     case ASTType::PROC_DEFENITION:{
@@ -306,7 +311,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 		u32 regID = procBC.newReg(entity.type);
 		procBC.varToReg[id] = regID;
 		bf.emitType(entity.type);
-		bf.emitReg(regID);
+		bf.emitReg(procBC.contextID, regID);
 	    }break;
 	    case ASTType::MULTI_DECLERATION:{
 		ASTMultiVar *var = (ASTMultiVar*)node;
@@ -317,7 +322,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 		    u32 regID = procBC.newReg(entity.type);
 		    procBC.varToReg[id] = regID;
 		    bf.emitType(entity.type);
-		    bf.emitReg(regID);
+		    bf.emitReg(procBC.contextID, regID);
 		};
 	    }break;
 	    };
@@ -334,6 +339,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    compileToBytecode(proc->body[x], lexer, see, bca, bf);
 	};
 	see.pop();
+	bca.pop();
 	bf.emitNextPageIfReq(1);
 	bf.emit(Bytecode::PROC_END);
     }break;
@@ -365,6 +371,8 @@ namespace dbg{
 	case Bytecode::REG:{
 	    x += 1;
 	    printf("%%%d", page[x]);
+	    x += 1;
+	    printf("%d", page[x]);
 	}break;
 	case Bytecode::MOVS: printf("movs");flag = false;
 	case Bytecode::MOVU: if(flag){printf("movu");flag = false;};
