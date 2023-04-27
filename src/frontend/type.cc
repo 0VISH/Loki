@@ -35,7 +35,7 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag) {
     SET_BIT(id, Type::COMP_VOID);
     return id;
 };
-Type getType(Lexer &lexer, u32 off){
+Type tokenKeywordToType(Lexer &lexer, u32 off){
     BRING_TOKENS_TO_SCOPE;
     switch (tokTypes[off]) {
     case Token_Type::K_U8:  return Type::U_8;
@@ -47,7 +47,7 @@ Type getType(Lexer &lexer, u32 off){
     default:
 	printf("%d", tokTypes[off]);
 	DEBUG_UNREACHABLE;
-	break;
+        return Type::UNKOWN;
     };
     return Type::UNKOWN;
 };

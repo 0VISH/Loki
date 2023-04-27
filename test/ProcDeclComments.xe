@@ -8,7 +8,7 @@
 */
 */
 
-main :: proc(a: u32, b,s: u8){
+add :: proc(a: s32, b: s32){
+    c:= 3
 }
-foo :: proc() ->(u32){}
 //asd

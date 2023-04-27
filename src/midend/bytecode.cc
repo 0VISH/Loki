@@ -17,6 +17,9 @@ enum class Bytecode : u16{
     ADDU,
     ADDF,
     DEF,
+    PROC_GIVES,
+    PROC_START,
+    PROC_END,
     RET,
     BYTECODE_COUNT,
 };
@@ -262,8 +265,50 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	ScopeEntities *procSE = se->procEntities[procID].se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count);
-	// DEF + bc_context_id + proc_id + IN_START  + in_count + OUT_START  + out_count + BODY_START
+	// DEF + bc_context_id + proc_id + in_count + PROC_GIVES + out_count + BODY_START
 	u32 reserveCount = 1 + 1 + 1 + 1 + (proc->inCommaCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
+	bf.emitNextPageIfReq(reserveCount);
+	bf.emit(Bytecode::DEF);
+	bf.emit((Bytecode)bc.contextID);
+	bf.emit((Bytecode)procBytecodeID);
+	for(u32 x=0; x<proc->inCommaCount; x+=1){
+	    ASTBase *node = proc->body[x];
+	    switch(node->type){
+	    case ASTType::UNI_DECLERATION:{
+		ASTUniVar *var = (ASTUniVar*)node;
+		u32 id = procSE->varMap.getValue(var->name);
+		const VariableEntity &entity = procSE->varEntities[id];
+		u32 regID = procBC.newReg(entity.type);
+		bf.emitType(entity.type);
+		bf.emitReg(regID);
+	    }break;
+	    case ASTType::MULTI_DECLERATION:{
+		ASTMultiVar *var = (ASTMultiVar*)node;
+		DynamicArray<String> &names = var->names;
+		for(u32 y=0; y<names.count; y+=1){
+		    u32 id = procSE->varMap.getValue(names[y]);
+		    const VariableEntity &entity = procSE->varEntities[id];
+		    u32 regID = procBC.newReg(entity.type);
+		    bf.emitType(entity.type);
+		    bf.emitReg(regID);
+		};
+	    }break;
+	    };
+	};
+	bf.emit(Bytecode::PROC_GIVES);
+	for(u32 x=0; x<proc->out.count; x+=1){
+	    AST_Type *type = (AST_Type*)proc->out[x];
+	    bf.emit(Bytecode::TYPE);
+	    bf.emit((Bytecode)type->type);
+	};
+	bf.emit(Bytecode::PROC_START);
+	see.push(procSE);
+	for(u32 x=proc->inCount-1; x<proc->body.count; x+=1){
+	    compileToBytecode(proc->body[x], lexer, see, bca, bf);
+	};
+	see.pop();
+	bf.emitNextPageIfReq(1);
+	bf.emit(Bytecode::PROC_END);
     }break;
     default:
 	DEBUG_UNREACHABLE;
@@ -346,6 +391,42 @@ namespace dbg{
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::DEF:{
+	    printf("def @");
+	    x += 1;
+	    printf("%d", (u32)page[x]);
+	    x += 1;
+	    printf("%d(", (u32)page[x]);
+	    x += 1;
+	    u8 comma = 0;
+	    while(page[x] != Bytecode::PROC_GIVES){
+		dumpBytecode(page, x);
+		x += 1;
+	        comma += 1;
+		if(comma == 2){
+		    comma = 0;
+		    printf(",");
+		};
+	    };
+	    printf(")");
+	    x += 1;
+	    if(page[x] != Bytecode::PROC_START){
+		printf(" -> (");
+		while(page[x] != Bytecode::PROC_START){
+		    dumpBytecode(page, x);
+		    x += 1;
+		};
+		printf(")");
+	    };
+	    printf("\n{\n");
+	    x += 1;
+	    while(page[x] != Bytecode::PROC_END){
+		dumpBytecode(page, x);
+		x += 1;
+		printf("\n");
+	    };
+	    printf("}");
 	}break;
 	default:
 	    printf("%d", page[x]);

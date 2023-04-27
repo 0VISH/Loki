@@ -17,7 +17,6 @@ bool compile(char *fileName){
     };
     //dbg::dumpLexerStat(lexer);
     //dbg::dumpLexerTokens(lexer);
-    
     ASTFile astFile = createASTFile();
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
@@ -37,8 +36,10 @@ bool compile(char *fileName){
     ScopeEntities *fileScopeEntities = pushNewScope(see);;
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	printf("\nchecking entites failed\n");
+	report::flushReports();
+	return false;
     } else {
-	for (u16 x = 0; x < fileScopeEntities->varMap.len; x += 1) {
+	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
 	    VariableEntity &entity = fileScopeEntities->varEntities[x];
 	    if (!IS_BIT(entity.flag, Flags::CONSTANT)) {
 		u32 nodeOff = 0;
@@ -70,6 +71,7 @@ bool compile(char *fileName){
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     dbg::dumpBytecodePages(bf.bytecodePages);
+    return true;
     VM vm = createVM();
     execBytecode(bf, 0, 0, 1000000, vm);
     destroyVM(vm);

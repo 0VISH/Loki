@@ -27,7 +27,11 @@ s8 const_ints(Bytecode *page, VM &vm){return 0;};
 s8 const_intu(Bytecode *page, VM &vm){return 0;};
 s8 const_dec(Bytecode *page, VM &vm){return 0;};
 s8 def(Bytecode *page, VM &vm){return 0;};
+s8 proc_gives(Bytecode *page, VM &vm){return 0;};
+s8 proc_start(Bytecode *page, VM &vm){return 0;};
+s8 proc_end(Bytecode *page, VM &vm){return 0;};
 
+//TODO: 
 s8 ret(Bytecode *page, VM &vm){return 0;};
 
 s8 cast(Bytecode *page, VM &vm){
@@ -148,6 +152,7 @@ s8 (*byteProc[])(Bytecode *page, VM &vm) = {
     addu,
     addf,
     def,
+    proc_gives, proc_start, proc_end,
     ret,
 };
 

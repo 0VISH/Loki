@@ -77,8 +77,8 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
 	    varCount += multi->names.count;
 	};
     };
-    se->varMap.len = 0;
-    se->procMap.len = 0;
+    se->varMap.count = 0;
+    se->procMap.count = 0;
     if(varCount != 0){
 	se->varMap.init(varCount);
 	se->varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
@@ -89,9 +89,14 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
     };
 };
 bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle){
+    BRING_TOKENS_TO_SCOPE;
     if(isSingle){
 	ASTUniVar *var = (ASTUniVar*)base;
-	Type type = getType(lexer, var->tokenOff+2);
+	Type type = tokenKeywordToType(lexer, var->tokenOff+2);
+	if(type == Type::UNKOWN){
+	    lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
+	    return false;
+	};
 	if(checkVarEntityPresentInScopeElseReg(lexer, var->name, var->flag, type, se) == false){
 	    BRING_TOKENS_TO_SCOPE;
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
@@ -100,7 +105,11 @@ bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle)
 	return true;
     };
     ASTMultiVar *var = (ASTMultiVar*)base;
-    Type type = getType(lexer, var->tokenOff+2);
+    Type type = tokenKeywordToType(lexer, var->tokenOff+2);
+    if(type == Type::UNKOWN){
+	lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
+	return false;
+    };
     for(u32 x=0; x!=var->names.count; x+=1){
 	String &name = var->names[x];
 	if(checkVarEntityPresentInScopeElseReg(lexer, name, var->flag, type, se) == false){
@@ -120,7 +129,11 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool tKown, boo
 	Flag treeFlag;
 	Type treeType = getType(getTreeTypeID(var->rhs, treeFlag));
 	if(tKown){
-	    type = getType(lexer, var->tokenOff+2);
+	    type = tokenKeywordToType(lexer, var->tokenOff+2);
+	    if(type == Type::UNKOWN){
+		lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
+		return false;
+	    };
 	    if((u32)treeType < (u32)type){
 		lexer.emitErr(tokOffs[var->tokenOff].off, "Type of expression tree does not match declared type");
 		return false;
@@ -141,7 +154,11 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool tKown, boo
     Flag treeFlag = 0;
     Type treeType = getType(getTreeTypeID(var->rhs, treeFlag));
     if(tKown){
-	type = getType(lexer, var->tokenOff+2);
+	type = tokenKeywordToType(lexer, var->tokenOff+2);
+	if(type == Type::UNKOWN){
+	    lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
+	    return false;
+	};
 	if((u32)treeType < (u32)type){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Size of expression is greater than declared size");
 	    return false;
@@ -185,7 +202,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	BRING_TOKENS_TO_SCOPE;
 	ASTProcDef *proc = (ASTProcDef*)node;
 	String name = proc->name;
-	if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se, pushNewScope(see)) == false){
+	ScopeEntities *procSE = pushNewScope(see);
+	if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se, procSE) == false){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};

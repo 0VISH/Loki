@@ -714,7 +714,7 @@ namespace dbg {
 	    PAD;
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    printf("[BODY]");
-	    for (u32 v=0; v < table.count-proc->inCommaCount; v += 1) {
+	    for (u32 v=proc->inCommaCount; v < table.count; v += 1) {
 		PAD;
 		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
