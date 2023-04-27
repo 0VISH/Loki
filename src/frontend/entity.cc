@@ -1,22 +1,3 @@
-struct ScopeEntities;
-struct Entity{
-    String name;
-    u8 flag;
-};
-struct VariableEntity : Entity{
-    Type type;
-};
-struct ProcEntity : Entity{
-    ScopeEntities *se;
-};
-
-struct ScopeEntities{
-    Map varMap;
-    Map procMap;
-    VariableEntity* varEntities;
-    ProcEntity* procEntities;
-};
-
 ScopeEntities* pushNewScope(DynamicArray<ScopeEntities*> &see){
     ScopeEntities *se = (ScopeEntities*)mem::alloc(sizeof(ScopeEntities));
     see.push(se);
@@ -120,14 +101,17 @@ bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle)
     };
     return true;
 };
-bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool tKown, bool isSingle){
+bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see, bool tKown, bool isSingle){
     BRING_TOKENS_TO_SCOPE;
+    ScopeEntities *se = see[see.count-1];
     if(isSingle){
 	ASTUniVar *var = (ASTUniVar*)base;
 	Type type;
 	Flag &flag = var->flag;
 	Flag treeFlag;
-	Type treeType = getType(getTreeTypeID(var->rhs, treeFlag));
+	TypeID treeTypeID = getTreeTypeID(var->rhs, treeFlag, see, lexer);
+	if(treeTypeID == 0){return false;};
+	Type treeType = getType(treeTypeID);
 	if(tKown){
 	    type = tokenKeywordToType(lexer, var->tokenOff+2);
 	    if(type == Type::UNKOWN){
@@ -152,7 +136,9 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool tKown, boo
     Type type;
     Flag &flag = var->flag;
     Flag treeFlag = 0;
-    Type treeType = getType(getTreeTypeID(var->rhs, treeFlag));
+    TypeID treeTypeID = getTreeTypeID(var->rhs, treeFlag, see, lexer);
+    if(treeTypeID == 0){return false;};
+    Type treeType = getType(treeTypeID);
     if(tKown){
 	type = tokenKeywordToType(lexer, var->tokenOff+2);
 	if(type == Type::UNKOWN){
@@ -230,36 +216,49 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
-	if(checkVarDef(node, lexer, se, true, false) == false){return false;};
+	if(checkVarDef(node, lexer, see, true, false) == false){return false;};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
 	ASTMultiVar *var = (ASTMultiVar*)node;
-	if(checkVarDef(node, lexer, se, false, false) == false){return false;};
+	if(checkVarDef(node, lexer, see, false, false) == false){return false;};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	if(checkVarDef(node, lexer, se, true, true) == false){return false;};
+	if(checkVarDef(node, lexer, see, true, true) == false){return false;};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 	ASTUniVar *var = (ASTUniVar*)node;
-	if(checkVarDef(node, lexer, se, false, true) == false){return false;};
+	if(checkVarDef(node, lexer, see, false, true) == false){return false;};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
     case ASTType::BIN_SUB:
     case ASTType::BIN_ADD:{
 	ASTBinOp *op = (ASTBinOp*)node;
 	Flag flag;
-	Type lhsType = getType(getTreeTypeID(op->lhs, flag));
-	Type rhsType = getType(getTreeTypeID(op->rhs, flag));
+	TypeID typeID = getTreeTypeID(op->lhs, flag, see, lexer);
+	if(typeID == 0){return false;};
+	Type lhsType = getType(typeID);
+	typeID = getTreeTypeID(op->rhs, flag, see, lexer);
+	if(typeID == 0){return false;};
+	Type rhsType = getType(typeID);
 	op->lhsType = lhsType;
 	op->rhsType = rhsType;
 	//TODO: check if types are compatible?
     }break;
     case ASTType::NUM_INTEGER:
     case ASTType::NUM_DECIMAL: break;
+    case ASTType::VARIABLE:{
+	ASTVariable *var = (ASTVariable*)node;
+	for(u32 x=see.count; x>0; x-=1){
+	    x -= 1;
+	    ScopeEntities *se = see[x];
+	    if(se->varMap.getValue(var->name) != -1){return true;};
+	};
+	return false;
+    }break;
     default: DEBUG_UNREACHABLE;return false;
     };
     return true;

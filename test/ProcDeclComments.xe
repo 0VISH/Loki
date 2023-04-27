@@ -9,6 +9,6 @@
 */
 
 add :: proc(a: s32, b: s32){
-    c:= 3
+    c:= a + b
 }
 //asd

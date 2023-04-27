@@ -1,3 +1,5 @@
+#include "frontend/entity.hh"
+
 Type getType(TypeID type) {
     u16 x = 1;
     while (IS_BIT(type, x) == 0) { x += 1; };
@@ -8,7 +10,7 @@ Type greaterType(Type t1, Type t2){
     return t2;
 };
 
-TypeID getTreeTypeID(ASTBase *base, Flag &flag) {
+TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer) {
     TypeID id = 0;
     switch (base->type) {
     case ASTType::BIN_ADD:
@@ -18,19 +20,43 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag) {
 	ASTBinOp *node = (ASTBinOp*)base;
 	Flag lhsFlag = 0;
 	Flag rhsFlag = 0;
-	TypeID lhsTypeID = getTreeTypeID(node->lhs, lhsFlag);
-	TypeID rhsTypeID = getTreeTypeID(node->rhs, rhsFlag);
+	TypeID lhsTypeID = getTreeTypeID(node->lhs, lhsFlag, see, lexer);
+	TypeID rhsTypeID = getTreeTypeID(node->rhs, rhsFlag, see, lexer);
 	flag = lhsFlag & rhsFlag;
 	return (TypeID)((u16)lhsTypeID | (u16)rhsTypeID);
     } break;
-    case ASTType::NUM_INTEGER:
+    case ASTType::NUM_INTEGER:{
 	SET_BIT(flag, Flags::CONSTANT);
 	SET_BIT(id, Type::COMP_INTEGER);
 	return id;
-    case ASTType::NUM_DECIMAL:
+    }break;
+    case ASTType::NUM_DECIMAL:{
 	SET_BIT(flag, Flags::CONSTANT);
 	SET_BIT(id, Type::COMP_DECIMAL);
 	return id;
+    }break;
+    case ASTType::VARIABLE:{
+	BRING_TOKENS_TO_SCOPE;
+	ASTVariable *var = (ASTVariable*)base;
+	Type type = Type::UNKOWN;
+	for(u32 x=see.count; x>0; x-=1){
+	    x -= 1;
+	    ScopeEntities *se = see[x];
+	    s32 id = se->varMap.getValue(var->name);
+	    if(id != -1){
+		const VariableEntity &e = se->varEntities[id];
+		type = e.type;
+		flag &= e.flag;
+		break;
+	    };
+	};
+	if(type == Type::UNKOWN){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable not defined");
+	    return (TypeID)0;
+	};
+	SET_BIT(id, (u32)type);
+	return id;
+    }break;
     };
     SET_BIT(id, Type::COMP_VOID);
     return id;

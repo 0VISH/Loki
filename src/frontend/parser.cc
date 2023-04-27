@@ -58,6 +58,7 @@ struct ASTProcDef : ASTBase {
 };
 struct ASTVariable : ASTBase{
     String name;
+    u32 tokenOff;
 };
 struct AST_Type : ASTBase{
     union{
@@ -71,6 +72,14 @@ struct ASTFile {
     u16 pageBrim;
 };
 
+String makeStringFromTokOff(u32 x, Lexer &lexer){
+    BRING_TOKENS_TO_SCOPE;
+    TokenOffset off = tokOffs[x];
+    String str;
+    str.len = off.len;
+    str.mem = lexer.fileContent + off.off;
+    return str;
+};
 ASTFile createASTFile() {
     ASTFile file;
     file.memPages.init(2);
@@ -123,6 +132,13 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, char *fileContent, ASTFile &file, s
 	    x += 1;
 	};
 	goto CHECK_TYPE_AST_OPERAND;
+    }break;
+    case Token_Type::IDENTIFIER:{
+	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
+	var->name = makeStringFromTokOff(x, lexer);
+	var->tokenOff = x;
+	x += 1;
+	return (ASTBase*)var;
     }break;
     default:
 	lexer.emitErr(tokOffs[x].off, "Invalid operand");
@@ -222,14 +238,6 @@ u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
     return x;
 };
 
-String makeStringFromTokOff(u32 x, Lexer &lexer){
-    BRING_TOKENS_TO_SCOPE;
-    TokenOffset off = tokOffs[x];
-    String str;
-    str.len = off.len;
-    str.mem = lexer.fileContent + off.off;
-    return str;
-};
 s8 varDeclAddTableEntriesAST(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &table, bool typesIncluded=false) {
     BRING_TOKENS_TO_SCOPE;
     s8 varCount = 0;
