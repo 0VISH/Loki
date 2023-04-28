@@ -74,7 +74,9 @@ bool compile(char *fileName){
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     dbg::dumpBytecodePages(bf.bytecodePages);
     VM vm = createVM();
-    execBytecode(bf, 0, 0, 1000000, vm);
+    ExecContext execContext = {0};
+    execContext.bf = &bf;
+    execBytecode(execContext, 1000000, vm);
     destroyVM(vm);
     bc.uninit();
     bf.uninit();

@@ -9,6 +9,20 @@ struct VM{
     Register *registers;
     DynamicArray<Bytecode*> procs;
 };
+struct ExecContext{
+    BytecodeFile *bf;
+    u32 pageOff;
+    u32 curOff;
+    Bytecode *page;
+    u32 off;
+
+    void nextPage(){
+	off += 1;
+	pageOff += 1;
+	page = bf->bytecodePages[pageOff];
+	curOff = 0;
+    };
+};
 
 VM createVM(){
     VM vm;
@@ -22,22 +36,22 @@ void destroyVM(VM &vm){
 };
 
 //NOTE: these functions are for continuity
-s8 none(Bytecode *page, VM &vm){return 0;};
-s8 next_page(Bytecode *page, VM &vm){return 0;};
-s8 reg(Bytecode *page, VM &vm){return 0;};
-s8 global(Bytecode *page, VM &vm){return 0;};
-s8 type(Bytecode *page, VM &vm){return 0;};
-s8 const_ints(Bytecode *page, VM &vm){return 0;};
-s8 const_intu(Bytecode *page, VM &vm){return 0;};
-s8 const_dec(Bytecode *page, VM &vm){return 0;};
-s8 proc_gives(Bytecode *page, VM &vm){return 0;};
-s8 proc_start(Bytecode *page, VM &vm){return 0;};
-s8 proc_end(Bytecode *page, VM &vm){return 0;};
+s8 none(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 next_page(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 reg(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 global(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 type(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 const_ints(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 const_intu(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 const_dec(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 proc_gives(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 proc_start(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 proc_end(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 
 //TODO: 
-s8 ret(Bytecode *page, VM &vm){return 0;};
+s8 ret(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 
-s8 cast(Bytecode *page, VM &vm){
+s8 cast(Bytecode *page, VM &vm, ExecContext &execContext){
     /*
        ot       nt
       float -> sint
@@ -73,7 +87,7 @@ s8 cast(Bytecode *page, VM &vm){
     };
     return 8;
 };
-s8 movi(Bytecode *page, VM &vm){
+s8 movi(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -89,7 +103,7 @@ s8 movi(Bytecode *page, VM &vm){
     };
     return x;
 };
-s8 movu(Bytecode *page, VM &vm){
+s8 movu(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -105,7 +119,7 @@ s8 movu(Bytecode *page, VM &vm){
     };
     return x;
 };
-s8 movf(Bytecode *page, VM &vm){
+s8 movf(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -121,46 +135,41 @@ s8 movf(Bytecode *page, VM &vm){
     };
     return x;
 };
-s8 addi(Bytecode *page, VM &vm){
+s8 addi(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 dest = (u16)page[2];
     u32 lhs = (u16)page[4];
     u32 rhs = (u16)page[6];
     vm.registers[dest].sint = vm.registers[lhs].sint + vm.registers[rhs].sint;
     return 6;
 };
-s8 addu(Bytecode *page, VM &vm){
+s8 addu(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 dest = (u16)page[2];
     u32 lhs = (u16)page[4];
     u32 rhs = (u16)page[6];
     vm.registers[dest].uint = vm.registers[lhs].uint + vm.registers[rhs].uint;
     return 6;
 };
-s8 addf(Bytecode *page, VM &vm){
+s8 addf(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 dest = (u16)page[2];
     u32 lhs = (u16)page[4];
     u32 rhs = (u16)page[6];
     vm.registers[dest].dec = vm.registers[lhs].dec + vm.registers[rhs].dec;
     return 6;
 };
-s8 def(Bytecode *page, VM &vm){
+s8 def(Bytecode *page, VM &vm, ExecContext &execContext){
+    u32 x = 2;
     u32 count = 0;
-    u32 inEndOff = 0;
-    u32 outEndOff = 0;
-    u32 x = 0;
-    while(page[x] != Bytecode::PROC_GIVES){x += 1;};
-    count = x;
-    inEndOff = x;
-    x += 1;
-    while(page[x] != Bytecode::PROC_START){x += 1;};
-    count += x - count - 1;
-    outEndOff = x;
-    x += 1;
     while(page[x] != Bytecode::PROC_END){x += 1;};
-    count += x - count - 1;
-    return x;
+    x -= 2;
+    count = x;
+    //TODO: handle next page
+    Bytecode *proc = (Bytecode*)mem::alloc(sizeof(Bytecode) * count);  //TODO: change allocator?
+    memcpy(proc, page+2, sizeof(Bytecode)*count);
+    proc[x] = Bytecode::NONE;
+    return count+2;
 };
 
-s8 (*byteProc[])(Bytecode *page, VM &vm) = {
+s8 (*byteProc[])(Bytecode *page, VM &vm, ExecContext &execContext) = {
     none, next_page, reg, global,
     cast,
     type, const_ints, const_intu, const_dec,
@@ -175,24 +184,20 @@ s8 (*byteProc[])(Bytecode *page, VM &vm) = {
     ret,
 };
 
-bool execBytecode(BytecodeFile &bf, u32 pageOff, u32 curOff, u32 endOff, VM &vm){
-    Bytecode *page = bf.bytecodePages[pageOff];
-    u32 off = curOff;
-    while(off != endOff){
-	switch(page[curOff]){
+bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
+    execContext.page = execContext.bf->bytecodePages[execContext.pageOff];
+    execContext.off = execContext.curOff;
+    while(execContext.off != endOff){
+	switch(execContext.page[execContext.curOff]){
 	case Bytecode::NONE: return true;
 	case Bytecode::NEXT_PAGE:{
-	    off += 1;
-	    pageOff += 1;
-	    page = bf.bytecodePages[pageOff];
-	    curOff = 0;
+	    execContext.nextPage();
 	    continue;
 	}break;
 	};
-	u32 x = byteProc[(u16)page[curOff]](page+curOff, vm);
-	x += 1;
-	curOff += x;
-	off += x;
+	u32 x = byteProc[(u16)execContext.page[execContext.curOff]](execContext.page+execContext.curOff, vm, execContext) + 1;
+	execContext.curOff += x;
+	execContext.off += x;
     };
     return true;
 };

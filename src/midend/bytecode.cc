@@ -440,6 +440,9 @@ namespace dbg{
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;
+	case Bytecode::PROC_GIVES:
+	case Bytecode::PROC_START:
+	case Bytecode::PROC_END:break;
 	case Bytecode::DEF:{
 	    printf("def _");
 	    x += 1;
