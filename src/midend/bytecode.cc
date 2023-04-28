@@ -1,10 +1,16 @@
 #define BYTECODE_PAGE_COUNT 100
 #define REGISTER_COUNT      100
 
+/*
+  %d  register
+  @d  global
+  _d  proc
+*/
 enum class Bytecode : u16{
     NONE = 0,
     NEXT_PAGE,
     REG,
+    GLOBAL,
     CAST,
     TYPE,
     CONST_INTS,
@@ -59,6 +65,10 @@ struct BytecodeFile{
 	emit(Bytecode::REG);
 	emit((Bytecode)regID);
     };
+    void emitGlobal(u32 globID){
+	emit(Bytecode::GLOBAL);
+	emit((Bytecode)globID);
+    };
     void emitType(Type type){
 	emit(Bytecode::TYPE);
 	emit((Bytecode)type);
@@ -90,15 +100,13 @@ private:
     };
 };
 
-static u32 BytecodeContextID = 0;
+static u32 procID = 0;
 
 struct BytecodeContext{
     Map procToID;
     u32 *varToReg;
     Type *types;
     u32 registerID;
-    u32 procID;
-    u8 contextID;
 
     void init(u32 varCount, u32 procCount){
 	registerID = 0;
@@ -109,9 +117,6 @@ struct BytecodeContext{
 	if(procCount != 0){
 	    procToID.init(procCount);
 	};
-	procID = 0;
-	contextID = BytecodeContextID;
-	BytecodeContextID += 1;
     };
     void uninit(){
 	mem::free(varToReg);
@@ -176,17 +181,19 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
 	Type type;
-	u32 off = see.count;
-	s32 id;
-	while(off>0){
-	    off -= 1;
-	    ScopeEntities *se = see[off];
+	bool isGlobal = false;
+	u32 off = see.count-1;
+	ScopeEntities *se = see[off];
+	s32 id = se->varMap.getValue(var->name);
+	if(id == -1){
+	    off = 0;
+	    se = see[0];
 	    id = se->varMap.getValue(var->name);
-	    if(id != -1){
-		type = se->varEntities[id].type;
-		break;
-	    };
+	    isGlobal = true;
 	};
+	const VariableEntity &entity = se->varEntities[id];
+	type = entity.type;
+	//isGlobal = IS_BIT(entity.flag, Flags::GLOBAL) != 0;
 	bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	BytecodeType bytecodeType = typeToBytecodeType(type);
 	if(isExprU){bf.emit(Bytecode::MOVU);}
@@ -194,7 +201,8 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	else{bf.emit(Bytecode::MOVU);};
 	BytecodeContext &correctBC = bca[off];
 	bf.emitReg(outputRegister);
-	bf.emitReg(correctBC.varToReg[id]);
+	if(isGlobal){bf.emitGlobal(correctBC.varToReg[id]);}
+	else{bf.emitReg(correctBC.varToReg[id]);};
     }break;
     case ASTType::BIN_ADD:{
 	ASTBinOp *op = (ASTBinOp*)node;
@@ -257,7 +265,8 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	if(type == BytecodeType::DECIMAL){bf.emit(Bytecode::MOVF);}
 	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
 	else{bf.emit(Bytecode::MOVU);};
-	bf.emitReg(regID);
+	if(IS_BIT(entity.flag, Flags::GLOBAL)){bf.emitGlobal(regID);}
+	else{bf.emitReg(regID);};
 	bf.emitReg(ansReg);
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
@@ -274,6 +283,9 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	if(type == BytecodeType::DECIMAL){byte = Bytecode::MOVF;}
 	else if(type == BytecodeType::INTEGER_S){byte = Bytecode::MOVS;}
 	else{byte = Bytecode::MOVU;};
+	Bytecode globalOrReg;
+	if(IS_BIT(firstEntityID.flag, Flags::GLOBAL)){globalOrReg = Bytecode::GLOBAL;}
+	else{globalOrReg=Bytecode::REG;};
 	for(u32 x=0; x<names.count; x+=1){
 	    u32 id = se->varMap.getValue(names[x]);
 	    const VariableEntity &entity = se->varEntities[id];
@@ -281,25 +293,24 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bc.varToReg[id] = regID;
 	    bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	    bf.emit(byte);
-	    bf.emitReg(regID);
+	    bf.emit(globalOrReg);
+	    bf.emit((Bytecode)regID);
 	    bf.emitReg(ansReg);
 	};
     }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
-	u32 procBytecodeID = bc.procID;
+	u32 procBytecodeID = procID;
 	bc.procToID.insertValue(proc->name, procBytecodeID);
-	bc.procID += 1;
+	procID += 1;
 	u32 procID = se->procMap.getValue(proc->name);
 	ScopeEntities *procSE = se->procEntities[procID].se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count);
-	procBC.registerID = bc.registerID;
-	// DEF + bc_context_id + proc_id + in_count + PROC_GIVES + out_count + BODY_START
-	u32 reserveCount = 1 + 1 + 1 + 1 + (proc->inCommaCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
+	// DEF + proc_id + in + PROC_GIVES + out + PROC_START
+	u32 reserveCount = 1 + 1 + (proc->inCommaCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
 	bf.emitNextPageIfReq(reserveCount);
 	bf.emit(Bytecode::DEF);
-	bf.emit((Bytecode)bc.contextID);
 	bf.emit((Bytecode)procBytecodeID);
 	for(u32 x=0; x<proc->inCommaCount; x+=1){
 	    ASTBase *node = proc->body[x];
@@ -372,6 +383,10 @@ namespace dbg{
 	    x += 1;
 	    printf("%%%d", page[x]);
 	}break;
+	case Bytecode::GLOBAL:{
+	    x += 1;
+	    printf("@%d", page[x]);
+	}break;
 	case Bytecode::MOVS: printf("movs");flag = false;
 	case Bytecode::MOVU: if(flag){printf("movu");flag = false;};
 	case Bytecode::MOVF:{
@@ -426,9 +441,7 @@ namespace dbg{
 	    DUMP_NEXT_BYTECODE;
 	}break;
 	case Bytecode::DEF:{
-	    printf("def @");
-	    x += 1;
-	    printf("%d", (u32)page[x]);
+	    printf("def _");
 	    x += 1;
 	    printf("%d(", (u32)page[x]);
 	    x += 1;

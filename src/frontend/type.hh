@@ -19,6 +19,7 @@ enum class Type : u16{
 enum class Flags {
     CONSTANT = 1,
     COMPTIME,
+    GLOBAL,
 };
 
 typedef u16 TypeID;

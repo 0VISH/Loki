@@ -62,6 +62,7 @@ bool compile(char *fileName){
 		};
 		lexer.emitErr(lexer.tokenOffsets[off].off, "Variable at global scope is not comptime");
 	    };
+	    SET_BIT(entity.flag, Flags::GLOBAL);
 	};
     };
     BytecodeFile bf;
@@ -72,7 +73,6 @@ bool compile(char *fileName){
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     dbg::dumpBytecodePages(bf.bytecodePages);
-    return true;
     VM vm = createVM();
     execBytecode(bf, 0, 0, 1000000, vm);
     destroyVM(vm);

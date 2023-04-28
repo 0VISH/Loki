@@ -7,26 +7,29 @@ struct Register{
 };
 struct VM{
     Register *registers;
+    DynamicArray<Bytecode*> procs;
 };
 
 VM createVM(){
     VM vm;
     vm.registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
+    vm.procs.init(3);
     return vm;
 };
 void destroyVM(VM &vm){
     mem::free(vm.registers);
+    vm.procs.uninit();
 };
 
 //NOTE: these functions are for continuity
 s8 none(Bytecode *page, VM &vm){return 0;};
 s8 next_page(Bytecode *page, VM &vm){return 0;};
 s8 reg(Bytecode *page, VM &vm){return 0;};
+s8 global(Bytecode *page, VM &vm){return 0;};
 s8 type(Bytecode *page, VM &vm){return 0;};
 s8 const_ints(Bytecode *page, VM &vm){return 0;};
 s8 const_intu(Bytecode *page, VM &vm){return 0;};
 s8 const_dec(Bytecode *page, VM &vm){return 0;};
-s8 def(Bytecode *page, VM &vm){return 0;};
 s8 proc_gives(Bytecode *page, VM &vm){return 0;};
 s8 proc_start(Bytecode *page, VM &vm){return 0;};
 s8 proc_end(Bytecode *page, VM &vm){return 0;};
@@ -87,7 +90,6 @@ s8 movi(Bytecode *page, VM &vm){
     return x;
 };
 s8 movu(Bytecode *page, VM &vm){
-    printf("LKSJDMFKLSDMOVE");
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -140,9 +142,26 @@ s8 addf(Bytecode *page, VM &vm){
     vm.registers[dest].dec = vm.registers[lhs].dec + vm.registers[rhs].dec;
     return 6;
 };
+s8 def(Bytecode *page, VM &vm){
+    u32 count = 0;
+    u32 inEndOff = 0;
+    u32 outEndOff = 0;
+    u32 x = 0;
+    while(page[x] != Bytecode::PROC_GIVES){x += 1;};
+    count = x;
+    inEndOff = x;
+    x += 1;
+    while(page[x] != Bytecode::PROC_START){x += 1;};
+    count += x - count - 1;
+    outEndOff = x;
+    x += 1;
+    while(page[x] != Bytecode::PROC_END){x += 1;};
+    count += x - count - 1;
+    return x;
+};
 
 s8 (*byteProc[])(Bytecode *page, VM &vm) = {
-    none, next_page, reg,
+    none, next_page, reg, global,
     cast,
     type, const_ints, const_intu, const_dec,
     movi,

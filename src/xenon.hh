@@ -3,7 +3,7 @@
 #define ARRAY_LENGTH(x)   sizeof(x)/sizeof(x[0])
 #define SET_BIT(x, pos)   x |=  (1 << (u32)pos)
 #define CLEAR_BIT(x, pos) x &= ~(1 << (u32)pos)
-#define IS_BIT(x, pos)    (((x)>>((u32)pos)) & 1)
+#define IS_BIT(x, pos)    ((((u32)(x))>>((u32)pos)) & 1)
 
 typedef unsigned char           u8;
 typedef unsigned short          u16;
