@@ -57,56 +57,90 @@ def genExpression(type):
         exec("value="+expr, globals())
         if value < 0: return "(" + expr + ") * -1"
     return expr
-        
+
+pyScope = {}
+
 def genVarDefEntity(varMapType, procMapIO):
     type = genType()
     identifier = genIdentifier()
     varMapType[identifier] = type
-    return identifier + ":" + type2String(type) + "=" + genExpression(type)
+    expr = genExpression(type)
+    xeCode = identifier + ":" + type2String(type) + " = " + expr
+    pyCode = identifier + " = " + expr
+    exec(pyCode, pyScope)
+    xeCheck = "//" + identifier + " should be " + str(pyScope[identifier])
+    return xeCode, xeCheck, pyCode
 def genVarDeclEntity(varMapType, procMapIO):
     type = genType()
     identifier = genIdentifier()
     varMapType[identifier] = type
-    return identifier + ":" + type2String(type)
+    xeCode = identifier + ":" + type2String(type)
+    pyCode = identifier + " = 0"
+    exec(pyCode, pyScope)
+    xeCheck = "//" + identifier + " should be " + str(pyScope[identifier])
+    return xeCode, xeCheck, pyCode
 def genProcDefEntity(varMapType, procMapIO):
     name = genIdentifier()
     io = []
     inputCount = random.randint(0, 30)
     inputVarMapType = {}
-    s = name + " :: proc("
+    xeCode = name + " :: proc("
+    pyCode = "def " + name + "("
     for i in range(0, inputCount):
-        s += genVarDeclEntity(inputVarMapType, None) + ", "
-    s = s.rstrip(", ")
-    s += ") "
+        type = genType()
+        identifier = genIdentifier()
+        inputVarMapType[identifier] = type
+        xeCode += identifier + ":" + type2String(type) + ", "
+        pyCode += identifier + ", "
+    xeCode = xeCode.rstrip(", ")
+    pyCode = pyCode.rstrip(", ")
+    xeCode += ") "
+    pyCode += ")"
     io.append(inputVarMapType)
     outputCount = random.randint(0, 30)
     if outputCount != 0:
-        s += "-> ("
+        xeCode += "-> ("
         types = []
         for i in range(0, outputCount):
             type = genType()
-            s += type2String(type) + ", "
+            xeCode += type2String(type) + ", "
             types.append(type)
-        s = s.rstrip(", ")
-        s += ")"
+        xeCode = xeCode.rstrip(", ")
+        xeCode += ")"
         io.append(types)
-    s += "{\n}"
+    bodyCount = random.randint(0, 15)
+    if bodyCount != 0:
+        xeCode += "{\n"
+        pyCode += ":\n"
+        for i in range(0, bodyCount):
+            code = genRandEntities()
+            xeCode += code
+            
+    else:
+        xeCode += "{}"
+        pyCode += ": pass\n"
     procMapIO[name] = tuple(io)
-    return s
+    exec(pyCode, pyScope)
+    return xeCode, None, pyCode
     
 
 genEntities = [genVarDefEntity, genVarDeclEntity, genProcDefEntity]
 
-def genRandEntities():
+def genRandEntities(tabs = 0):
     varMapType = {}
     procMapIO = {}
     entityCount = random.randint(15, 30)
     entities = []
+    pyCode = ""
     for i in range(0,entityCount):
         entityID = random.randint(0, len(genEntities)-1)
-        entities.append(genEntities[entityID](varMapType, procMapIO))
-        entities.append("\n")
-    return entities
+        xeCode, xeCheck, py = genEntities[entityID](varMapType, procMapIO)
+        entities.append(xeCode)
+        if xeCheck != None: entities.append("\n"+xeCheck+"\n\n")
+        else: entities.append("\n\n")
+        for j in range(0, tabs): pyCode += "\t"
+        pyCode += py
+    return entities, pyCode
 
 print("Generating garbage...")
 entities = genRandEntities()
