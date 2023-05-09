@@ -108,17 +108,8 @@ def genProcDefEntity(varMapType, procMapIO):
         xeCode = xeCode.rstrip(", ")
         xeCode += ")"
         io.append(types)
-    bodyCount = random.randint(0, 15)
-    if bodyCount != 0:
-        xeCode += "{\n"
-        pyCode += ":\n"
-        for i in range(0, bodyCount):
-            code = genRandEntities()
-            xeCode += code
-            
-    else:
-        xeCode += "{}"
-        pyCode += ": pass\n"
+    xeCode += "{}"
+    pyCode += ": pass\n"
     procMapIO[name] = tuple(io)
     exec(pyCode, pyScope)
     return xeCode, None, pyCode
@@ -130,21 +121,21 @@ def genRandEntities(tabs = 0):
     varMapType = {}
     procMapIO = {}
     entityCount = random.randint(15, 30)
-    entities = []
+    xeCode = ""
     pyCode = ""
     for i in range(0,entityCount):
         entityID = random.randint(0, len(genEntities)-1)
-        xeCode, xeCheck, py = genEntities[entityID](varMapType, procMapIO)
-        entities.append(xeCode)
-        if xeCheck != None: entities.append("\n"+xeCheck+"\n\n")
-        else: entities.append("\n\n")
-        for j in range(0, tabs): pyCode += "\t"
-        pyCode += py
-    return entities, pyCode
+        xe, xeCheck, py = genEntities[entityID](varMapType, procMapIO)
+        xeCode += ("\t"*tabs) + xe + "\n"
+        if xeCheck != None: xeCode += ("\t"*tabs) + xeCheck
+        xeCode += "\n\n"
+        pyCode += "\t" * tabs
+        pyCode += py + "\n"
+    return xeCode, pyCode
 
 print("Generating garbage...")
-entities = genRandEntities()
+xeCode, _ = genRandEntities()
 file = open("fuzz.xe", "w")
-file.writelines(entities)
+file.write(xeCode)
 file.close()
 print("Done :)")
