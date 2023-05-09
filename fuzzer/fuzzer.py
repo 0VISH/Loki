@@ -11,7 +11,10 @@ class Type():
     s32 = 6
     f32 = 7
     TYPE_LEN = 8
-    
+
+#             u8   s8    u16    s16    f16      u32          s32       f32
+typeMaxVal = (255, 127, 65535, 32767, 1000.0, 4294967295, 2147483647, 1000.0)
+
 def genIdentifier():
     #all identifiers start with '_'
     #we dont bother checking if the generated identifier is already generated cause the chances are too low
@@ -53,8 +56,14 @@ def genExpression(type):
             expr += genOperand(type)
             continue
         expr += genOperator()
+    #checkin if value of expr is greater than var size
+    exec("value="+expr, globals())
+    max = typeMaxVal[type]
+    if value > max:
+        expr += "- " + str(value-max + 10)
+    elif value < -max:
+        expr += "+ " + str(max-value - 10)
     if isUnsigned(type):
-        exec("value="+expr, globals())
         if value < 0: return "(" + expr + ") * -1"
     return expr
 
@@ -94,8 +103,8 @@ def genProcDefEntity(varMapType, procMapIO):
         pyCode += identifier + ", "
     xeCode = xeCode.rstrip(", ")
     pyCode = pyCode.rstrip(", ")
-    xeCode += ") "
-    pyCode += ")"
+    xeCode += ")"
+    pyCode += ") "
     io.append(inputVarMapType)
     outputCount = random.randint(0, 30)
     if outputCount != 0:
@@ -108,8 +117,11 @@ def genProcDefEntity(varMapType, procMapIO):
         xeCode = xeCode.rstrip(", ")
         xeCode += ")"
         io.append(types)
-    xeCode += "{}"
-    pyCode += ": pass\n"
+    xeCode += "\n{\n"
+    pyCode += ":\n"
+    xe, py = genRandEntities(1, True)
+    xeCode += xe + "}"
+    pyCode += py +"\tpass"
     procMapIO[name] = tuple(io)
     exec(pyCode, pyScope)
     return xeCode, None, pyCode
@@ -117,19 +129,21 @@ def genProcDefEntity(varMapType, procMapIO):
 
 genEntities = [genVarDefEntity, genVarDeclEntity, genProcDefEntity]
 
-def genRandEntities(tabs = 0):
+def genRandEntities(tabs = 0, inProc = False):
     varMapType = {}
     procMapIO = {}
-    entityCount = random.randint(15, 30)
+    entityCount = random.randint(2, 5)
     xeCode = ""
     pyCode = ""
+    tabs = "\t" * tabs
     for i in range(0,entityCount):
         entityID = random.randint(0, len(genEntities)-1)
+        if entityID == 2 and inProc == True: continue
         xe, xeCheck, py = genEntities[entityID](varMapType, procMapIO)
-        xeCode += ("\t"*tabs) + xe + "\n"
-        if xeCheck != None: xeCode += ("\t"*tabs) + xeCheck
+        xeCode += tabs + xe + "\n"
+        if xeCheck != None: xeCode += tabs + xeCheck
         xeCode += "\n\n"
-        pyCode += "\t" * tabs
+        pyCode += tabs
         pyCode += py + "\n"
     return xeCode, pyCode
 
