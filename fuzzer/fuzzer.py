@@ -1,5 +1,8 @@
 import random
 import string
+import subprocess
+
+GARBAGE_COUNT = 5
 
 class Type():
     u8  = 0
@@ -64,7 +67,7 @@ def genExpression(type):
     elif value < -max:
         expr += "+ " + str(max-value - 10)
     if isUnsigned(type):
-        if value < 0: return "(" + expr + ") * -1"
+        if value < 0: return "(" + expr + ") * 1"     #todo: make it -1, but we dont yet know how to deal with negative numbers
     return expr
 
 pyScope = {}
@@ -147,9 +150,29 @@ def genRandEntities(tabs = 0, inProc = False):
         pyCode += py + "\n"
     return xeCode, pyCode
 
-print("Generating garbage...")
-xeCode, _ = genRandEntities()
-file = open("fuzz.xe", "w")
-file.write(xeCode)
-file.close()
+command = "bin\\dbg\\xenon.exe bin\\fuzz.xe"
+outputFileName = "bin\\fuzzOutput.txt"
+outputFile = open(outputFileName, "w")
+
+for i in range(0, GARBAGE_COUNT):
+    print("["+str(i)+"] Generating garbage...")
+    xeCode, _ = genRandEntities()
+    file = open("bin\\fuzz.xe", "w")
+    file.write(xeCode)
+    file.close()
+    print("wrote garbage to file")
+    print("calling:", command)
+    process = subprocess.Popen(command, shell=True, stdout=outputFile)
+    process.wait()
+    if process.returncode != 0:
+        fName = "bin\\fuzz"+str(i)+".xe"
+        f = open(fName, "w")
+        f.write(xeCode)
+        f.close()
+        print("wrote to", fName)
+        print("FAIL")
+    else: print("OK")
+    print()
+    
+outputFile.close()
 print("Done :)")

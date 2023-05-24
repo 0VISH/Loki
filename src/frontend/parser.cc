@@ -444,6 +444,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		};
 		DynamicArray<ASTBase*> *table = &(proc->body);
 		while (tokTypes[x] != (Token_Type)'}') {
+		    //parse body
 		    ASTBase *node = parseBlock(lexer, file, x);
 		    if (node == nullptr) {
 			table->uninit();
@@ -452,6 +453,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		    };
 		    table->push(node);
 		    x += 1;
+		    eatNewlines(tokTypes, x);
 		};
 		x += 1;
 		return (ASTBase*)proc;
