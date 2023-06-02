@@ -58,10 +58,23 @@ namespace report{
 		x += 1;
 	    };
 	    beg[x] = '\0';
+	    bool printDots = false;
+	    while(off > 40){
+		off -= 40;
+		beg += 40;
+		printDots = true;
+	    }
 	    printf("\n%s: ", rep.fileName);
 	    os::printErrorInRed();
 	    printf(" %s\n", rep.msg);
-	    printf("  %d|  %s\n_____", line, beg);
+	    printf("  %d| ", line);
+	    if(printDots){
+		printf("...");
+	    };
+	    printf("%s\n____", beg);
+	    if(printDots){
+		printf("___");
+	    }
 	    u32 n = line;
 	    while (n > 0) {
 		printf("_");

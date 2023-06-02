@@ -1,6 +1,9 @@
+from termcolor import colored        #pip install termcolor
 import random
 import string
 import subprocess
+from decimal import Decimal
+import os
 
 GARBAGE_COUNT = 5
 
@@ -31,10 +34,10 @@ def genOperand(type):
     if type < Type.u16: return str(random.randint(0, 200))
     #16
     if type < Type.u32:
-        if isFloat(type): return str(random.uniform(0.0, 10000.0))
+        if isFloat(type): return str(Decimal(random.uniform(0.0, 10000.0)))
         return str(random.randint(0, 10000))
     #32
-    if isFloat(type): return str(random.uniform(0.0, 10000000.0))
+    if isFloat(type): return str(Decimal(random.uniform(0.0, 10000000.0)))
     return str(random.randint(0, 10000000))
 def genOperator():
     operators = [' + ', ' - ', ' * ', ' / ']
@@ -150,16 +153,19 @@ def genRandEntities(tabs = 0, inProc = False):
         pyCode += py + "\n"
     return xeCode, pyCode
 
-command = "bin\\dbg\\xenon.exe bin\\fuzz.xe"
+fuzzFile = "bin\\fuzz.xe"
+command = "bin\\dbg\\xenon.exe " + fuzzFile
 outputFileName = "bin\\fuzzOutput.txt"
 outputFile = open(outputFileName, "w")
+file = open(fuzzFile, "w")
 
+fail = 0
+ok = 0
 for i in range(0, GARBAGE_COUNT):
     print("["+str(i)+"] Generating garbage...")
     xeCode, _ = genRandEntities()
-    file = open("bin\\fuzz.xe", "w")
     file.write(xeCode)
-    file.close()
+    file.flush()
     print("wrote garbage to file")
     print("calling:", command)
     process = subprocess.Popen(command, shell=True, stdout=outputFile)
@@ -170,9 +176,18 @@ for i in range(0, GARBAGE_COUNT):
         f.write(xeCode)
         f.close()
         print("wrote to", fName)
-        print("FAIL")
-    else: print("OK")
+        print(colored("FAIL", "red"))
+        fail += 1
+    else:
+        print(colored("OK", "green"))
+        ok += 1
     print()
-    
+    file.seek(0)
+
+file.close()
 outputFile.close()
+os.remove(fuzzFile)
+print("OK:", ok)
+print("FAIL:", fail)
+print("total:", ok+fail, "\n")
 print("Done :)")

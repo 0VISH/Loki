@@ -37,7 +37,6 @@ bool compile(char *fileName){
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	printf("\nchecking entites failed\n");
 	report::flushReports();
-	printf("LSKDFJLSDKFJ");
 	return false;
     } else {
 	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
@@ -72,10 +71,10 @@ bool compile(char *fileName){
     BytecodeContext &bc = bca.newElem();
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
-    dbg::dumpBytecodePages(bf.bytecodePages);
+    dbg::dumpBytecodeFile(bf);
     VM vm = createVM();
-    ExecContext execContext = {0};
-    execContext.bf = &bf;
+    ExecContext execContext;
+    execContext.init(bf);
     execBytecode(execContext, 1000000, vm);
     destroyVM(vm);
     bc.uninit();

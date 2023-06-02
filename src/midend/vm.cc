@@ -10,18 +10,13 @@ struct VM{
     DynamicArray<Bytecode*> procs;
 };
 struct ExecContext{
-    BytecodeFile *bf;
-    u32 pageOff;
-    u32 curOff;
     Bytecode *page;
     u32 off;
 
-    void nextPage(){
-	off += 1;
-	pageOff += 1;
-	page = bf->bytecodePages[pageOff];
-	curOff = 0;
-    };
+    void init(BytecodeFile &bf, u32 o = 0){
+	page = bf.bcs.mem;
+	off = o;
+    }
 };
 
 VM createVM(){
@@ -37,7 +32,6 @@ void destroyVM(VM &vm){
 
 //NOTE: these functions are for continuity
 s8 none(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 next_page(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 s8 reg(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 s8 global(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 s8 type(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
@@ -170,7 +164,7 @@ s8 def(Bytecode *page, VM &vm, ExecContext &execContext){
 };
 
 s8 (*byteProc[])(Bytecode *page, VM &vm, ExecContext &execContext) = {
-    none, next_page, reg, global,
+    none, reg, global,
     cast,
     type, const_ints, const_intu, const_dec,
     movi,
@@ -185,18 +179,10 @@ s8 (*byteProc[])(Bytecode *page, VM &vm, ExecContext &execContext) = {
 };
 
 bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
-    execContext.page = execContext.bf->bytecodePages[execContext.pageOff];
-    execContext.off = execContext.curOff;
     while(execContext.off != endOff){
-	switch(execContext.page[execContext.curOff]){
-	case Bytecode::NONE: return true;
-	case Bytecode::NEXT_PAGE:{
-	    execContext.nextPage();
-	    continue;
-	}break;
-	};
-	u32 x = byteProc[(u16)execContext.page[execContext.curOff]](execContext.page+execContext.curOff, vm, execContext) + 1;
-	execContext.curOff += x;
+	Bytecode bc = execContext.page[execContext.off];
+	if(bc == Bytecode::NONE){return true;};
+	u32 x = byteProc[(u16)bc](execContext.page+execContext.off, vm, execContext) + 1;
 	execContext.off += x;
     };
     return true;

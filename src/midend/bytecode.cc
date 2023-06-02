@@ -8,7 +8,6 @@
 */
 enum class Bytecode : u16{
     NONE = 0,
-    NEXT_PAGE,
     REG,
     GLOBAL,
     CAST,
@@ -40,26 +39,16 @@ const u16 reg_in_stream = 2;
 const u16 type_in_stream = 2;
 
 struct BytecodeFile{
-    DynamicArray<Bytecode*> bytecodePages;
-    u16 pageBrim;
+    DynamicArray<Bytecode> bcs;
 
     void init(){
-	pageBrim = 0;
-	bytecodePages.init(2);
-	newBytecodePage();
+	bcs.init(50);
     };
     void uninit(){
-	bytecodePages.uninit();
+	bcs.uninit();
     };
     void emit(Bytecode bc){
-#if(XE_DBG)
-	if(pageBrim + 1 >= BYTECODE_PAGE_COUNT){
-	    printf("\n[ERROR]: forgot to call emitNextPageIfReq?");
-	};
-#endif
-	Bytecode *page = bytecodePages[bytecodePages.count-1];
-	page[pageBrim] = bc;
-	pageBrim += 1;
+	bcs.push(bc);
     };
     void emitReg(u32 regID){
 	emit(Bytecode::REG);
@@ -73,30 +62,20 @@ struct BytecodeFile{
 	emit(Bytecode::TYPE);
 	emit((Bytecode)type);
     };
-    //encoding constant into bytecode page cause why not?
+    //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
-	Bytecode *page = bytecodePages[bytecodePages.count-1];
-	s64 *mem = (s64*)(page + pageBrim);
+	bcs.reserve(const_in_stream);
+	Bytecode *loc = bcs.mem + bcs.count;
+	s64 *mem = (s64*)(loc);
 	*mem = num;
-	pageBrim += const_in_stream;
+        bcs.count += const_in_stream;
     };
     void emitConstDec(f64 num){
-	Bytecode *page = bytecodePages[bytecodePages.count-1];
-	f64 *mem = (f64*)(page + pageBrim);
+        bcs.reserve(const_in_stream);
+	Bytecode *loc = bcs.mem + bcs.count;
+	f64 *mem = (f64*)(loc);
 	*mem = num;
-	pageBrim += const_in_stream;
-    };
-    void emitNextPageIfReq(u32 count){
-	if(pageBrim+count >= BYTECODE_PAGE_COUNT){
-	    emit(Bytecode::NEXT_PAGE);
-	    newBytecodePage();
-	};
-    };
-private:
-    void newBytecodePage(){
-	Bytecode *page = (Bytecode*)mem::alloc(sizeof(Bytecode) * BYTECODE_PAGE_COUNT + 1); //NOTE: +1 for NEXT_PAGE if there is no more space left
-	bytecodePages.push(page);
-	pageBrim = 0;
+	bcs.count += const_in_stream;
     };
 };
 
@@ -160,7 +139,6 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	s64 num = string2int(str);    //TODO: maybe have a sep func which returns u64
-	bf.emitNextPageIfReq(1 + reg_in_stream + 1 + const_in_stream);
 	if(isExprU){bf.emit(Bytecode::MOVU);}
 	else{bf.emit(Bytecode::MOVS);};
 	bf.emitReg(outputRegister);
@@ -172,7 +150,6 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
 	f64 num = string2float(str);
-	bf.emitNextPageIfReq(1 + reg_in_stream + 1 + const_in_stream);
 	bf.emit(Bytecode::MOVF);
 	bf.emitReg(outputRegister);
 	bf.emit(Bytecode::CONST_DEC);
@@ -194,7 +171,6 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	const VariableEntity &entity = se->varEntities[id];
 	type = entity.type;
 	//isGlobal = IS_BIT(entity.flag, Flags::GLOBAL) != 0;
-	bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	BytecodeType bytecodeType = typeToBytecodeType(type);
 	if(isExprU){bf.emit(Bytecode::MOVU);}
 	else if(bytecodeType == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
@@ -218,7 +194,6 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	compileExprToBytecode(rhsReg, op->rhs, lexer, see, bca, bf, isExprU);
 	if(lbt != rbt){
 	    u32 newReg = bc.newReg(ansType);
-	    bf.emitNextPageIfReq(1 + reg_in_stream *2 + type_in_stream*2);
 	    bf.emit(Bytecode::CAST);
 	    bf.emitType(ansType);
 	    bf.emitReg(newReg);
@@ -232,7 +207,6 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 		rhsReg = newReg;
 	    };
 	};
-	bf.emitNextPageIfReq(1 + reg_in_stream*3);
 	BytecodeType type = typeToBytecodeType(ansType);
 	if(isExprU){bf.emit(Bytecode::ADDU);}
 	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::ADDS);}
@@ -260,7 +234,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	u32 ansReg = bc.newReg(entity.type);
 	compileExprToBytecode(ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(entity.type)==BytecodeType::INTEGER_U);
 	bc.varToReg[id] = regID;
-	bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	BytecodeType type = typeToBytecodeType(entity.type);
 	if(type == BytecodeType::DECIMAL){bf.emit(Bytecode::MOVF);}
 	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
@@ -291,7 +264,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    const VariableEntity &entity = se->varEntities[id];
 	    u32 regID = bc.newReg(firstEntityType);
 	    bc.varToReg[id] = regID;
-	    bf.emitNextPageIfReq(1 + reg_in_stream*2);
 	    bf.emit(byte);
 	    bf.emit(globalOrReg);
 	    bf.emit((Bytecode)regID);
@@ -309,7 +281,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
         procBC.init(procSE->varMap.count, procSE->procMap.count);
 	// DEF + proc_id + in + PROC_GIVES + out + PROC_START
 	u32 reserveCount = 1 + 1 + (proc->inCommaCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
-	bf.emitNextPageIfReq(reserveCount);
 	bf.emit(Bytecode::DEF);
 	bf.emit((Bytecode)procBytecodeID);
 	for(u32 x=0; x<proc->inCommaCount; x+=1){
@@ -351,7 +322,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	};
 	see.pop();
 	bca.pop();
-	bf.emitNextPageIfReq(1);
 	bf.emit(Bytecode::PROC_END);
     }break;
     default:
@@ -484,22 +454,15 @@ namespace dbg{
 	};
 	return true;
     };
-    void dumpBytecodePages(DynamicArray<Bytecode*> &pages){
-	printf("\n\n[STARTING DUMPING BYTECODE PAGES]\n");
-	for(u32 x=0; x<pages.count; x+=1){
-	    printf(" -------------------PAGE %d-------------------\n", x);
-	    Bytecode *page = pages[x];
-	    for(u32 y=0; y<BYTECODE_PAGE_COUNT; y+=1){
-		if(page[y] == Bytecode::NEXT_PAGE){
-		    printf(" next_page\n");
-		    break;
-		};
-		if(dumpBytecode(page, y) == false){goto DUMP_BYTECODE_PAGES_OVER;};
-		printf("\n");
-	    };
+    void dumpBytecodeFile(BytecodeFile &bf){
+	printf("\n\n[DUMPING BYTECODE FILE]\n");
+	Bytecode *mem = bf.bcs.mem;
+	for(u32 x=0; x<bf.bcs.count; x+=1){
+	    if(mem[x] == Bytecode::NONE){break;};
+	    if(dumpBytecode(mem, x) == false){break;};
+	    printf("\n");
 	};
-    DUMP_BYTECODE_PAGES_OVER:
-	printf("\n[FINISHED DUMPING BYTECODE PAGES]\n\n");
+	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");
     };
 };
 #endif
