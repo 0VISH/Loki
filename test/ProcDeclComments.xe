@@ -1,15 +1,1 @@
-//testing procedures, variable assignments, and comments  
-/*
-/*
-	/*
-		multi line comment
-	*/
-*/
-*/
-
-vb := 1 - 2 + 3 + 4 * 5
-add :: proc(a: s32, b: s32){
-    c:= vb + b
-}
-l := 5
-//asd
+v := 1 * (2 + 3)
