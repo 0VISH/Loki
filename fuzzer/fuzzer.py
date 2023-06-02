@@ -2,7 +2,6 @@ from termcolor import colored        #pip install termcolor
 import random
 import string
 import subprocess
-from decimal import Decimal
 import os
 
 GARBAGE_COUNT = 5
@@ -21,6 +20,11 @@ class Type():
 #             u8   s8    u16    s16    f16      u32          s32       f32
 typeMaxVal = (255, 127, 65535, 32767, 1000.0, 4294967295, 2147483647, 1000.0)
 
+def genDecimal():
+    int = str(random.randint(0, 200))
+    dec = str(random.randint(0, 200))
+    return int + "." + dec
+
 def genIdentifier():
     #all identifiers start with '_'
     #we dont bother checking if the generated identifier is already generated cause the chances are too low
@@ -34,10 +38,10 @@ def genOperand(type):
     if type < Type.u16: return str(random.randint(0, 200))
     #16
     if type < Type.u32:
-        if isFloat(type): return str(Decimal(random.uniform(0.0, 10000.0)))
+        if isFloat(type): return genDecimal()
         return str(random.randint(0, 10000))
     #32
-    if isFloat(type): return str(Decimal(random.uniform(0.0, 10000000.0)))
+    if isFloat(type): return genDecimal()
     return str(random.randint(0, 10000000))
 def genOperator():
     operators = [' + ', ' - ', ' * ', ' / ']

@@ -21,6 +21,15 @@ enum class Bytecode : u16{
     ADDS,
     ADDU,
     ADDF,
+    SUBS,
+    SUBU,
+    SUBF,
+    MULS,
+    MULU,
+    MULF,
+    DIVS,
+    DIVU,
+    DIVF,
     DEF,
     PROC_GIVES,
     PROC_START,
@@ -110,6 +119,41 @@ struct BytecodeContext{
     };
 };
 
+#define EMIT_BIN_OP_BC_TEMPLATE(SIGNED, UNSIGNED, DECIMAL)		\
+    ASTBinOp *op = (ASTBinOp*)node;					\
+    Type lhsType = op->lhsType;						\
+    Type rhsType = op->rhsType;						\
+    Type ansType = greaterType(lhsType, rhsType);			\
+    BytecodeType lbt = typeToBytecodeType(lhsType);			\
+    BytecodeType rbt = typeToBytecodeType(rhsType);			\
+    BytecodeType abt = typeToBytecodeType(ansType);			\
+    u32 lhsReg = bc.newReg(lhsType);					\
+    u32 rhsReg = bc.newReg(rhsType);					\
+    compileExprToBytecode(lhsReg, op->lhs, lexer, see, bca, bf, isExprU); \
+    compileExprToBytecode(rhsReg, op->rhs, lexer, see, bca, bf, isExprU); \
+    if(lbt != rbt){							\
+	u32 newReg = bc.newReg(ansType);				\
+	bf.emit(Bytecode::CAST);					\
+	bf.emitType(ansType);						\
+	bf.emitReg(newReg);						\
+	if(lbt != abt){							\
+	    bf.emitType(lhsType);					\
+	    bf.emitReg(lhsReg);						\
+	    lhsReg = newReg;						\
+	}else{								\
+	    bf.emitType(rhsType);					\
+	    bf.emitReg(rhsReg);						\
+	    rhsReg = newReg;						\
+	};								\
+    };									\
+    BytecodeType type = typeToBytecodeType(ansType);			\
+    if(isExprU){bf.emit(UNSIGNED);}					\
+    else if(type == BytecodeType::INTEGER_S){bf.emit(SIGNED);}		\
+    else{bf.emit(DECIMAL);};						\
+    bf.emitReg(outputRegister);						\
+    bf.emitReg(lhsReg);							\
+    bf.emitReg(rhsReg);							\
+
 s64 getConstInt(Bytecode *bytes){
     s64 *mem = (s64*)bytes;
     return *mem;
@@ -181,39 +225,16 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	else{bf.emitReg(correctBC.varToReg[id]);};
     }break;
     case ASTType::BIN_ADD:{
-	ASTBinOp *op = (ASTBinOp*)node;
-	Type lhsType = op->lhsType;
-	Type rhsType = op->rhsType;
-	Type ansType = greaterType(lhsType, rhsType);
-	BytecodeType lbt = typeToBytecodeType(lhsType);
-	BytecodeType rbt = typeToBytecodeType(rhsType);
-	BytecodeType abt = typeToBytecodeType(ansType);
-	u32 lhsReg = bc.newReg(lhsType);
-	u32 rhsReg = bc.newReg(rhsType);
-	compileExprToBytecode(lhsReg, op->lhs, lexer, see, bca, bf, isExprU);
-	compileExprToBytecode(rhsReg, op->rhs, lexer, see, bca, bf, isExprU);
-	if(lbt != rbt){
-	    u32 newReg = bc.newReg(ansType);
-	    bf.emit(Bytecode::CAST);
-	    bf.emitType(ansType);
-	    bf.emitReg(newReg);
-	    if(lbt != abt){
-		bf.emitType(lhsType);
-		bf.emitReg(lhsReg);
-		lhsReg = newReg;
-	    }else{
-		bf.emitType(rhsType);
-		bf.emitReg(rhsReg);
-		rhsReg = newReg;
-	    };
-	};
-	BytecodeType type = typeToBytecodeType(ansType);
-	if(isExprU){bf.emit(Bytecode::ADDU);}
-	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::ADDS);}
-	else{bf.emit(Bytecode::ADDF);};
-	bf.emitReg(outputRegister);
-	bf.emitReg(lhsReg);
-	bf.emitReg(rhsReg);
+	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::ADDS, Bytecode::ADDU, Bytecode::ADDF);
+    }break;
+    case ASTType::BIN_SUB:{
+	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::SUBS, Bytecode::SUBU, Bytecode::SUBF);
+    }break;
+    case ASTType::BIN_MUL:{
+	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::MULS, Bytecode::MULU, Bytecode::MULF);
+    }break;
+    case ASTType::BIN_DIV:{
+	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::DIVS, Bytecode::DIVU, Bytecode::DIVF);
     }break;
     default:
 	DEBUG_UNREACHABLE;
@@ -399,6 +420,30 @@ namespace dbg{
 	case Bytecode::ADDU: if(flag){printf("addu");flag = false;};
 	case Bytecode::ADDF:{
 	    if(flag){printf("addf");};
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::SUBS: printf("subs");flag = false;
+	case Bytecode::SUBU: if(flag){printf("subu");flag = false;};
+	case Bytecode::SUBF:{
+	    if(flag){printf("subf");};
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::MULS: printf("muls");flag = false;
+	case Bytecode::MULU: if(flag){printf("mulu");flag = false;};
+	case Bytecode::MULF:{
+	    if(flag){printf("mulf");};
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::DIVS: printf("divs");flag = false;
+	case Bytecode::DIVU: if(flag){printf("divu");flag = false;};
+	case Bytecode::DIVF:{
+	    if(flag){printf("divf");};
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;

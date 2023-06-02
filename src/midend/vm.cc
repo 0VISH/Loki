@@ -42,6 +42,25 @@ s8 proc_gives(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 s8 proc_start(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 s8 proc_end(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 
+#define BIN_OP_TEMPLATE(SIGN, TYPE)						\
+    u32 dest = (u16)page[2];						\
+    u32 lhs = (u16)page[4];						\
+    u32 rhs = (u16)page[6];						\
+    vm.registers[dest].TYPE = vm.registers[lhs].TYPE SIGN vm.registers[rhs].TYPE; \
+    printf("RES: %lld\n", vm.registers[dest].uint);			\
+    return 6;								\
+
+#define BIN_DIV_TEMPLATE(TYPE)						\
+    u32 dest = (u16)page[2];						\
+    u32 lhs = (u16)page[4];						\
+    u32 rhs = (u16)page[6];						\
+    if(vm.registers[rhs].TYPE == 0){					\
+	printf("TODO: div by 0 VM");					\
+	return 0;							\
+    }									\
+    vm.registers[dest].TYPE = vm.registers[lhs].TYPE / vm.registers[rhs].TYPE; \
+    return 6;								\
+
 //TODO: 
 s8 ret(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
 
@@ -130,25 +149,40 @@ s8 movf(Bytecode *page, VM &vm, ExecContext &execContext){
     return x;
 };
 s8 addi(Bytecode *page, VM &vm, ExecContext &execContext){
-    u32 dest = (u16)page[2];
-    u32 lhs = (u16)page[4];
-    u32 rhs = (u16)page[6];
-    vm.registers[dest].sint = vm.registers[lhs].sint + vm.registers[rhs].sint;
-    return 6;
+    BIN_OP_TEMPLATE(+, sint);
 };
 s8 addu(Bytecode *page, VM &vm, ExecContext &execContext){
-    u32 dest = (u16)page[2];
-    u32 lhs = (u16)page[4];
-    u32 rhs = (u16)page[6];
-    vm.registers[dest].uint = vm.registers[lhs].uint + vm.registers[rhs].uint;
-    return 6;
+    BIN_OP_TEMPLATE(+, uint);
 };
 s8 addf(Bytecode *page, VM &vm, ExecContext &execContext){
-    u32 dest = (u16)page[2];
-    u32 lhs = (u16)page[4];
-    u32 rhs = (u16)page[6];
-    vm.registers[dest].dec = vm.registers[lhs].dec + vm.registers[rhs].dec;
-    return 6;
+    BIN_OP_TEMPLATE(+, dec);
+};
+s8 subi(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_OP_TEMPLATE(-, sint);
+};
+s8 subu(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_OP_TEMPLATE(-, uint);
+};
+s8 subf(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_OP_TEMPLATE(-, dec);
+};
+s8 muli(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_OP_TEMPLATE(*, sint);
+};
+s8 mulu(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_OP_TEMPLATE(*, uint);
+};
+s8 mulf(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_OP_TEMPLATE(*, dec);
+};
+s8 divi(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_DIV_TEMPLATE(sint);
+};
+s8 divu(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_DIV_TEMPLATE(uint);
+};
+s8 divf(Bytecode *page, VM &vm, ExecContext &execContext){
+    BIN_DIV_TEMPLATE(dec);
 };
 s8 def(Bytecode *page, VM &vm, ExecContext &execContext){
     u32 x = 2;
@@ -173,6 +207,15 @@ s8 (*byteProc[])(Bytecode *page, VM &vm, ExecContext &execContext) = {
     addi,
     addu,
     addf,
+    subi,
+    subu,
+    subf,
+    muli,
+    mulu,
+    mulf,
+    divi,
+    divu,
+    divf,
     def,
     proc_gives, proc_start, proc_end,
     ret,
@@ -183,6 +226,7 @@ bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
 	Bytecode bc = execContext.page[execContext.off];
 	if(bc == Bytecode::NONE){return true;};
 	u32 x = byteProc[(u16)bc](execContext.page+execContext.off, vm, execContext) + 1;
+	if(x == 0){return false;};
 	execContext.off += x;
     };
     return true;
