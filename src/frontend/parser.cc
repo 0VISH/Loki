@@ -109,9 +109,21 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     return node;
 };
 
+ASTBinOp *genASTOperator(Lexer &lexer, u32 x, ASTFile &file) {
+    BRING_TOKENS_TO_SCOPE;
+    ASTType type;
+    switch (lexer.fileContent[tokOffs[x].off]) {
+    case '+': type = ASTType::BIN_ADD; break;
+    case '-': type = ASTType::BIN_SUB; break;
+    case '*': type = ASTType::BIN_MUL; break;
+    case '/': type = ASTType::BIN_DIV; break;
+    default: DEBUG_UNREACHABLE;
+    };
+    return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
+};
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     BRING_TOKENS_TO_SCOPE;
- GEN_AST_OPERAND:
+ CHECK_TYPE_AST_OPERAND:
     Token_Type type = tokTypes[x];
     switch (type) {
     case Token_Type::INTEGER: {
@@ -126,6 +138,13 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	x += 1;
 	return (ASTBase*)numNode;
     }break;
+    case (Token_Type)'(': {
+	while (tokTypes[x] == (Token_Type)'(') {
+	    bracket += 10;
+	    x += 1;
+	};
+	goto CHECK_TYPE_AST_OPERAND;
+    }break;
     case Token_Type::IDENTIFIER:{
 	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
 	var->name = makeStringFromTokOff(x, lexer);
@@ -133,96 +152,84 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	x += 1;
 	return (ASTBase*)var;
     }break;
-    case (Token_Type)'(':
-	while(tokTypes[x] == (Token_Type)'('){
-	    x += 1;
-	    bracket += 10;
-	};
-	goto GEN_AST_OPERAND;
     default:
 	lexer.emitErr(tokOffs[x].off, "Invalid operand");
 	return nullptr;
     };
     return nullptr;
 };
-ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, u32 y, ASTFile &file, s16 &bracket, s16 &outPrio) {
+s16 checkAndGetPrio(Lexer &lexer, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
-    ASTType type;
-    s16 prio = 0;
- GEN_AST_OPERATOR:
-    switch(tokTypes[x]) {
-    case (Token_Type)'+':{
-	type = ASTType::BIN_ADD;
-	x += 1;
-	prio = 1;
-    }break;
-    case (Token_Type)'-':{
-	type = ASTType::BIN_SUB;
-	x += 1;
-	prio = 1;
-    }break;
-    case (Token_Type)'*':{
-	type = ASTType::BIN_MUL;
-	x += 1;
-	prio = 2;
-    }break;
-    case (Token_Type)'/':{
-	type = ASTType::BIN_DIV;
-	x += 1;
-	prio = 2;
-    }break;
-    case (Token_Type)')':{
-	while(tokTypes[x] == (Token_Type)')'){
-	    x += 1;
-	    bracket -= 10;
-	};
-	if(x >= y){return (ASTBinOp*)1;};
-	goto GEN_AST_OPERATOR;
-    }break;
+    switch (tokTypes[x]) {
+    case (Token_Type)'+':
+    case (Token_Type)'-':
+	return 1;
+    case (Token_Type)'*':
+    case (Token_Type)'/':
+	return 2;
     default:
 	lexer.emitErr(tokOffs[x].off, "Invalid operator");
-	return nullptr;
+	return -1;
     };
-    ASTBinOp *op = (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
-    outPrio = prio + bracket;
-    return op;
 };
-bool isNodeBinOp(ASTBase *node){
-    return (node->type >= ASTType::BIN_ADD) && (node->type <= ASTType::BIN_DIV);
+ASTBinOp *genRHSExpr(Lexer &lexer, ASTFile &file, u32 &curPos, u32 y, s16 &bracket) {
+    BRING_TOKENS_TO_SCOPE;
+    u32 x = curPos;
+    s16 prio = checkAndGetPrio(lexer, x);
+    if (prio == -1) { return nullptr; };
+    ASTBinOp *node = genASTOperator(lexer, x, file);
+    ASTBinOp *previousOperator = node;
+    ASTBinOp *binOperator = nullptr;
+    ASTBase *operand = nullptr;
+    x += 1;
+    while (x < y) {
+	operand = genASTOperand(lexer, x, file, bracket);
+	if (operand == nullptr) { return nullptr; };
+	if (x >= y) { break; };
+	if (tokTypes[x] == (Token_Type)')') {
+	    while (tokTypes[x] == (Token_Type)')') {
+		bracket -= 10;
+		x += 1;
+	    };
+	    break;
+	};
+	s16 curPrio = checkAndGetPrio(lexer, x);
+	if (curPrio == -1) { return nullptr; };
+	if (curPrio+bracket < prio) {break;};
+	prio = curPrio;
+	binOperator = genASTOperator(lexer , x, file);
+	binOperator->lhs = operand;
+	previousOperator->rhs = (ASTBase*)binOperator;
+	previousOperator = binOperator;
+	x += 1;
+    };
+    previousOperator->rhs = operand;
+    curPos = x;
+    return node;
 };
-//NOTE: thank you jonathan blow! https://youtu.be/MnctEW1oL-E?t=3761
-ASTBase *genASTExprTreeInner(Lexer &lexer, ASTFile &file, u32 &x, u32 y, s16 &bracket, s16 &outPrio) {
+ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 end) {
+    u32 start = x;
     BRING_TOKENS_TO_SCOPE;
     Token_Type type = tokTypes[x];
+    s16 bracket = 0;
     ASTBase *lhs = genASTOperand(lexer, x, file, bracket);
-    if(lhs == nullptr){return nullptr;};
-    if(x >= y){
-	return lhs;
-    }
-    ASTBinOp *bin = genASTOperator(lexer, x, y, file, bracket, outPrio);
-    if(bin == nullptr){return nullptr;};
-    if(bin == (ASTBinOp*)1){return lhs;};
-    s16 rhsPrio = 0;
-    ASTBase *rhs = genASTExprTreeInner(lexer, file, x, y, bracket, rhsPrio);
-    if(rhs == nullptr){return nullptr;};
-    bin->lhs = lhs;
-    bin->rhs = rhs;
-    if(isNodeBinOp(rhs)){
-	ASTBinOp *rhsBinOp = (ASTBinOp*)rhs;
-	if(rhsPrio < outPrio){
-	    bin->rhs = rhsBinOp->lhs;
-	    rhsBinOp->lhs = bin;
-	    return rhsBinOp;
+    if (lhs == nullptr) { return nullptr; };
+    while (x<end) {
+	ASTBinOp *rhs = genRHSExpr(lexer, file, x, end, bracket);
+	if (rhs == nullptr) { return nullptr; };
+	rhs->lhs = lhs;
+	lhs = rhs;
+    };
+    if (bracket != 0) {
+	if (bracket < 0) {
+	    bracket *= -1;
+	    lexer.emitErr(tokOffs[start].off, "Missing %d opening brackets", bracket / 10);
+	} else {
+	    lexer.emitErr(tokOffs[start].off, "Missing %d closing brackets", bracket/10);
 	};
     };
-    return bin;
+    return (ASTBase*)lhs;
 };
-ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 y) {
-    s16 bracket = 0;
-    s16 prio = 0;
-    return genASTExprTreeInner(lexer, file, x, y, bracket, prio);
-    //TODO: bracket error
-}
 u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
     //SIMD?
     while (tokTypes[x] != (Token_Type)'\n' && tokTypes[x] != Token_Type::END_OF_FILE) {

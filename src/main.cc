@@ -8,8 +8,6 @@
 #include "include.hh"
 
 s32 main(s32 argc, char **argv) {
-    auto ggg = 1 - 2 + 3 + 4 * 5;
-    printf("%d", ggg);return 0;
     SEH_EXCEPTION_BLOCK_START;
 
     if (argc < 2) {
