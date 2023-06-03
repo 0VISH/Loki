@@ -289,7 +289,6 @@ ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
 };
 ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &flagStart) {
     BRING_TOKENS_TO_SCOPE;
-    eatNewlines(tokTypes, x);
     flagStart = x;
     while(tokTypes[x] == Token_Type::K_CONSTANT || tokTypes[x] == Token_Type::K_COMPTIME){
 	if(tokTypes[x] == Token_Type::K_CONSTANT){
