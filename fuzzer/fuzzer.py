@@ -83,7 +83,7 @@ def genExpression(type):
     elif value < -max:
         expr += "+ " + str(max-value - 10)
     if isUnsigned(type):
-        if value < 0: return "(" + expr + ") * 1"     #todo: make it -1, but we dont yet know how to deal with negative numbers
+        if value < 0: return "(" + expr + ") * -1"
     return expr
 
 pyScope = {}

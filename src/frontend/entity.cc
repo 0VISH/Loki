@@ -234,7 +234,6 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(checkVarDef(node, lexer, see, false, true) == false){return false;};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
-    case ASTType::BIN_SUB:
     case ASTType::BIN_MUL:
     case ASTType::BIN_DIV:
     case ASTType::BIN_ADD:{

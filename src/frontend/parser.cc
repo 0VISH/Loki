@@ -5,7 +5,6 @@ enum class ASTType {
     NUM_INTEGER,
     NUM_DECIMAL,
     BIN_ADD,
-    BIN_SUB,
     BIN_MUL,
     BIN_DIV,
     UNI_DECLERATION,
@@ -17,6 +16,7 @@ enum class ASTType {
     PROC_DEFENITION,
     VARIABLE,
     TYPE,
+    UNI_SUB,
 };
 
 struct ASTBase {
@@ -45,6 +45,9 @@ struct ASTMultiVar : ASTBase{
     ASTBase *rhs;
     u32 tokenOff;
     u8 flag;
+};
+struct ASTUniOp : ASTBase{
+    ASTBase *node;
 };
 struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> body;    //NOTE: also includes input
@@ -109,14 +112,14 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     return node;
 };
 
-ASTBinOp *genASTOperator(Lexer &lexer, u32 x, ASTFile &file) {
+ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
     BRING_TOKENS_TO_SCOPE;
     ASTType type;
-    switch (lexer.fileContent[tokOffs[x].off]) {
-    case '+': type = ASTType::BIN_ADD; break;
-    case '-': type = ASTType::BIN_SUB; break;
-    case '*': type = ASTType::BIN_MUL; break;
-    case '/': type = ASTType::BIN_DIV; break;
+    switch (tokTypes[x]) {
+    case (Token_Type)'-': x -= 1;//NOTE: sub is a uni operator
+    case (Token_Type)'+': type = ASTType::BIN_ADD; x += 1; break;
+    case (Token_Type)'*': type = ASTType::BIN_MUL; x += 1; break;
+    case (Token_Type)'/': type = ASTType::BIN_DIV; x += 1; break;
     default: DEBUG_UNREACHABLE;
     };
     return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
@@ -126,6 +129,13 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
  CHECK_TYPE_AST_OPERAND:
     Token_Type type = tokTypes[x];
     switch (type) {
+    case (Token_Type)'-':{
+	ASTUniOp *uniOp = (ASTUniOp*)allocAST(sizeof(ASTUniOp), ASTType::UNI_SUB, file);
+	x += 1;
+	ASTBase *node = genASTOperand(lexer, x, file, bracket);
+	uniOp->node = node;
+	return (ASTBase*)uniOp;
+    }break;
     case Token_Type::INTEGER: {
 	ASTNumInt *numNode = (ASTNumInt*)allocAST(sizeof(ASTNumInt), ASTType::NUM_INTEGER, file);
 	numNode->tokenOff = x;
@@ -181,7 +191,6 @@ ASTBinOp *genRHSExpr(Lexer &lexer, ASTFile &file, u32 &curPos, u32 y, s16 &brack
     ASTBinOp *previousOperator = node;
     ASTBinOp *binOperator = nullptr;
     ASTBase *operand = nullptr;
-    x += 1;
     while (x < y) {
 	operand = genASTOperand(lexer, x, file, bracket);
 	if (operand == nullptr) { return nullptr; };
@@ -201,7 +210,6 @@ ASTBinOp *genRHSExpr(Lexer &lexer, ASTFile &file, u32 &curPos, u32 y, s16 &brack
 	binOperator->lhs = operand;
 	previousOperator->rhs = (ASTBase*)binOperator;
 	previousOperator = binOperator;
-	x += 1;
     };
     previousOperator->rhs = operand;
     curPos = x;
@@ -608,7 +616,6 @@ namespace dbg {
 	    printf("num: %f", num);
 	} break;
 	case ASTType::BIN_ADD: if (c == NULL) { c = '+'; printf("bin_add"); };
-	case ASTType::BIN_SUB: if (c == NULL) { c = '-'; printf("bin_sub"); };
 	case ASTType::BIN_MUL: if (c == NULL) { c = '*'; printf("bin_mul"); };
 	case ASTType::BIN_DIV:{
 	    ASTBinOp *bin = (ASTBinOp*)node;
@@ -642,6 +649,13 @@ namespace dbg {
 	    PAD;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	} break;
+	case ASTType::UNI_SUB:{
+	    printf("uni_sub");
+	    PAD;
+	    printf("NODE");
+	    ASTUniOp *uniOp = (ASTUniOp*)node;
+	    __dumpNodesWithoutEndPadding(uniOp->node, lexer, padding + 1);
+	}break;
 	case ASTType::MULTI_DECLERATION:{
 	    ASTMultiVar *decl = (ASTMultiVar*)node;
 	    u32 x = decl->tokenOff+2;

@@ -228,9 +228,6 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
     case ASTType::BIN_ADD:{
 	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::ADDS, Bytecode::ADDU, Bytecode::ADDF);
     }break;
-    case ASTType::BIN_SUB:{
-	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::SUBS, Bytecode::SUBU, Bytecode::SUBF);
-    }break;
     case ASTType::BIN_MUL:{
 	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::MULS, Bytecode::MULU, Bytecode::MULF);
     }break;

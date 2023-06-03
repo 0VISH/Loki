@@ -14,7 +14,6 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
     TypeID id = 0;
     switch (base->type) {
     case ASTType::BIN_ADD:
-    case ASTType::BIN_SUB:
     case ASTType::BIN_MUL:
     case ASTType::BIN_DIV: {
 	ASTBinOp *node = (ASTBinOp*)base;
