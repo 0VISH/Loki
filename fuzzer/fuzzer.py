@@ -1,10 +1,10 @@
 from termcolor import colored        #pip install termcolor
-import random
+from random import randint, sample
 import string
 import subprocess
 import os
 
-GARBAGE_COUNT = 5
+GARBAGE_COUNT = 100
 
 class Type():
     u8  = 0
@@ -21,32 +21,32 @@ class Type():
 typeMaxVal = (255, 127, 65535, 32767, 1000.0, 4294967295, 2147483647, 1000.0)
 
 def genDecimal():
-    int = str(random.randint(0, 200))
-    dec = str(random.randint(0, 200))
+    int = str(randint(0, 200))
+    dec = str(randint(0, 200))
     return int + "." + dec
 
 def genIdentifier():
     #all identifiers start with '_'
     #we dont bother checking if the generated identifier is already generated cause the chances are too low
     s = string.ascii_lowercase+string.ascii_uppercase+string.digits
-    len = random.randint(1,20)
-    return "_" + ''.join(random.sample(s, len))
+    len = randint(1,20)
+    return "_" + ''.join(sample(s, len))
 def isFloat(type):    return type == Type.f16 or type == Type.f32
 def isUnsigned(type): return type == Type.u8  or type == Type.u16 or type == Type.u32
 def genOperand(type):
     #8
-    if type < Type.u16: return str(random.randint(0, 200))
+    if type < Type.u16: return str(randint(0, 200))
     #16
     if type < Type.u32:
         if isFloat(type): return genDecimal()
-        return str(random.randint(0, 10000))
+        return str(randint(0, 10000))
     #32
     if isFloat(type): return genDecimal()
-    return str(random.randint(0, 10000000))
+    return str(randint(0, 10000000))
 def genOperator():
-    operators = [' + ', ' - ', ' * ', ' / ']
-    return operators[random.randint(0, len(operators)-1)]
-def genType(): return random.randint(0, Type.TYPE_LEN-1)
+    operators = ['+', '-', '* ', '/ ']
+    return operators[randint(0, len(operators)-1)]
+def genType(): return randint(0, Type.TYPE_LEN-1)
 def type2String(type):
     if type == Type.u8:  return "u8"
     if type == Type.u16: return "u16"
@@ -58,14 +58,23 @@ def type2String(type):
     if type == Type.f32: return "f32"
 def genExpression(type):
     #TODO: avoid gen div by 0
-    len = random.randint(1,20)
+    len = randint(1,20)
     if len%2 == 0: len -= 1
     expr = ""
+    div = False
     for i in range(0, len):
         if i%2 == 0:
-            expr += genOperand(type)
+            operand = genOperand(type)
+            if div:
+                #avoid div by 0
+                div = False
+                while int(operand) == 0:
+                    operand = genOperand(type)
+            expr += operand
             continue
-        expr += genOperator()
+        op = genOperator()
+        if op == '/': div = True
+        expr += ' ' + op + ' '
     #checkin if value of expr is greater than var size
     exec("value="+expr, globals())
     max = typeMaxVal[type]
@@ -101,13 +110,15 @@ def genVarDeclEntity(varMapType, procMapIO):
 def genProcDefEntity(varMapType, procMapIO):
     name = genIdentifier()
     io = []
-    inputCount = random.randint(0, 30)
+    inputCount = randint(0, 30)
     inputVarMapType = {}
     xeCode = name + " :: proc("
     pyCode = "def " + name + "("
     for i in range(0, inputCount):
         type = genType()
         identifier = genIdentifier()
+        #generate unique identifiers
+        while identifier in inputVarMapType: identifier = genIdentifier()
         inputVarMapType[identifier] = type
         xeCode += identifier + ":" + type2String(type) + ", "
         pyCode += identifier + ", "
@@ -116,7 +127,7 @@ def genProcDefEntity(varMapType, procMapIO):
     xeCode += ")"
     pyCode += ") "
     io.append(inputVarMapType)
-    outputCount = random.randint(0, 30)
+    outputCount = randint(0, 30)
     if outputCount != 0:
         xeCode += "-> ("
         types = []
@@ -142,12 +153,12 @@ genEntities = [genVarDefEntity, genVarDeclEntity, genProcDefEntity]
 def genRandEntities(tabs = 0, inProc = False):
     varMapType = {}
     procMapIO = {}
-    entityCount = random.randint(2, 5)
+    entityCount = randint(2, 5)
     xeCode = ""
     pyCode = ""
     tabs = "\t" * tabs
     for i in range(0,entityCount):
-        entityID = random.randint(0, len(genEntities)-1)
+        entityID = randint(0, len(genEntities)-1)
         if entityID == 2 and inProc == True: continue
         xe, xeCheck, py = genEntities[entityID](varMapType, procMapIO)
         xeCode += tabs + xe + "\n"
@@ -165,12 +176,12 @@ file = open(fuzzFile, "w")
 
 fail = 0
 ok = 0
-for i in range(0, GARBAGE_COUNT):
+for i in range(1, GARBAGE_COUNT+1):
     print("["+str(i)+"] Generating garbage...")
     xeCode, _ = genRandEntities()
     file.write(xeCode)
     file.flush()
-    print("wrote garbage to file")
+    print("wrote garbage to", fuzzFile)
     print("calling:", command)
     process = subprocess.Popen(command, shell=True, stdout=outputFile)
     process.wait()
