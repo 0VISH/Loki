@@ -33,7 +33,6 @@ struct ASTBinOp : ASTBase{
     ASTBase *rhs;
     Type lhsType;
     Type rhsType;
-    s16 prio;
 };
 struct ASTUniVar : ASTBase{
     String name;
@@ -146,7 +145,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     };
     return nullptr;
 };
-ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, u32 y, ASTFile &file, s16 &bracket) {
+ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, u32 y, ASTFile &file, s16 &bracket, s16 &outPrio) {
     BRING_TOKENS_TO_SCOPE;
     ASTType type;
     s16 prio = 0;
@@ -185,14 +184,14 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, u32 y, ASTFile &file, s16 &bracke
 	return nullptr;
     };
     ASTBinOp *op = (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
-    op->prio = prio + bracket;
+    outPrio = prio + bracket;
     return op;
 };
 bool isNodeBinOp(ASTBase *node){
     return (node->type >= ASTType::BIN_ADD) && (node->type <= ASTType::BIN_DIV);
 };
 //NOTE: thank you jonathan blow! https://youtu.be/MnctEW1oL-E?t=3761
-ASTBase *genASTExprTreeInner(Lexer &lexer, ASTFile &file, u32 &x, u32 y, s16 &bracket) {
+ASTBase *genASTExprTreeInner(Lexer &lexer, ASTFile &file, u32 &x, u32 y, s16 &bracket, s16 &outPrio) {
     BRING_TOKENS_TO_SCOPE;
     Token_Type type = tokTypes[x];
     ASTBase *lhs = genASTOperand(lexer, x, file, bracket);
@@ -200,16 +199,17 @@ ASTBase *genASTExprTreeInner(Lexer &lexer, ASTFile &file, u32 &x, u32 y, s16 &br
     if(x >= y){
 	return lhs;
     }
-    ASTBinOp *bin = genASTOperator(lexer, x, y, file, bracket);
+    ASTBinOp *bin = genASTOperator(lexer, x, y, file, bracket, outPrio);
     if(bin == nullptr){return nullptr;};
     if(bin == (ASTBinOp*)1){return lhs;};
-    ASTBase *rhs = genASTExprTreeInner(lexer, file, x, y, bracket);
+    s16 rhsPrio = 0;
+    ASTBase *rhs = genASTExprTreeInner(lexer, file, x, y, bracket, rhsPrio);
     if(rhs == nullptr){return nullptr;};
     bin->lhs = lhs;
     bin->rhs = rhs;
     if(isNodeBinOp(rhs)){
 	ASTBinOp *rhsBinOp = (ASTBinOp*)rhs;
-	if(rhsBinOp->prio < bin->prio){
+	if(rhsPrio < outPrio){
 	    bin->rhs = rhsBinOp->lhs;
 	    rhsBinOp->lhs = bin;
 	    return rhsBinOp;
@@ -219,7 +219,9 @@ ASTBase *genASTExprTreeInner(Lexer &lexer, ASTFile &file, u32 &x, u32 y, s16 &br
 };
 ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 y) {
     s16 bracket = 0;
-    return genASTExprTreeInner(lexer, file, x, y, bracket);
+    s16 prio = 0;
+    return genASTExprTreeInner(lexer, file, x, y, bracket, prio);
+    //TODO: bracket error
 }
 u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
     //SIMD?
@@ -315,6 +317,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		x += 1;
 		u32 end = getEndNewlineEOF(tokTypes, x);
 		assign->rhs = genASTExprTree(lexer, file, x, end);
+		if(assign->rhs == nullptr){return nullptr;};
 		assign->flag = flag;
 		flag = 0;
 		return (ASTBase*)assign;
@@ -338,7 +341,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		flag = 0;
 		proc->name = makeStringFromTokOff(start, lexer);
 		proc->body.init();
-		proc->out.count = 0;
+		proc->out.len = 0;
 		proc->inCommaCount = 0;
 		if (tokTypes[x] == (Token_Type)')') {
 		    goto PARSE_AFTER_ARGS;
@@ -433,16 +436,14 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		    x += 1;
 		    return (ASTBase*)proc;
 		};
-		DynamicArray<ASTBase*> *table = &(proc->body);
 		while (tokTypes[x] != (Token_Type)'}') {
 		    //parse body
 		    ASTBase *node = parseBlock(lexer, file, x);
 		    if (node == nullptr) {
-			table->uninit();
 		        uninitProcDef(proc);
 			return nullptr;
 		    };
-		    table->push(node);
+		    proc->body.push(node);
 		    x += 1;
 		    eatNewlines(tokTypes, x);
 		};
@@ -612,8 +613,6 @@ namespace dbg {
 	    printf("rhs: %p", bin->rhs);
 	    PAD;
 	    printf("op: %c", c);
-	    PAD;
-	    printf("prio: %d", bin->prio);
 	    PAD;
 	    printf("LHS");
 	    if (bin->lhs != nullptr) {__dumpNodesWithoutEndPadding(bin->lhs, lexer, padding + 1);};

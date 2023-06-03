@@ -47,7 +47,6 @@ s8 proc_end(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
     u32 lhs = (u16)page[4];						\
     u32 rhs = (u16)page[6];						\
     vm.registers[dest].TYPE = vm.registers[lhs].TYPE SIGN vm.registers[rhs].TYPE; \
-    printf("RES: %lld\n", vm.registers[dest].uint);			\
     return 6;								\
 
 #define BIN_DIV_TEMPLATE(TYPE)						\

@@ -102,13 +102,14 @@ struct BytecodeContext{
 	    varToReg = (u32*)mem::alloc(sizeof(u32)*varCount);
 	    types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
 	};
+	procToID.len = 0;
 	if(procCount != 0){
 	    procToID.init(procCount);
 	};
     };
     void uninit(){
 	mem::free(varToReg);
-	procToID.uninit();
+	if(procToID.len != 0){procToID.uninit();};
 	mem::free(types);
     };
     u32 newReg(Type type){
