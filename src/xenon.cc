@@ -15,8 +15,8 @@ bool compile(char *fileName){
 	destroyLexer(lexer);
 	return true;
     };
-    dbg::dumpLexerStat(lexer);
-    dbg::dumpLexerTokens(lexer);
+    //dbg::dumpLexerStat(lexer);
+    //dbg::dumpLexerTokens(lexer);
     ASTFile astFile = createASTFile();
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);

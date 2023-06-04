@@ -1,3 +1,5 @@
+#define BYTECODE_INPUT Bytecode *page, VM &vm, ExecContext &execContext
+
 struct Register{
     union{
 	s64 sint;
@@ -31,16 +33,16 @@ void destroyVM(VM &vm){
 };
 
 //NOTE: these functions are for continuity
-s8 none(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 reg(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 global(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 type(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 const_ints(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 const_intu(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 const_dec(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 proc_gives(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 proc_start(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
-s8 proc_end(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 none(BYTECODE_INPUT){return 0;};
+s8 reg(BYTECODE_INPUT){return 0;};
+s8 global(BYTECODE_INPUT){return 0;};
+s8 type(BYTECODE_INPUT){return 0;};
+s8 const_ints(BYTECODE_INPUT){return 0;};
+s8 const_intu(BYTECODE_INPUT){return 0;};
+s8 const_dec(BYTECODE_INPUT){return 0;};
+s8 proc_gives(BYTECODE_INPUT){return 0;};
+s8 proc_start(BYTECODE_INPUT){return 0;};
+s8 proc_end(BYTECODE_INPUT){return 0;};
 
 #define BIN_OP_TEMPLATE(SIGN, TYPE)						\
     u32 dest = (u16)page[2];						\
@@ -61,9 +63,9 @@ s8 proc_end(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
     return 6;								\
 
 //TODO: 
-s8 ret(Bytecode *page, VM &vm, ExecContext &execContext){return 0;};
+s8 ret(BYTECODE_INPUT){return 0;};
 
-s8 cast(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 cast(BYTECODE_INPUT){
     /*
        ot       nt
       float -> sint
@@ -78,7 +80,7 @@ s8 cast(Bytecode *page, VM &vm, ExecContext &execContext){
     switch(newType){
     case BytecodeType::INTEGER_S:{
 	switch(oldType){
-	case BytecodeType::DECIMAL:
+	case BytecodeType::DECIMAL_S:
 	    vm.registers[newReg].sint = (s64)vm.registers[oldReg].dec;
 	    break;
 	case BytecodeType::INTEGER_U:
@@ -86,7 +88,7 @@ s8 cast(Bytecode *page, VM &vm, ExecContext &execContext){
 	    break;
 	};
     }break;
-    case BytecodeType::DECIMAL:{
+    case BytecodeType::DECIMAL_S:{
 	switch(oldType){
 	case BytecodeType::INTEGER_S:
 	    vm.registers[newReg].dec = (f64)vm.registers[oldReg].sint;
@@ -96,10 +98,20 @@ s8 cast(Bytecode *page, VM &vm, ExecContext &execContext){
 	    break;
 	};
     }break;
+    case BytecodeType::INTEGER_U:{
+	switch(oldType){
+	case BytecodeType::INTEGER_S:
+	    vm.registers[newReg].uint = (f64)vm.registers[oldReg].sint;
+	    break;
+	case BytecodeType::DECIMAL_S:
+	    vm.registers[newReg].uint = (f64)vm.registers[oldReg].dec;
+	    break;
+	};
+    };
     };
     return 8;
 };
-s8 movi(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 movi(BYTECODE_INPUT){
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -115,7 +127,7 @@ s8 movi(Bytecode *page, VM &vm, ExecContext &execContext){
     };
     return x;
 };
-s8 movu(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 movu(BYTECODE_INPUT){
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -131,7 +143,7 @@ s8 movu(Bytecode *page, VM &vm, ExecContext &execContext){
     };
     return x;
 };
-s8 movf(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 movf(BYTECODE_INPUT){
     u32 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
@@ -147,43 +159,43 @@ s8 movf(Bytecode *page, VM &vm, ExecContext &execContext){
     };
     return x;
 };
-s8 addi(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 addi(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(+, sint);
 };
-s8 addu(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 addu(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(+, uint);
 };
-s8 addf(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 addf(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(+, dec);
 };
-s8 subi(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 subi(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(-, sint);
 };
-s8 subu(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 subu(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(-, uint);
 };
-s8 subf(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 subf(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(-, dec);
 };
-s8 muli(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 muli(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(*, sint);
 };
-s8 mulu(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 mulu(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(*, uint);
 };
-s8 mulf(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 mulf(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(*, dec);
 };
-s8 divi(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 divi(BYTECODE_INPUT){
     BIN_DIV_TEMPLATE(sint);
 };
-s8 divu(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 divu(BYTECODE_INPUT){
     BIN_DIV_TEMPLATE(uint);
 };
-s8 divf(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 divf(BYTECODE_INPUT){
     BIN_DIV_TEMPLATE(dec);
 };
-s8 def(Bytecode *page, VM &vm, ExecContext &execContext){
+s8 def(BYTECODE_INPUT){
     u32 x = 2;
     u32 count = 0;
     while(page[x] != Bytecode::PROC_END){x += 1;};
@@ -195,8 +207,18 @@ s8 def(Bytecode *page, VM &vm, ExecContext &execContext){
     proc[x] = Bytecode::NONE;
     return count+2;
 };
+s8 neg(BYTECODE_INPUT){
+    BytecodeType bt = typeToBytecodeType((Type)page[1]);
+    u32 reg = (u32)page[3];
+    switch(bt){
+    case BytecodeType::INTEGER_S: vm.registers[reg].sint *= -1; break;
+    case BytecodeType::INTEGER_U: vm.registers[reg].uint *= -1; break;
+    case BytecodeType::DECIMAL_S: vm.registers[reg].dec  *= -1; break;
+    };
+    return 4;
+};
 
-s8 (*byteProc[])(Bytecode *page, VM &vm, ExecContext &execContext) = {
+s8 (*byteProc[])(BYTECODE_INPUT) = {
     none, reg, global,
     cast,
     type, const_ints, const_intu, const_dec,
@@ -218,6 +240,7 @@ s8 (*byteProc[])(Bytecode *page, VM &vm, ExecContext &execContext) = {
     def,
     proc_gives, proc_start, proc_end,
     ret,
+    neg,
 };
 
 bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
@@ -232,5 +255,5 @@ bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
 };
 
 #if(XE_DBG)
-//static_assert((u16)Bytecode::BYTECODE_COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
+static_assert((u16)Bytecode::BYTECODE_COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
 #endif

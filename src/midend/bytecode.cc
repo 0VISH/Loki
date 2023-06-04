@@ -35,15 +35,13 @@ enum class Bytecode : u16{
     PROC_START,
     PROC_END,
     RET,
-    NEG_S,
-    NEG_U,
-    NEG_D,
+    NEG,
     BYTECODE_COUNT,
 };
 enum class BytecodeType : u16{
     INTEGER_S,
     INTEGER_U,
-    DECIMAL,
+    DECIMAL_S,
 };
 
 const u16 const_in_stream = (sizeof(s64) / sizeof(Bytecode));
@@ -125,16 +123,15 @@ struct BytecodeContext{
 
 #define EMIT_BIN_OP_BC_TEMPLATE(SIGNED, UNSIGNED, DECIMAL)		\
     ASTBinOp *op = (ASTBinOp*)node;					\
-    Type lhsType = op->lhsType;						\
-    Type rhsType = op->rhsType;						\
+    u32 lhsReg = compileExprToBytecode(op->lhs, lexer, see, bca, bf);	\
+    u32 rhsReg = compileExprToBytecode(op->rhs, lexer, see, bca, bf);	\
+    Type lhsType = bc.types[lhsReg];					\
+    Type rhsType = bc.types[rhsReg];					\
     Type ansType = greaterType(lhsType, rhsType);			\
+    outputReg = bc.newReg(ansType);					\
     BytecodeType lbt = typeToBytecodeType(lhsType);			\
     BytecodeType rbt = typeToBytecodeType(rhsType);			\
     BytecodeType abt = typeToBytecodeType(ansType);			\
-    u32 lhsReg = bc.newReg(lhsType);					\
-    u32 rhsReg = bc.newReg(rhsType);					\
-    compileExprToBytecode(lhsReg, op->lhs, lexer, see, bca, bf, isExprU); \
-    compileExprToBytecode(rhsReg, op->rhs, lexer, see, bca, bf, isExprU); \
     if(lbt != rbt){							\
 	u32 newReg = bc.newReg(ansType);				\
 	bf.emit(Bytecode::CAST);					\
@@ -150,13 +147,15 @@ struct BytecodeContext{
 	    rhsReg = newReg;						\
 	};								\
     };									\
-    BytecodeType type = typeToBytecodeType(ansType);			\
-    if(isExprU){bf.emit(UNSIGNED);}					\
-    else if(type == BytecodeType::INTEGER_S){bf.emit(SIGNED);}		\
-    else{bf.emit(DECIMAL);};						\
-    bf.emitReg(outputRegister);						\
+    switch(abt){							\
+    case BytecodeType::INTEGER_S: bf.emit(SIGNED);   break;		\
+    case BytecodeType::INTEGER_U: bf.emit(UNSIGNED); break;		\
+    case BytecodeType::DECIMAL_S:   bf.emit(DECIMAL);  break;		\
+    };									\
+    bf.emitReg(outputReg);						\
     bf.emitReg(lhsReg);							\
     bf.emitReg(rhsReg);							\
+    return outputReg;							\
 
 s64 getConstInt(Bytecode *bytes){
     s64 *mem = (s64*)bytes;
@@ -171,7 +170,7 @@ BytecodeType typeToBytecodeType(Type type){
     case Type::F_64:
     case Type::F_32:
     case Type::F_16:
-    case Type::COMP_DECIMAL: return BytecodeType::DECIMAL;
+    case Type::COMP_DECIMAL: return BytecodeType::DECIMAL_S;
     case Type::S_64:
     case Type::S_32:
     case Type::S_16:
@@ -179,34 +178,35 @@ BytecodeType typeToBytecodeType(Type type){
     default: return BytecodeType::INTEGER_U;
     }
 };
-void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, bool isExprU=false){
+u32 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     ASTType type = node->type;
     BytecodeContext &bc = bca[bca.count - 1];
+    u32 outputReg;
     switch(type){
     case ASTType::NUM_INTEGER:{
+	outputReg = bc.newReg(Type::U_64);
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	s64 num = string2int(str);    //TODO: maybe have a sep func which returns u64
-	if(isExprU){bf.emit(Bytecode::MOVU);}
-	else{bf.emit(Bytecode::MOVS);};
-	bf.emitReg(outputRegister);
-	if(isExprU){bf.emit(Bytecode::CONST_INTU);}
-	else{bf.emit(Bytecode::CONST_INTS);};
+	bf.emit(Bytecode::MOVU);
+	bf.emitReg(outputReg);
+	bf.emit(Bytecode::CONST_INTU);
 	bf.emitConstInt(num);
+	return outputReg;
     }break;
     case ASTType::NUM_DECIMAL:{
+	outputReg = bc.newReg(Type::F_64);
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
 	f64 num = string2float(str);
 	bf.emit(Bytecode::MOVF);
-	bf.emitReg(outputRegister);
+	bf.emitReg(outputReg);
 	bf.emit(Bytecode::CONST_DEC);
 	bf.emitConstDec(num);
+	return outputReg;
     }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
-	Type type;
-	bool isGlobal = false;
 	u32 off = see.count-1;
 	ScopeEntities *se = see[off];
 	s32 id = se->varMap.getValue(var->name);
@@ -214,21 +214,11 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
 	    off = 0;
 	    se = see[0];
 	    id = se->varMap.getValue(var->name);
-	    isGlobal = true;
 	};
-	const VariableEntity &entity = se->varEntities[id];
-	type = entity.type;
-	//isGlobal = IS_BIT(entity.flag, Flags::GLOBAL) != 0;
-	BytecodeType bytecodeType = typeToBytecodeType(type);
-	if(isExprU){bf.emit(Bytecode::MOVU);}
-	else if(bytecodeType == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
-	else{bf.emit(Bytecode::MOVU);};
 	BytecodeContext &correctBC = bca[off];
-	bf.emitReg(outputRegister);
-	if(isGlobal){bf.emitGlobal(correctBC.varToReg[id]);}
-	else{bf.emitReg(correctBC.varToReg[id]);};
+	return correctBC.varToReg[id];	
     }break;
-    case ASTType::BIN_ADD:{
+    case ASTType::BIN_ADD:{									
 	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::ADDS, Bytecode::ADDU, Bytecode::ADDF);
     }break;
     case ASTType::BIN_MUL:{
@@ -239,22 +229,21 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *uniOp = (ASTUniOp*)node;
-	compileExprToBytecode(outputRegister, uniOp->node, lexer, see, bca, bf, isExprU);
-	BytecodeType type = typeToBytecodeType(bc.types[outputRegister]);
-	switch(type){
-	case BytecodeType::INTEGER_S: bf.emit(Bytecode::NEG_S); break;
-	case BytecodeType::INTEGER_U:
-	    bf.emit(Bytecode::NEG_U);
-	    bc.types[outputRegister] = Type::S_64;
-	    break;
-	case BytecodeType::DECIMAL:   bf.emit(Bytecode::NEG_D); break;
+	u32 outputReg = compileExprToBytecode(uniOp->node, lexer, see, bca, bf);
+	Type type = bc.types[outputReg];
+	if(typeToBytecodeType(type) == BytecodeType::INTEGER_U){
+	    bc.types[outputReg] = Type::S_64;
 	};
-	bf.emitReg(outputRegister);
+	bf.emit(Bytecode::NEG);
+	bf.emitType(type);
+	bf.emitReg(outputReg);
+	return outputReg;
     }break;
     default:
 	DEBUG_UNREACHABLE;
 	break;
     };
+    return 0;
 };
 void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     BytecodeContext &bc = bca[bca.count-1];
@@ -266,17 +255,19 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
-	u32 regID = bc.newReg(entity.type);
-	u32 ansReg = bc.newReg(entity.type);
-	compileExprToBytecode(ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(entity.type)==BytecodeType::INTEGER_U);
-	bc.varToReg[id] = regID;
-	BytecodeType type = typeToBytecodeType(entity.type);
-	if(type == BytecodeType::DECIMAL){bf.emit(Bytecode::MOVF);}
-	else if(type == BytecodeType::INTEGER_S){bf.emit(Bytecode::MOVS);}
-	else{bf.emit(Bytecode::MOVU);};
-	if(IS_BIT(entity.flag, Flags::GLOBAL)){bf.emitGlobal(regID);}
-	else{bf.emitReg(regID);};
-	bf.emitReg(ansReg);
+	u32 regID = compileExprToBytecode(var->rhs, lexer, see, bca, bf);
+	Type regType = bc.types[regID];
+	if(regType != entity.type){
+	    u32 newReg = bc.newReg(entity.type);
+	    bf.emit(Bytecode::CAST);
+	    bf.emitType(entity.type);
+	    bf.emitReg(newReg);
+	    bf.emitType(regType);
+	    bf.emitReg(regID);
+	    bc.varToReg[id] = newReg;
+	}else{
+	    bc.varToReg[id] = regID;
+	};
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
@@ -285,11 +276,10 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	u32 firstID = se->varMap.getValue(names[0]);
 	const VariableEntity &firstEntityID = se->varEntities[firstID];
 	Type firstEntityType = firstEntityID.type;
-	u32 ansReg = bc.newReg(firstEntityType);
-	compileExprToBytecode(ansReg, var->rhs, lexer, see, bca, bf, typeToBytecodeType(firstEntityType)==BytecodeType::INTEGER_U);
+	u32 ansReg = compileExprToBytecode(var->rhs, lexer, see, bca, bf);
 	Bytecode byte;
 	BytecodeType type = typeToBytecodeType(firstEntityType);
-	if(type == BytecodeType::DECIMAL){byte = Bytecode::MOVF;}
+	if(type == BytecodeType::DECIMAL_S){byte = Bytecode::MOVF;}
 	else if(type == BytecodeType::INTEGER_S){byte = Bytecode::MOVS;}
 	else{byte = Bytecode::MOVU;};
 	Bytecode globalOrReg;
@@ -300,6 +290,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    const VariableEntity &entity = se->varEntities[id];
 	    u32 regID = bc.newReg(firstEntityType);
 	    bc.varToReg[id] = regID;
+	    bc.types[regID] = bc.types[ansReg];
 	    bf.emit(byte);
 	    bf.emit(globalOrReg);
 	    bf.emit((Bytecode)regID);
@@ -507,10 +498,9 @@ namespace dbg{
 	    };
 	    printf("}");
 	}break;
-        case Bytecode::NEG_S: printf("neg_s");flag = false;
-	case Bytecode::NEG_U: if(flag){printf("neg_u");flag = false;};
-	case Bytecode::NEG_D:{
-	    if(flag){printf("neg_d");};
+	case Bytecode::NEG:{
+	    printf("neg");
+	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;
 	default:
