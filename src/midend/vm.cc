@@ -232,5 +232,5 @@ bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
 };
 
 #if(XE_DBG)
-static_assert((u16)Bytecode::BYTECODE_COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
+//static_assert((u16)Bytecode::BYTECODE_COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
 #endif

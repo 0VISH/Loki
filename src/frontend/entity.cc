@@ -260,6 +260,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	};
 	return false;
     }break;
+    case ASTType::UNI_NEG:{
+	//TODO: 
+    }break;
     default: DEBUG_UNREACHABLE;return false;
     };
     return true;

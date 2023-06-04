@@ -16,7 +16,7 @@ enum class ASTType {
     PROC_DEFENITION,
     VARIABLE,
     TYPE,
-    UNI_SUB,
+    UNI_NEG,
 };
 
 struct ASTBase {
@@ -130,7 +130,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     Token_Type type = tokTypes[x];
     switch (type) {
     case (Token_Type)'-':{
-	ASTUniOp *uniOp = (ASTUniOp*)allocAST(sizeof(ASTUniOp), ASTType::UNI_SUB, file);
+	ASTUniOp *uniOp = (ASTUniOp*)allocAST(sizeof(ASTUniOp), ASTType::UNI_NEG, file);
 	x += 1;
 	ASTBase *node = genASTOperand(lexer, x, file, bracket);
 	uniOp->node = node;
@@ -649,8 +649,8 @@ namespace dbg {
 	    PAD;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	} break;
-	case ASTType::UNI_SUB:{
-	    printf("uni_sub");
+	case ASTType::UNI_NEG:{
+	    printf("uni_neg");
 	    PAD;
 	    printf("NODE");
 	    ASTUniOp *uniOp = (ASTUniOp*)node;

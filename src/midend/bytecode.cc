@@ -35,6 +35,9 @@ enum class Bytecode : u16{
     PROC_START,
     PROC_END,
     RET,
+    NEG_S,
+    NEG_U,
+    NEG_D,
     BYTECODE_COUNT,
 };
 enum class BytecodeType : u16{
@@ -233,6 +236,20 @@ void compileExprToBytecode(u32 outputRegister, ASTBase *node, Lexer &lexer, Dyna
     }break;
     case ASTType::BIN_DIV:{
 	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::DIVS, Bytecode::DIVU, Bytecode::DIVF);
+    }break;
+    case ASTType::UNI_NEG:{
+	ASTUniOp *uniOp = (ASTUniOp*)node;
+	compileExprToBytecode(outputRegister, uniOp->node, lexer, see, bca, bf, isExprU);
+	BytecodeType type = typeToBytecodeType(bc.types[outputRegister]);
+	switch(type){
+	case BytecodeType::INTEGER_S: bf.emit(Bytecode::NEG_S); break;
+	case BytecodeType::INTEGER_U:
+	    bf.emit(Bytecode::NEG_U);
+	    bc.types[outputRegister] = Type::S_64;
+	    break;
+	case BytecodeType::DECIMAL:   bf.emit(Bytecode::NEG_D); break;
+	};
+	bf.emitReg(outputRegister);
     }break;
     default:
 	DEBUG_UNREACHABLE;
@@ -490,8 +507,13 @@ namespace dbg{
 	    };
 	    printf("}");
 	}break;
+        case Bytecode::NEG_S: printf("neg_s");flag = false;
+	case Bytecode::NEG_U: if(flag){printf("neg_u");flag = false;};
+	case Bytecode::NEG_D:{
+	    if(flag){printf("neg_d");};
+	    DUMP_NEXT_BYTECODE;
+	}break;
 	default:
-	    printf("%d", page[x]);
 	    DEBUG_UNREACHABLE;
 	    return false;
 	};

@@ -36,6 +36,10 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	SET_BIT(id, Type::COMP_DECIMAL);
 	return id;
     }break;
+    case ASTType::UNI_NEG:{
+	ASTUniOp *uniOp = (ASTUniOp*)base;
+	return getTreeTypeID(uniOp->node, flag, see, lexer);
+    }break;
     case ASTType::VARIABLE:{
 	BRING_TOKENS_TO_SCOPE;
 	ASTVariable *var = (ASTVariable*)base;
