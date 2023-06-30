@@ -37,7 +37,7 @@ bool compile(char *fileName){
 	    destroyScopes(see);
 	    see.uninit();
 	});
-    ScopeEntities *fileScopeEntities = pushNewScope(see);
+    ScopeEntities *fileScopeEntities = pushNewScope(see, Scope::GLOBAL);
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	printf("\nchecking entites failed\n");
 	report::flushReports();

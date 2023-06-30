@@ -63,7 +63,7 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	return id;
     }break;
     };
-    SET_BIT(id, Type::COMP_VOID);
+    SET_BIT(id, Type::XE_VOID);
     return id;
 };
 Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer){
@@ -85,11 +85,12 @@ Type tokenKeywordToType(Lexer &lexer, u32 off){
     };
     return Type::UNKOWN;
 };
+bool isTypeNum(Type type){return (type > Type::XE_VOID) && (type <= Type::COMP_INTEGER);};
 
 #if(XE_DBG)
 char *Type2CString[] =  {
     "unkown",
-    "comp_void",
+    "xe_void",
     "f_64",
     "s_64",
     "u_64",

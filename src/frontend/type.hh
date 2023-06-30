@@ -1,6 +1,8 @@
+#pragma once
+
 enum class Type : u16{
     UNKOWN = 0,
-    COMP_VOID = 1,
+    XE_VOID = 1,
     F_64,
     S_64,
     U_64,

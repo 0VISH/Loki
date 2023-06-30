@@ -1,5 +1,10 @@
 #pragma once
 
+enum class Scope{
+    GLOBAL,
+    PROC,
+    BLOCK,
+};
 struct ScopeEntities;
 struct Entity{
     String name;
@@ -16,8 +21,9 @@ struct ScopeEntities{
     Map procMap;
     VariableEntity* varEntities;
     ProcEntity* procEntities;
-    DynamicArray<Type> treeTypes;    //This stores the types returned by the tree which is being checked
+    Scope scope;
 
     void init(u32 varCount, u32 procCount);
     void uninit();
 };
+void freeNodeInternal(ASTBase *base);

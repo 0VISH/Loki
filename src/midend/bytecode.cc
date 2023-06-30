@@ -97,6 +97,8 @@ struct BytecodeContext{
     u32 registerID;
 
     void init(u32 varCount, u32 procCount){
+	varToReg = nullptr;
+	types = nullptr;
 	registerID = 0;
 	if(varCount != 0){
 	    varToReg = (u32*)mem::alloc(sizeof(u32)*varCount);
@@ -108,9 +110,10 @@ struct BytecodeContext{
 	};
     };
     void uninit(){
-	mem::free(varToReg);
-	if(procToID.len != 0){procToID.uninit();};
-	mem::free(types);
+	if(varToReg != nullptr){mem::free(varToReg);};
+	if(types != nullptr){mem::free(types);};
+	if(procToID.len != 0){
+	    procToID.uninit();};
     };
     u32 newReg(Type type){
 	u32 reg = registerID;
@@ -311,10 +314,10 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count);
 	// DEF + proc_id + in + PROC_GIVES + out + PROC_START
-	u32 reserveCount = 1 + 1 + (proc->inCommaCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
+	u32 reserveCount = 1 + 1 + (proc->inCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
 	bf.emit(Bytecode::DEF);
 	bf.emit((Bytecode)procBytecodeID);
-	for(u32 x=0; x<proc->inCommaCount; x+=1){
+	for(u32 x=0; x<proc->inCount;){
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
 	    case ASTType::UNI_DECLERATION:{
@@ -325,6 +328,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 		procBC.varToReg[id] = regID;
 		bf.emitType(entity.type);
 		bf.emitReg(regID);
+		x += 1;
 	    }break;
 	    case ASTType::MULTI_DECLERATION:{
 		ASTMultiVar *var = (ASTMultiVar*)node;
@@ -337,6 +341,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 		    bf.emitType(entity.type);
 		    bf.emitReg(regID);
 		};
+		x += var->names.count;
 	    }break;
 	    };
 	};
@@ -398,7 +403,7 @@ namespace dbg{
 	case Bytecode::TYPE:{
 	    x += 1;
 	    switch(page[x]){
-	    case (Bytecode)Type::COMP_VOID: printf("void");break;
+	    case (Bytecode)Type::XE_VOID: printf("void");break;
 	    case (Bytecode)Type::S_64: printf("s64");break;
 	    case (Bytecode)Type::U_64: printf("u64");break;
 	    case (Bytecode)Type::S_32: printf("s32");break;

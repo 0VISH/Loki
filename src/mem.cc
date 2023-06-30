@@ -5,9 +5,6 @@ namespace mem {
 #endif
     //TODO: write an allocator
     void *alloc(u64 size) {
-	if(size == 96){
-	    printf("lkjsdf");
-	};
 	void *mem;
 #if(XE_DBG)
 	if(size == 0){

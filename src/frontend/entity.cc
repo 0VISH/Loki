@@ -1,4 +1,6 @@
 void ScopeEntities::init(u32 varCount, u32 procCount){
+    varMap.len = 0;
+    procMap.len = 0;
     varMap.count = 0;
     procMap.count = 0;
     if(varCount != 0){
@@ -9,22 +11,21 @@ void ScopeEntities::init(u32 varCount, u32 procCount){
 	procMap.init(procCount);
 	procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
     };
-    treeTypes.init();
 };
 void ScopeEntities::uninit(){
-    if(varMap.count != 0){
+    if(varMap.len != 0){
 	varMap.uninit();
 	mem::free(varEntities);
     };
-    if(procMap.count != 0){
+    if(procMap.len != 0){
 	procMap.uninit();
-	mem::free(procEntities);
+        mem::free(procEntities);
     };
-    treeTypes.uninit();
 };
 
-ScopeEntities* pushNewScope(DynamicArray<ScopeEntities*> &see){
+ScopeEntities* pushNewScope(DynamicArray<ScopeEntities*> &see, Scope scope){
     ScopeEntities *se = (ScopeEntities*)mem::alloc(sizeof(ScopeEntities));
+    se->scope = scope;
     see.push(se);
     return se;
 };
@@ -191,6 +192,16 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     typeNode->type = type;
     return true;
 };
+VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
+    for(u32 x=see.count; x>0; x-=1){
+	x -= 1;
+	ScopeEntities *se = see[x];
+	s32 k = se->varMap.getValue(name);
+	if(k != -1){return se->varEntities+k;};
+	if(se->scope == Scope::PROC){return nullptr;};
+    };
+    return nullptr;
+};
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     ScopeEntities *se = see[see.count-1];
@@ -199,8 +210,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	BRING_TOKENS_TO_SCOPE;
 	ASTProcDef *proc = (ASTProcDef*)node;
 	String name = proc->name;
-	ScopeEntities *procSE = pushNewScope(see);
-	if(checkProcEntityPresentInScopeElseReg(lexer, name, NULL, se, procSE) == false){
+	ScopeEntities *procSE = pushNewScope(see, Scope::PROC);
+	if(checkProcEntityPresentInScopeElseReg(lexer, name, proc->flag, se, procSE) == false){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};
@@ -256,21 +267,24 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(rhsType == Type::UNKOWN){return false;};
 	op->lhsType = lhsType;
 	op->rhsType = rhsType;
-	//TODO: check if types are compatible?
     }break;
     case ASTType::NUM_INTEGER:
     case ASTType::NUM_DECIMAL: break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
-	for(u32 x=see.count; x>0; x-=1){
-	    x -= 1;
-	    ScopeEntities *se = see[x];
-	    if(se->varMap.getValue(var->name) != -1){return true;};
-	};
-	return false;
+	if(getVarEntity(var->name, see) == nullptr){return false;};
     }break;
     case ASTType::UNI_NEG:{
-	//TODO: 
+	ASTUniOp *op = (ASTUniOp*)node;
+        switch(op->node->type){
+	case ASTType::NUM_INTEGER:
+	case ASTType::NUM_DECIMAL: break;
+	case ASTType::VARIABLE:{
+	    ASTVariable *var = (ASTVariable*)op->node;
+	    Type type = getVarEntity(var->name, see)->type;
+	    if(isTypeNum(type) == false){return false;};
+	}break;
+	};
     }break;
     default: DEBUG_UNREACHABLE;return false;
     };
@@ -286,4 +300,24 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
 	if(checkEntity(node, lexer, see) == false){return false;};
     };
     return true;
+};
+void freeNodeInternal(ASTBase *base){
+    switch(base->type){
+    case ASTType::MULTI_DECLERATION:
+    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:
+    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
+	ASTMultiVar *mv = (ASTMultiVar*)base;
+	mv->names.uninit();
+    }break;
+    case ASTType::PROC_DEFENITION:{
+	ASTProcDef *proc = (ASTProcDef*)base;
+        if(proc->body.len != 0){
+	    for(u32 x=0; x<proc->body.count; x+=1){
+		freeNodeInternal(proc->body[x]);
+	    };
+	    proc->body.uninit();
+	};
+	if(proc->out.len != 0){proc->out.uninit();};
+    }break;
+    };
 };
