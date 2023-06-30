@@ -81,7 +81,7 @@ struct DynamicArray {
     };
     void uninit() { mem::free(mem); };
     void push(const T &t) {
-	if (count == len) { realloc(len + len / 2); };
+	if (count == len) { realloc(len + len / 2 + 1); };
 	mem[count] = t;
 	count += 1;
     };
@@ -90,7 +90,7 @@ struct DynamicArray {
 	return mem[count];
     };
     T& newElem(){
-	if (count == len) { realloc(len + len / 2); };
+	if (count == len) { realloc(len + len / 2 + 1); };
 	count += 1;
 	return mem[count-1];
     };
