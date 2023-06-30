@@ -2,3 +2,4 @@ bin/
 misc/
 .vs/
 fuzz.xe
+**/.vs/
