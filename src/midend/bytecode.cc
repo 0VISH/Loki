@@ -351,6 +351,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	};
 	see.pop()->uninit();
 	bca.pop().uninit();
+	
 	bf.emit(Bytecode::PROC_END);
     }break;
     default:

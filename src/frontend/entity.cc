@@ -198,7 +198,7 @@ VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
 };
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
-    ScopeEntities *se = see[see.count-1];
+    ScopeEntities *se = see[see.count-1]; //current scope
     switch (node->type) {
     case ASTType::PROC_DEFENITION: {
 	BRING_TOKENS_TO_SCOPE;
