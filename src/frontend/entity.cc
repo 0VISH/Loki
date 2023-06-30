@@ -29,12 +29,6 @@ ScopeEntities* pushNewScope(DynamicArray<ScopeEntities*> &see, Scope scope){
     see.push(se);
     return se;
 };
-void destroyScopes(DynamicArray<ScopeEntities*> &see){
-    for(u32 x=0; x<see.count; x+=1){
-	see[x]->uninit();
-	mem::free(see[x]);
-    };
-};
 
 bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, Type type, ScopeEntities *se) {
     Map &map = se->varMap;

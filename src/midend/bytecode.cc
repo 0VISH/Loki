@@ -122,11 +122,6 @@ struct BytecodeContext{
 	return reg;
     };
 };
-void destroyBytecodeContexts(DynamicArray<BytecodeContext> &bca){
-    for(u32 x=0; x<bca.count; x += 1){
-	bca[x].uninit();
-    };
-};
 
 #define EMIT_BIN_OP_BC_TEMPLATE(SIGNED, UNSIGNED, DECIMAL)		\
     ASTBinOp *op = (ASTBinOp*)node;					\
@@ -313,8 +308,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	ScopeEntities *procSE = se->procEntities[procID].se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count);
-	// DEF + proc_id + in + PROC_GIVES + out + PROC_START
-	u32 reserveCount = 1 + 1 + (proc->inCount * (2 + 2)) + 1 + (proc->out.count * (2 + 2)) + 1;
 	bf.emit(Bytecode::DEF);
 	bf.emit((Bytecode)procBytecodeID);
 	for(u32 x=0; x<proc->inCount;){
@@ -356,8 +349,8 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	for(u32 x=proc->inCount; x<proc->body.count; x+=1){
 	    compileToBytecode(proc->body[x], lexer, see, bca, bf);
 	};
-	see.pop();
-	bca.pop();
+	see.pop()->uninit();
+	bca.pop().uninit();
 	bf.emit(Bytecode::PROC_END);
     }break;
     default:

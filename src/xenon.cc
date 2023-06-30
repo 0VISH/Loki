@@ -34,7 +34,8 @@ bool compile(char *fileName){
     DynamicArray<ScopeEntities*> see;
     see.init(3);
     DEFER({
-	    destroyScopes(see);
+	    see[0]->uninit();
+	    mem::free(see[0]);
 	    see.uninit();
 	});
     ScopeEntities *fileScopeEntities = pushNewScope(see, Scope::GLOBAL);
@@ -74,7 +75,7 @@ bool compile(char *fileName){
     DynamicArray<BytecodeContext> bca;
     bca.init(3);
     DEFER({
-	    destroyBytecodeContexts(bca);
+	    bca[0].uninit();
 	    bca.uninit();
 	});
     BytecodeContext &bc = bca.newElem();
