@@ -5,6 +5,9 @@ import subprocess
 import os
 
 GARBAGE_COUNT = 100
+fuzzFile = "bin\\fuzz.xe"
+command = "bin\\win\\dbg\\xenon.exe " + fuzzFile
+outputFileName = "bin\\fuzzOutput.txt"
 
 class Type():
     u8  = 0
@@ -168,9 +171,6 @@ def genRandEntities(tabs = 0, inProc = False):
         pyCode += py + "\n"
     return xeCode, pyCode
 
-fuzzFile = "bin\\fuzz.xe"
-command = "bin\\dbg\\xenon.exe " + fuzzFile
-outputFileName = "bin\\fuzzOutput.txt"
 outputFile = open(outputFileName, "w")
 file = open(fuzzFile, "w")
 

@@ -112,8 +112,7 @@ struct BytecodeContext{
     void uninit(){
 	if(varToReg != nullptr){mem::free(varToReg);};
 	if(types != nullptr){mem::free(types);};
-	if(procToID.len != 0){
-	    procToID.uninit();};
+	if(procToID.len != 0){procToID.uninit();};
     };
     u32 newReg(Type type){
 	u32 reg = registerID;
@@ -350,6 +349,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    compileToBytecode(proc->body[x], lexer, see, bca, bf);
 	};
 	see.pop()->uninit();
+	mem::free(procSE);
 	bca.pop().uninit();
 	
 	bf.emit(Bytecode::PROC_END);

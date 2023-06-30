@@ -21,6 +21,9 @@ struct VM{
     };
     void uninit(){
 	mem::free(registers);
+	for(u32 x=0; x<procs.count; x+=1){
+	    mem::free(procs[x]);
+	};
 	procs.uninit();
     };
 };
@@ -196,10 +199,10 @@ s8 def(BYTECODE_INPUT){
     while(page[x] != Bytecode::PROC_END){x += 1;};
     x -= 2;
     count = x;
-    //TODO: handle next page
     Bytecode *proc = (Bytecode*)mem::alloc(sizeof(Bytecode) * count);  //TODO: change allocator?
     memcpy(proc, page+2, sizeof(Bytecode)*count);
     proc[x] = Bytecode::NONE;
+    vm.procs.push(proc);
     return count+2;
 };
 s8 neg(BYTECODE_INPUT){
