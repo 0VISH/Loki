@@ -12,8 +12,7 @@ enum class Bytecode : u16{
     GLOBAL,
     CAST,
     TYPE,
-    CONST_INTS,
-    CONST_INTU,
+    CONST_INT,
     CONST_DEC,
     MOVS,
     MOVU,
@@ -184,13 +183,13 @@ u32 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
     u32 outputReg;
     switch(type){
     case ASTType::NUM_INTEGER:{
-	outputReg = bc.newReg(Type::U_64);
+	outputReg = bc.newReg(Type::S_64);
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	s64 num = string2int(str);    //TODO: maybe have a sep func which returns u64
-	bf.emit(Bytecode::MOVU);
+	bf.emit(Bytecode::MOVS);
 	bf.emitReg(outputReg);
-	bf.emit(Bytecode::CONST_INTU);
+	bf.emit(Bytecode::CONST_INT);
 	bf.emitConstInt(num);
 	return outputReg;
     }break;
@@ -407,15 +406,10 @@ namespace dbg{
 	    case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
 	    };
 	}break;
-	case Bytecode::CONST_INTS:{
+	case Bytecode::CONST_INT:{
 	    s64 num = getConstInt(page+x+1);
 	    x += const_in_stream;
 	    printf("%lld", num);
-	}break;
-	case Bytecode::CONST_INTU:{
-	    s64 num = getConstInt(page+x+1); //TODO: maybe sep func?
-	    x += const_in_stream;
-	    printf("%llu", num);
 	}break;
 	case Bytecode::CONST_DEC:{
 	    f64 num = getConstDec(page+x+1);

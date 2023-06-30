@@ -37,12 +37,13 @@ s8 none(BYTECODE_INPUT){return 0;};
 s8 reg(BYTECODE_INPUT){return 0;};
 s8 global(BYTECODE_INPUT){return 0;};
 s8 type(BYTECODE_INPUT){return 0;};
-s8 const_ints(BYTECODE_INPUT){return 0;};
-s8 const_intu(BYTECODE_INPUT){return 0;};
+s8 const_int(BYTECODE_INPUT){return 0;};
 s8 const_dec(BYTECODE_INPUT){return 0;};
 s8 proc_gives(BYTECODE_INPUT){return 0;};
 s8 proc_start(BYTECODE_INPUT){return 0;};
 s8 proc_end(BYTECODE_INPUT){return 0;};
+//TODO: 
+s8 ret(BYTECODE_INPUT){return 0;};
 
 #define BIN_OP_TEMPLATE(SIGN, TYPE)						\
     u32 dest = (u16)page[2];						\
@@ -62,9 +63,6 @@ s8 proc_end(BYTECODE_INPUT){return 0;};
     vm.registers[dest].TYPE = vm.registers[lhs].TYPE / vm.registers[rhs].TYPE; \
     return 6;								\
 
-//TODO: 
-s8 ret(BYTECODE_INPUT){return 0;};
-
 s8 cast(BYTECODE_INPUT){
     /*
        ot       nt
@@ -77,6 +75,10 @@ s8 cast(BYTECODE_INPUT){
     u32 oldReg = (u16)page[8];
     BytecodeType newType = typeToBytecodeType((Type)page[2]);
     BytecodeType oldType = typeToBytecodeType((Type)page[6]);
+    if(newType == oldType){
+	vm.registers[newReg] = vm.registers[oldReg];
+	return 8;
+    };
     switch(newType){
     case BytecodeType::INTEGER_S:{
 	switch(oldType){
@@ -120,7 +122,7 @@ s8 movi(BYTECODE_INPUT){
 	vm.registers[dest].sint = vm.registers[src].sint;
 	x += reg_in_stream;
     }break;
-    case Bytecode::CONST_INTS:{
+    case Bytecode::CONST_INT:{
 	vm.registers[dest].sint = getConstInt(page + 4);
 	x += const_in_stream + 1;
     }break;
@@ -136,7 +138,7 @@ s8 movu(BYTECODE_INPUT){
 	vm.registers[dest].sint = vm.registers[src].sint;
 	x += reg_in_stream;
     }break;
-    case Bytecode::CONST_INTU:{
+    case Bytecode::CONST_INT:{
 	vm.registers[dest].uint = getConstInt(page + 4);
 	x += const_in_stream + 1;
     }break;
@@ -208,20 +210,28 @@ s8 def(BYTECODE_INPUT){
     return count+2;
 };
 s8 neg(BYTECODE_INPUT){
-    BytecodeType bt = typeToBytecodeType((Type)page[1]);
-    u32 reg = (u32)page[3];
+    BytecodeType bt = typeToBytecodeType((Type)page[2]);
+    u32 reg = (u32)page[4];
     switch(bt){
     case BytecodeType::INTEGER_S: vm.registers[reg].sint *= -1; break;
-    case BytecodeType::INTEGER_U: vm.registers[reg].uint *= -1; break;
+    case BytecodeType::INTEGER_U:
+	vm.registers[reg].sint = vm.registers[reg].uint * -1;
+	break;
     case BytecodeType::DECIMAL_S: vm.registers[reg].dec  *= -1; break;
     };
     return 4;
 };
 
+/*
+  NEG TYPE 1 REG 1
+   0   1   2  3  4     (offsets which the byteProc will use)
+
+   NEG will return 4
+*/
 s8 (*byteProc[])(BYTECODE_INPUT) = {
     none, reg, global,
     cast,
-    type, const_ints, const_intu, const_dec,
+    type, const_int, const_dec,
     movi,
     movu,
     movf,
