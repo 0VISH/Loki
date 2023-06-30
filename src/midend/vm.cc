@@ -1,4 +1,4 @@
-#define BYTECODE_INPUT Bytecode *page, VM &vm, ExecContext &execContext
+#define BYTECODE_INPUT Bytecode *page, VM &vm
 
 struct Register{
     union{
@@ -10,26 +10,19 @@ struct Register{
 struct VM{
     Register *registers;
     DynamicArray<Bytecode*> procs;
-};
-struct ExecContext{
     Bytecode *page;
     u32 off;
 
-    void init(BytecodeFile &bf, u32 o = 0){
+    void init(BytecodeFile &bf, u32 offset){
 	page = bf.bcs.mem;
-	off = o;
-    }
-};
-
-VM createVM(){
-    VM vm;
-    vm.registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
-    vm.procs.init(3);
-    return vm;
-};
-void destroyVM(VM &vm){
-    mem::free(vm.registers);
-    vm.procs.uninit();
+	off = offset;
+	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
+	procs.init(3);
+    };
+    void uninit(){
+	mem::free(registers);
+	procs.uninit();
+    };
 };
 
 //NOTE: these functions are for continuity
@@ -253,13 +246,13 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     neg,
 };
 
-bool execBytecode(ExecContext &execContext, u32 endOff, VM &vm){
-    while(execContext.off != endOff){
-	Bytecode bc = execContext.page[execContext.off];
+bool execBytecode(u32 endOff, VM &vm){
+    while(vm.off != endOff){
+	Bytecode bc = vm.page[vm.off];
 	if(bc == Bytecode::NONE){return true;};
-	u32 x = byteProc[(u16)bc](execContext.page+execContext.off, vm, execContext) + 1;
+	u32 x = byteProc[(u16)bc](vm.page+vm.off, vm) + 1;
 	if(x == 0){return false;};
-	execContext.off += x;
+	vm.off += x;
     };
     return true;
 };

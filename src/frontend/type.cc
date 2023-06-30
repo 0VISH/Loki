@@ -1,6 +1,8 @@
 #include "frontend/entity.hh"
 
-Type getType(TypeID type) {
+typedef u16 TypeID;
+
+Type typeID2Type(TypeID type) {
     u16 x = 1;
     while (IS_BIT(type, x) == 0) { x += 1; };
     return (Type)x;
@@ -9,7 +11,6 @@ Type greaterType(Type t1, Type t2){
     if(t1 < t2){return t1;};
     return t2;
 };
-
 TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer) {
     TypeID id = 0;
     switch (base->type) {
@@ -64,6 +65,9 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
     };
     SET_BIT(id, Type::COMP_VOID);
     return id;
+};
+Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer){
+    return typeID2Type(getTreeTypeID(base, flag, see, lexer));
 };
 Type tokenKeywordToType(Lexer &lexer, u32 off){
     BRING_TOKENS_TO_SCOPE;

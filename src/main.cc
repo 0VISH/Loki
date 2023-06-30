@@ -35,7 +35,7 @@ s32 main(s32 argc, char **argv) {
     
 #if(XE_DBG)
     dbg::dumpBlockTimes();
-    printf("\ndone!");
+    printf("\nNOT FREED: %lld\nCALLS NOT FREED: %d\n", mem::notFreed, mem::calls);
 #endif
     
     return EXIT_SUCCESS;

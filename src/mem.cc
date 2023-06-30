@@ -1,19 +1,37 @@
 namespace mem {
+#if(XE_DBG)
+    u64 notFreed = 0;
+    u32 calls = 0;
+#endif
     //TODO: write an allocator
     void *alloc(u64 size) {
+	if(size == 96){
+	    printf("lkjsdf");
+	};
+	void *mem;
 #if(XE_DBG)
 	if(size == 0){
 	    printf("\n[ERROR]: trying to allocate memory of size 0");
 	    return nullptr;
 	};
+	calls += 1;
+	notFreed += size;
+	mem = malloc(size + sizeof(u64));
+	u64 *num = (u64*)mem;
+	*num = size;
+	mem = (char*)mem + sizeof(u64);
 #endif
-	return malloc(size);
+	return mem;
     };
     void free(void *mem) {
 #if(XE_DBG)
 	if (mem == nullptr) {
 	    printf("\n[ERROR]: trying to free a nullptr\n");
 	};
+	calls -= 1;
+	u64 *num = (u64*)((char*)mem - sizeof(u64));
+	notFreed -= *num;
+	mem = num;
 #endif
 	::free(mem);
     };

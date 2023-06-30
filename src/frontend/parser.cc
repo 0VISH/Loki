@@ -73,6 +73,21 @@ struct ASTFile {
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
     u16 pageBrim;
+
+    void init(){
+	memPages.init(2);
+	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
+	memPages.push(page);
+	pageBrim = 0;
+	nodes.init(10);
+    };
+    void uninit(){
+	for (u16 i=0; i<memPages.count; i++) {
+	    mem::free(memPages[i]);
+	};
+	memPages.uninit();
+	nodes.uninit();
+    };
 };
 
 String makeStringFromTokOff(u32 x, Lexer &lexer){
@@ -82,22 +97,6 @@ String makeStringFromTokOff(u32 x, Lexer &lexer){
     str.len = off.len;
     str.mem = lexer.fileContent + off.off;
     return str;
-};
-ASTFile createASTFile() {
-    ASTFile file;
-    file.memPages.init(2);
-    char *page = (char*)mem::alloc(AST_PAGE_SIZE);
-    file.memPages.push(page);
-    file.pageBrim = 0;
-    file.nodes.init(10);
-    return file;
-};
-void destroyASTFile(ASTFile &file) {
-    for (u16 i=0; i<file.memPages.count; i++) {
-	mem::free(file.memPages[i]);
-    };
-    file.memPages.uninit();
-    file.nodes.uninit();
 };
 ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     if (file.pageBrim+nodeSize >= AST_PAGE_SIZE) {

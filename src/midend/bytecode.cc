@@ -119,6 +119,11 @@ struct BytecodeContext{
 	return reg;
     };
 };
+void destroyBytecodeContexts(DynamicArray<BytecodeContext> &bca){
+    for(u32 x=0; x<bca.count; x += 1){
+	bca[x].uninit();
+    };
+};
 
 #define EMIT_BIN_OP_BC_TEMPLATE(SIGNED, UNSIGNED, DECIMAL)		\
     ASTBinOp *op = (ASTBinOp*)node;					\

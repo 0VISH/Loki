@@ -1,19 +1,40 @@
+void ScopeEntities::init(u32 varCount, u32 procCount){
+    varMap.count = 0;
+    procMap.count = 0;
+    if(varCount != 0){
+	varMap.init(varCount);
+	varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
+    };
+    if(procCount != 0){
+	procMap.init(procCount);
+	procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
+    };
+    treeTypes.init();
+};
+void ScopeEntities::uninit(){
+    if(varMap.count != 0){
+	varMap.uninit();
+	mem::free(varEntities);
+    };
+    if(procMap.count != 0){
+	procMap.uninit();
+	mem::free(procEntities);
+    };
+    treeTypes.uninit();
+};
+
 ScopeEntities* pushNewScope(DynamicArray<ScopeEntities*> &see){
     ScopeEntities *se = (ScopeEntities*)mem::alloc(sizeof(ScopeEntities));
     see.push(se);
     return se;
 };
-
-void destroyFileEntities(ScopeEntities *se) {
-    if(se->varMap.len != 0){
-	mem::free(se->varEntities);
-	se->varMap.uninit();
-    };
-    if(se->procMap.len != 0){
-	mem::free(se->procEntities);
-	se->procMap.uninit();
+void destroyScopes(DynamicArray<ScopeEntities*> &see){
+    for(u32 x=0; x<see.count; x+=1){
+	see[x]->uninit();
+	mem::free(see[x]);
     };
 };
+
 bool checkVarEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, Type type, ScopeEntities *se) {
     Map &map = se->varMap;
     BRING_TOKENS_TO_SCOPE;
@@ -44,7 +65,7 @@ bool checkProcEntityPresentInScopeElseReg(Lexer &lexer, String name, Flag flag, 
     se->procEntities[id] = entity;
     return true;
 };
-void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntities *se) {
+void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntities *se) {
     u32 procCount = 0;
     u32 varCount = 0;
     for (u32 x = 0; x < entities.count; x += 1) {
@@ -58,16 +79,7 @@ void goThroughEntitiesAndInitMaps(DynamicArray<ASTBase*> &entities, ScopeEntitie
 	    varCount += multi->names.count;
 	};
     };
-    se->varMap.count = 0;
-    se->procMap.count = 0;
-    if(varCount != 0){
-	se->varMap.init(varCount);
-	se->varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
-    };
-    if(procCount != 0){
-	se->procMap.init(procCount);
-	se->procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
-    };
+    se->init(varCount, procCount);
 };
 bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle){
     BRING_TOKENS_TO_SCOPE;
@@ -109,9 +121,8 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	Type type;
 	Flag &flag = var->flag;
 	Flag treeFlag;
-	TypeID treeTypeID = getTreeTypeID(var->rhs, treeFlag, see, lexer);
-	if(treeTypeID == 0){return false;};
-	Type treeType = getType(treeTypeID);
+	Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);
+        if(treeType == Type::UNKOWN){return false;};
 	if(tKown){
 	    type = tokenKeywordToType(lexer, var->tokenOff+2);
 	    if(type == Type::UNKOWN){
@@ -136,9 +147,8 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
     Type type;
     Flag &flag = var->flag;
     Flag treeFlag = 0;
-    TypeID treeTypeID = getTreeTypeID(var->rhs, treeFlag, see, lexer);
-    if(treeTypeID == 0){return false;};
-    Type treeType = getType(treeTypeID);
+    Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);
+    if(treeType == Type::UNKOWN){return false;};
     if(tKown){
 	type = tokenKeywordToType(lexer, var->tokenOff+2);
 	if(type == Type::UNKOWN){
@@ -176,6 +186,7 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     case Token_Type::K_U32: type = Type::U_32; break;
     case Token_Type::K_S32: type = Type::S_32; break;
     case Token_Type::K_F32: type = Type::F_32; break;
+    default: return false;
     };
     typeNode->type = type;
     return true;
@@ -205,7 +216,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    };
 	};
 	//NOTE: checking body checks the input also
-	if (checkEntities(proc->body, lexer, see) == false) { return false; };
+	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
     } break;
     case ASTType::UNI_DECLERATION:{
@@ -239,12 +250,10 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::BIN_ADD:{
 	ASTBinOp *op = (ASTBinOp*)node;
 	Flag flag;
-	TypeID typeID = getTreeTypeID(op->lhs, flag, see, lexer);
-	if(typeID == 0){return false;};
-	Type lhsType = getType(typeID);
-	typeID = getTreeTypeID(op->rhs, flag, see, lexer);
-	if(typeID == 0){return false;};
-	Type rhsType = getType(typeID);
+	Type lhsType = getTreeType(op->lhs, flag, see, lexer);
+	if(lhsType == Type::UNKOWN){return false;};
+	Type rhsType = getTreeType(op->rhs, flag, see, lexer);
+	if(rhsType == Type::UNKOWN){return false;};
 	op->lhsType = lhsType;
 	op->rhsType = rhsType;
 	//TODO: check if types are compatible?
@@ -271,7 +280,7 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
     TIME_BLOCK;
     BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1];
-    goThroughEntitiesAndInitMaps(entities, se);
+    goThroughEntitiesAndInitScope(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
 	if(checkEntity(node, lexer, see) == false){return false;};
