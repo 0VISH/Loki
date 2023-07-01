@@ -29,6 +29,9 @@ enum class Bytecode : u16{
     DIVS,
     DIVU,
     DIVF,
+    GRTS,
+    GRTU,
+    GRTF,
     DEF,
     PROC_GIVES,
     PROC_START,
@@ -149,14 +152,48 @@ struct BytecodeContext{
 	};								\
     };									\
     switch(abt){							\
-    case BytecodeType::INTEGER_S: bf.emit(SIGNED);   break;		\
-    case BytecodeType::INTEGER_U: bf.emit(UNSIGNED); break;		\
+    case BytecodeType::INTEGER_S:   bf.emit(SIGNED);   break;		\
+    case BytecodeType::INTEGER_U:   bf.emit(UNSIGNED); break;		\
     case BytecodeType::DECIMAL_S:   bf.emit(DECIMAL);  break;		\
     };									\
     bf.emitReg(outputReg);						\
     bf.emitReg(lhsReg);							\
     bf.emitReg(rhsReg);							\
     return outputReg;							\
+
+#define EMIT_LOG_OP_BC_TEMPLATE(SIGNED, UNSIGNED, DECIMAL)		\
+    ASTBinOp *op = (ASTBinOp*)node;					\
+    u32 lhsReg = compileExprToBytecode(op->lhs, lexer, see, bca, bf);	\
+    u32 rhsReg = compileExprToBytecode(op->rhs, lexer, see, bca, bf);	\
+    Type lhsType = bc.types[lhsReg];					\
+    Type rhsType = bc.types[rhsReg];					\
+    Type ansType = greaterType(lhsType, rhsType);			\
+    BytecodeType lbt = typeToBytecodeType(lhsType);			\
+    BytecodeType rbt = typeToBytecodeType(rhsType);			\
+    BytecodeType abt = typeToBytecodeType(ansType);			\
+    if(lbt != rbt){							\
+	u32 newReg = bc.newReg(ansType);				\
+	bf.emit(Bytecode::CAST);					\
+	bf.emitType(ansType);						\
+	bf.emitReg(newReg);						\
+	if(lbt != abt){							\
+	    bf.emitType(lhsType);					\
+	    bf.emitReg(lhsReg);						\
+	    lhsReg = newReg;						\
+	}else{								\
+	    bf.emitType(rhsType);					\
+	    bf.emitReg(rhsReg);						\
+	    rhsReg = newReg;						\
+	};								\
+    };									\
+    switch(abt){							\
+    case BytecodeType::INTEGER_S:   bf.emit(SIGNED);   break;		\
+    case BytecodeType::INTEGER_U:   bf.emit(UNSIGNED); break;		\
+    case BytecodeType::DECIMAL_S:   bf.emit(DECIMAL);  break;		\
+    };									\
+    bf.emitReg(lhsReg);							\
+    bf.emitReg(rhsReg);							\
+    return 0;								\
 
 s64 getConstInt(Bytecode *bytes){
     s64 *mem = (s64*)bytes;
@@ -185,10 +222,10 @@ u32 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
     u32 outputReg;
     switch(type){
     case ASTType::NUM_INTEGER:{
-	outputReg = bc.newReg(Type::S_64);
+	outputReg = bc.newReg(Type::COMP_INTEGER);
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
-	s64 num = string2int(str);    //TODO: maybe have a sep func which returns u64
+	s64 num = string2int(str);
 	bf.emit(Bytecode::MOVS);
 	bf.emitReg(outputReg);
 	bf.emit(Bytecode::CONST_INT);
@@ -196,7 +233,7 @@ u32 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	return outputReg;
     }break;
     case ASTType::NUM_DECIMAL:{
-	outputReg = bc.newReg(Type::F_64);
+	outputReg = bc.newReg(Type::COMP_DECIMAL);
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
 	f64 num = string2float(str);
@@ -227,6 +264,9 @@ u32 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
     }break;
     case ASTType::BIN_DIV:{
 	EMIT_BIN_OP_BC_TEMPLATE(Bytecode::DIVS, Bytecode::DIVU, Bytecode::DIVF);
+    }break;
+    case ASTType::LOG_GRT:{
+	EMIT_LOG_OP_BC_TEMPLATE(Bytecode::GRTS, Bytecode::GRTU, Bytecode::GRTF);
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *uniOp = (ASTUniOp*)node;
@@ -449,6 +489,13 @@ namespace dbg{
 	case Bytecode::DIVF:{
 	    if(flag){printf("divf");};
 	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::GRTS: printf("grts");flag = false;
+	case Bytecode::GRTU: if(flag){printf("grtu");flag = false;};
+	case Bytecode::GRTF:{
+	    if(flag){printf("grts");};
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;

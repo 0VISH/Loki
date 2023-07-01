@@ -12,8 +12,10 @@ struct VM{
     DynamicArray<Bytecode*> procs;
     Bytecode *page;
     u32 off;
+    bool flag;
 
     void init(BytecodeFile &bf, u32 offset){
+	flag = false;
 	page = bf.bcs.mem;
 	off = offset;
 	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
@@ -42,16 +44,16 @@ s8 proc_end(BYTECODE_INPUT){return 0;};
 s8 ret(BYTECODE_INPUT){return 0;};
 
 #define BIN_OP_TEMPLATE(SIGN, TYPE)						\
-    u32 dest = (u16)page[2];						\
-    u32 lhs = (u16)page[4];						\
-    u32 rhs = (u16)page[6];						\
+    u16 dest = (u16)page[2];						\
+    u16 lhs = (u16)page[4];						\
+    u16 rhs = (u16)page[6];						\
     vm.registers[dest].TYPE = vm.registers[lhs].TYPE SIGN vm.registers[rhs].TYPE; \
     return 6;								\
 
 #define BIN_DIV_TEMPLATE(TYPE)						\
-    u32 dest = (u16)page[2];						\
-    u32 lhs = (u16)page[4];						\
-    u32 rhs = (u16)page[6];						\
+    u16 dest = (u16)page[2];						\
+    u16 lhs = (u16)page[4];						\
+    u16 rhs = (u16)page[6];						\
     if(vm.registers[rhs].TYPE == 0){					\
 	printf("TODO: div by 0 VM");					\
 	return 0;							\
@@ -67,8 +69,8 @@ s8 cast(BYTECODE_INPUT){
       sint  -> float
       uint  -> float
      */
-    u32 newReg = (u16)page[4];
-    u32 oldReg = (u16)page[8];
+    u16 newReg = (u16)page[4];
+    u16 oldReg = (u16)page[8];
     BytecodeType newType = typeToBytecodeType((Type)page[2]);
     BytecodeType oldType = typeToBytecodeType((Type)page[6]);
     if(newType == oldType){
@@ -110,11 +112,11 @@ s8 cast(BYTECODE_INPUT){
     return 8;
 };
 s8 movi(BYTECODE_INPUT){
-    u32 dest = (u16)page[2];
+    u16 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
     case Bytecode::REG:{
-	u32 src = (u16)page[4];
+	u16 src = (u16)page[4];
 	vm.registers[dest].sint = vm.registers[src].sint;
 	x += reg_in_stream;
     }break;
@@ -126,11 +128,11 @@ s8 movi(BYTECODE_INPUT){
     return x;
 };
 s8 movu(BYTECODE_INPUT){
-    u32 dest = (u16)page[2];
+    u16 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
     case Bytecode::REG:{
-	u32 src = (u16)page[4];
+	u16 src = (u16)page[4];
 	vm.registers[dest].sint = vm.registers[src].sint;
 	x += reg_in_stream;
     }break;
@@ -142,7 +144,7 @@ s8 movu(BYTECODE_INPUT){
     return x;
 };
 s8 movf(BYTECODE_INPUT){
-    u32 dest = (u16)page[2];
+    u16 dest = (u16)page[2];
     s8 x = reg_in_stream;
     switch(page[3]){
     case Bytecode::REG:{
@@ -193,6 +195,24 @@ s8 divu(BYTECODE_INPUT){
 s8 divf(BYTECODE_INPUT){
     BIN_DIV_TEMPLATE(dec);
 };
+s8 grts(BYTECODE_INPUT){
+    u16 lhsReg = (u16)page[2];
+    u16 rhsReg = (u16)page[4];
+    vm.flag = vm.registers[lhsReg].sint > vm.registers[rhsReg].sint;
+    return 4;
+};
+s8 grtu(BYTECODE_INPUT){
+    u16 lhsReg = (u16)page[2];
+    u16 rhsReg = (u16)page[4];
+    vm.flag = vm.registers[lhsReg].uint > vm.registers[rhsReg].uint;
+    return 4;
+};
+s8 grtf(BYTECODE_INPUT){
+    u16 lhsReg = (u16)page[2];
+    u16 rhsReg = (u16)page[4];
+    vm.flag = vm.registers[lhsReg].dec > vm.registers[rhsReg].dec;
+    return 4;
+};
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
     u32 count = 0;
@@ -207,7 +227,7 @@ s8 def(BYTECODE_INPUT){
 };
 s8 neg(BYTECODE_INPUT){
     BytecodeType bt = typeToBytecodeType((Type)page[2]);
-    u32 reg = (u32)page[4];
+    u16 reg = (u32)page[4];
     switch(bt){
     case BytecodeType::INTEGER_S: vm.registers[reg].sint *= -1; break;
     case BytecodeType::INTEGER_U:
@@ -243,6 +263,9 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     divi,
     divu,
     divf,
+    grts,
+    grtu,
+    grtf,
     def,
     proc_gives, proc_start, proc_end,
     ret,
@@ -253,7 +276,7 @@ bool execBytecode(u32 endOff, VM &vm){
     while(vm.off != endOff){
 	Bytecode bc = vm.page[vm.off];
 	if(bc == Bytecode::NONE){return true;};
-	u32 x = byteProc[(u16)bc](vm.page+vm.off, vm) + 1;
+	s8 x = byteProc[(u16)bc](vm.page+vm.off, vm) + 1;
 	if(x == 0){return false;};
 	vm.off += x;
     };

@@ -1,4 +1,3 @@
-#if(XE_DBG)
 #define BLOCK_COUNT 120
 namespace dbg{
     struct BlockTime {
@@ -32,9 +31,8 @@ namespace dbg{
 	printf("----\n");
     }
 };
-#endif
 
-#if(XE_DBG && XE_PLAT_WIN)
+#if(XE_PLAT_WIN)
 namespace dbg{
     u64 freq;
     void initTimer() {

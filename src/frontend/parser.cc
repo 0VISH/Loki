@@ -7,6 +7,10 @@ enum class ASTType {
     BIN_ADD,
     BIN_MUL,
     BIN_DIV,
+    LOG_GRT,
+    LOG_GRTE,
+    LOG_LSR,
+    LOG_LSRE,
     UNI_DECLERATION,
     UNI_ASSIGNMENT_T_UNKNOWN,
     UNI_ASSIGNMENT_T_KNOWN,
@@ -67,7 +71,7 @@ struct AST_Type : ASTBase{
 	Type type;
     };
 };
-//NOTE: cpp sucks
+//cpp sucks
 void freeNodeInternal(ASTBase *base);
 struct ASTFile {
     DynamicArray<char*> memPages;
@@ -122,6 +126,7 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
     case (Token_Type)'+': type = ASTType::BIN_ADD; x += 1; break;
     case (Token_Type)'*': type = ASTType::BIN_MUL; x += 1; break;
     case (Token_Type)'/': type = ASTType::BIN_DIV; x += 1; break;
+    case (Token_Type)'>': type = ASTType::LOG_GRT; x += 1; break;
     default: DEBUG_UNREACHABLE;
     };
     return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
@@ -173,12 +178,14 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 s16 checkAndGetPrio(Lexer &lexer, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
     switch (tokTypes[x]) {
+    case (Token_Type)'>':
+	return 1;
     case (Token_Type)'+':
     case (Token_Type)'-':
-	return 1;
+	return 2;
     case (Token_Type)'*':
     case (Token_Type)'/':
-	return 2;
+	return 3;
     default:
 	lexer.emitErr(tokOffs[x].off, "Invalid operator");
 	return -1;
@@ -600,6 +607,7 @@ namespace dbg {
 	    PAD;
 	    printf("num: %f", num);
 	} break;
+	case ASTType::LOG_GRT: c = '>'; printf("log_gtr");
 	case ASTType::BIN_ADD: if (c == NULL) { c = '+'; printf("bin_add"); };
 	case ASTType::BIN_MUL: if (c == NULL) { c = '*'; printf("bin_mul"); };
 	case ASTType::BIN_DIV:{

@@ -1,8 +1,9 @@
 #include "frontend/entity.hh"
 
-typedef u16 TypeID;
+typedef u32 TypeID;
 
 Type typeID2Type(TypeID type) {
+    if(type == 0){return Type::UNKOWN;};
     u16 x = 1;
     while (IS_BIT(type, x) == 0) { x += 1; };
     return (Type)x;
@@ -14,6 +15,7 @@ Type greaterType(Type t1, Type t2){
 TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer) {
     TypeID id = 0;
     switch (base->type) {
+    case ASTType::LOG_GRT:
     case ASTType::BIN_ADD:
     case ASTType::BIN_MUL:
     case ASTType::BIN_DIV: {
@@ -25,7 +27,7 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	TypeID rhsTypeID = getTreeTypeID(node->rhs, rhsFlag, see, lexer);
 	if(rhsTypeID == 0){return 0;};
 	flag = lhsFlag & rhsFlag;
-	return (TypeID)((u16)lhsTypeID | (u16)rhsTypeID);
+	return (TypeID)((u32)lhsTypeID | (u32)rhsTypeID);
     } break;
     case ASTType::NUM_INTEGER:{
 	SET_BIT(flag, Flags::CONSTANT);

@@ -22,8 +22,10 @@
 #include <typeinfo>
 #endif
 
+#if(XE_DBG)
 #include "debug/timer.cc"
 #include "debug/exception.cc"
+#endif
 #include "report.cc"
 #include "threadpool.cc"
 #include "frontend/lexer.cc"
