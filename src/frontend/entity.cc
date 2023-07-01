@@ -250,18 +250,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(checkVarDef(node, lexer, see, false, true) == false){return false;};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
-    case ASTType::LOG_GRT:{
-	ASTBinOp *op = (ASTBinOp*)node;
-	Flag flag;
-	Type lhsType = getTreeType(op->lhs, flag, see, lexer);
-	if(lhsType == Type::UNKOWN){return false;};
-	if(isTypeNum(lhsType) == false){return false;};
-	Type rhsType = getTreeType(op->rhs, flag, see, lexer);
-	if(rhsType == Type::UNKOWN){return false;};
-	if(isTypeNum(rhsType) == false){return false;};
-	op->lhsType = lhsType;
-	op->rhsType = rhsType;
-    }break;
+    case ASTType::BIN_GRT:
+    case ASTType::BIN_GRTE:
+    case ASTType::BIN_LSR:
+    case ASTType::BIN_LSRE:
+    case ASTType::BIN_EQU:
     case ASTType::BIN_MUL:
     case ASTType::BIN_DIV:
     case ASTType::BIN_ADD:{

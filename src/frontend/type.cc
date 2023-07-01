@@ -15,7 +15,11 @@ Type greaterType(Type t1, Type t2){
 TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer) {
     TypeID id = 0;
     switch (base->type) {
-    case ASTType::LOG_GRT:
+    case ASTType::BIN_GRT:
+    case ASTType::BIN_GRTE:
+    case ASTType::BIN_LSR:
+    case ASTType::BIN_LSRE:
+    case ASTType::BIN_EQU:
     case ASTType::BIN_ADD:
     case ASTType::BIN_MUL:
     case ASTType::BIN_DIV: {
@@ -81,7 +85,6 @@ Type tokenKeywordToType(Lexer &lexer, u32 off){
     case Token_Type::K_S16: return Type::S_16;
     case Token_Type::K_S32: return Type::S_32;
     default:
-	printf("%d", tokTypes[off]);
 	DEBUG_UNREACHABLE;
         return Type::UNKOWN;
     };

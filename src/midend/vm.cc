@@ -12,10 +12,8 @@ struct VM{
     DynamicArray<Bytecode*> procs;
     Bytecode *page;
     u32 off;
-    bool flag;
 
     void init(BytecodeFile &bf, u32 offset){
-	flag = false;
 	page = bf.bcs.mem;
 	off = offset;
 	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
@@ -60,6 +58,19 @@ s8 ret(BYTECODE_INPUT){return 0;};
     }									\
     vm.registers[dest].TYPE = vm.registers[lhs].TYPE / vm.registers[rhs].TYPE; \
     return 6;								\
+
+#define BIN_CMP_TEMPLATE(TYPE)						\
+    u16 outputReg = (u16)page[2];					\
+    u16 lhsReg = (u16)page[4];						\
+    u16 rhsReg = (u16)page[6];						\
+    vm.registers[outputReg].sint = vm.registers[lhsReg].TYPE - vm.registers[rhsReg].TYPE; \
+    return 6;								\
+
+#define REGISTER_CHECK_TEMPLATE(TYPE, OP)			\
+    u16 outReg = (u16)page[2];					\
+    u16 inReg  = (u16)page[4];					\
+    vm.registers[outReg].uint = vm.registers[inReg].TYPE OP 0;	\
+    return 4;							\
 
 s8 cast(BYTECODE_INPUT){
     /*
@@ -195,23 +206,41 @@ s8 divu(BYTECODE_INPUT){
 s8 divf(BYTECODE_INPUT){
     BIN_DIV_TEMPLATE(dec);
 };
-s8 grts(BYTECODE_INPUT){
-    u16 lhsReg = (u16)page[2];
-    u16 rhsReg = (u16)page[4];
-    vm.flag = vm.registers[lhsReg].sint > vm.registers[rhsReg].sint;
-    return 4;
+s8 cmps(BYTECODE_INPUT){
+    BIN_CMP_TEMPLATE(sint);
 };
-s8 grtu(BYTECODE_INPUT){
-    u16 lhsReg = (u16)page[2];
-    u16 rhsReg = (u16)page[4];
-    vm.flag = vm.registers[lhsReg].uint > vm.registers[rhsReg].uint;
-    return 4;
+s8 cmpu(BYTECODE_INPUT){
+    BIN_CMP_TEMPLATE(uint);
 };
-s8 grtf(BYTECODE_INPUT){
-    u16 lhsReg = (u16)page[2];
-    u16 rhsReg = (u16)page[4];
-    vm.flag = vm.registers[lhsReg].dec > vm.registers[rhsReg].dec;
-    return 4;
+s8 cmpf(BYTECODE_INPUT){
+    BIN_CMP_TEMPLATE(dec);
+};
+s8 rps(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(sint, >);
+};
+s8 rpu(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(uint, >);
+};
+s8 rpf(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(dec, >);
+};
+s8 rns(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(sint, <);
+};
+s8 rnu(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(uint, <);
+};
+s8 rnf(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(dec, <);
+};
+s8 rzs(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(sint, ==);
+};
+s8 rzu(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(uint, ==);
+};
+s8 rzf(BYTECODE_INPUT){
+    REGISTER_CHECK_TEMPLATE(dec, ==);
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
@@ -263,9 +292,18 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     divi,
     divu,
     divf,
-    grts,
-    grtu,
-    grtf,
+    cmps,
+    cmpu,
+    cmpf,
+    rps,
+    rpu,
+    rpf,
+    rns,
+    rnu,
+    rnf,
+    rzs,
+    rzu,
+    rzf,
     def,
     proc_gives, proc_start, proc_end,
     ret,

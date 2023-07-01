@@ -7,10 +7,11 @@ enum class ASTType {
     BIN_ADD,
     BIN_MUL,
     BIN_DIV,
-    LOG_GRT,
-    LOG_GRTE,
-    LOG_LSR,
-    LOG_LSRE,
+    BIN_GRT,
+    BIN_GRTE,
+    BIN_LSR,
+    BIN_LSRE,
+    BIN_EQU,
     UNI_DECLERATION,
     UNI_ASSIGNMENT_T_UNKNOWN,
     UNI_ASSIGNMENT_T_KNOWN,
@@ -32,17 +33,17 @@ struct ASTNumInt : ASTBase{
 struct ASTNumDec : ASTBase{
     u32 tokenOff;
 };
-struct ASTBinOp : ASTBase{
-    ASTBase *lhs;
-    ASTBase *rhs;
-    Type lhsType;
-    Type rhsType;
-};
 struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
     u32 tokenOff;
     u8 flag;
+};
+struct ASTBinOp : ASTBase{
+    ASTBase *lhs;
+    ASTBase *rhs;
+    Type lhsType;
+    Type rhsType;
 };
 struct ASTMultiVar : ASTBase{
     DynamicArray<String> names;
@@ -126,7 +127,32 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
     case (Token_Type)'+': type = ASTType::BIN_ADD; x += 1; break;
     case (Token_Type)'*': type = ASTType::BIN_MUL; x += 1; break;
     case (Token_Type)'/': type = ASTType::BIN_DIV; x += 1; break;
-    case (Token_Type)'>': type = ASTType::LOG_GRT; x += 1; break;
+    case (Token_Type)'=':{
+	type = ASTType::BIN_EQU;
+	x += 1;
+    }break;
+    case (Token_Type)'>':{
+	type = ASTType::BIN_GRT;
+	x += 1;
+	if(tokTypes[x] == (Token_Type)'='){
+	    type = ASTType::BIN_GRTE;
+	    x += 1;
+	}else{
+	     lexer.emitErr(tokOffs[x].off, "Expected '='");
+	    return nullptr;
+	};
+    }break;
+    case (Token_Type)'<':{
+	type = ASTType::BIN_LSR;
+	x += 1;
+	if(tokTypes[x] == (Token_Type)'<'){
+	    type = ASTType::BIN_LSRE;
+	    x += 1;
+	}else{
+	    lexer.emitErr(tokOffs[x].off, "Expected '='");
+	    return nullptr; 
+	};
+    }break;
     default: DEBUG_UNREACHABLE;
     };
     return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
@@ -178,7 +204,10 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 s16 checkAndGetPrio(Lexer &lexer, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
     switch (tokTypes[x]) {
+    case (Token_Type)'=':
+    case (Token_Type)'<':
     case (Token_Type)'>':
+	//NOTE: this takes care of <=, >=
 	return 1;
     case (Token_Type)'+':
     case (Token_Type)'-':
@@ -197,6 +226,7 @@ ASTBinOp *genRHSExpr(Lexer &lexer, ASTFile &file, u32 &curPos, u32 y, s16 &brack
     s16 prio = checkAndGetPrio(lexer, x);
     if (prio == -1) { return nullptr; };
     ASTBinOp *node = genASTOperator(lexer, x, file);
+    if(node == nullptr){return nullptr;};
     ASTBinOp *previousOperator = node;
     ASTBinOp *binOperator = nullptr;
     ASTBase *operand = nullptr;
@@ -216,6 +246,7 @@ ASTBinOp *genRHSExpr(Lexer &lexer, ASTFile &file, u32 &curPos, u32 y, s16 &brack
 	if (curPrio+bracket < prio) {break;};
 	prio = curPrio;
 	binOperator = genASTOperator(lexer , x, file);
+	if(binOperator == nullptr){return nullptr;};
 	binOperator->lhs = operand;
 	previousOperator->rhs = (ASTBase*)binOperator;
 	previousOperator = binOperator;
@@ -590,6 +621,7 @@ namespace dbg {
 	ASTType type = node->type;
 	char c = NULL;
 	u8 flag = false;
+	u8 printEqual = false;
 	switch (type) {
 	case ASTType::NUM_INTEGER: {
 	    ASTNumInt *numInt = (ASTNumInt*)node;
@@ -607,9 +639,13 @@ namespace dbg {
 	    PAD;
 	    printf("num: %f", num);
 	} break;
-	case ASTType::LOG_GRT: c = '>'; printf("log_gtr");
-	case ASTType::BIN_ADD: if (c == NULL) { c = '+'; printf("bin_add"); };
-	case ASTType::BIN_MUL: if (c == NULL) { c = '*'; printf("bin_mul"); };
+	case ASTType::BIN_GRT: c = '>'; printf("bin_grt");
+	case ASTType::BIN_GRTE: if(c == NULL) { c = '>'; printf("bin_grte"); printEqual=true;};
+	case ASTType::BIN_LSR:  if(c == NULL) { c = '<'; printf("bin_lsr");};
+	case ASTType::BIN_LSRE: if(c == NULL) { c = '<'; printf("bin_lsre"); printEqual=true;};
+	case ASTType::BIN_EQU:  if(c == NULL) { c = '='; printf("bin_equ"); printEqual=true;};
+	case ASTType::BIN_ADD:  if(c == NULL) { c = '+'; printf("bin_add"); };
+	case ASTType::BIN_MUL:  if(c == NULL) { c = '*'; printf("bin_mul"); };
 	case ASTType::BIN_DIV:{
 	    ASTBinOp *bin = (ASTBinOp*)node;
 	    if (c == NULL) { c = '/'; printf("bin_div"); };
@@ -619,6 +655,7 @@ namespace dbg {
 	    printf("rhs: %p", bin->rhs);
 	    PAD;
 	    printf("op: %c", c);
+	    if(printEqual){printf("=");};
 	    PAD;
 	    printf("LHS");
 	    if (bin->lhs != nullptr) {__dumpNodesWithoutEndPadding(bin->lhs, lexer, padding + 1);};
