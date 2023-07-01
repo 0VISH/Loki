@@ -230,6 +230,13 @@ s8 setge(BYTECODE_INPUT){
 s8 setle(BYTECODE_INPUT){
     SET_TEMPLATE(<=);
 };
+s8 jmpns(BYTECODE_INPUT){
+    u16 reg = (u16)page[2];
+    if(vm.registers[reg].uint == 0){
+	vm.off += (u16)page[3];
+    };
+    return 3;
+};
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
     u32 count = 0;
@@ -288,6 +295,7 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     sete,
     setge,
     setle,
+    jmpns,
     def,
     proc_gives, proc_start, proc_end,
     ret,

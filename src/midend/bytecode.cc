@@ -37,6 +37,7 @@ enum class Bytecode : u16{
     SETE,
     SETGE,
     SETLE,
+    JMPNS,        //jumps if given register is 0
     DEF,
     PROC_GIVES,
     PROC_START,
@@ -79,6 +80,8 @@ struct BytecodeFile{
 	emit(Bytecode::TYPE);
 	emit((Bytecode)type);
     };
+    u32 getCursorOff(){return bcs.count;};
+    void setBytecodeAtCursor(u32 cursor, Bytecode bc){bcs[cursor] = bc;};
     //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
 	emit(Bytecode::CONST_INT);
@@ -108,11 +111,10 @@ struct BytecodeContext{
 
     void init(u32 varCount, u32 procCount){
 	varToReg = nullptr;
-	types = nullptr;
 	registerID = 0;
+	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
 	if(varCount != 0){
 	    varToReg = (u32*)mem::alloc(sizeof(u32)*varCount);
-	    types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
 	};
 	procToID.len = 0;
 	if(procCount != 0){
@@ -121,8 +123,8 @@ struct BytecodeContext{
     };
     void uninit(){
 	if(varToReg != nullptr){mem::free(varToReg);};
-	if(types != nullptr){mem::free(types);};
 	if(procToID.len != 0){procToID.uninit();};
+	mem::free(types);
     };
     u16 newReg(Type type){
 	u16 reg = registerID;
@@ -364,6 +366,26 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bf.emitReg(ansReg);
 	};
     }break;
+    case ASTType::IF:{
+	ASTIf *If = (ASTIf*)node;
+	u32 exprID = compileExprToBytecode(If->expr, lexer, see, bca, bf);
+	BytecodeContext &blockBC = bca.newElem();
+	ScopeEntities *IfSe = (ScopeEntities*)If->IfSe;
+	blockBC.init(IfSe->varMap.count, IfSe->procMap.count);
+	see.push(IfSe);
+	bf.emit(Bytecode::JMPNS);
+	bf.emitReg(exprID);
+	u32 bytecodeOffToModify = bf.getCursorOff();
+	bf.emit(Bytecode::NONE);        //filler for now
+	for(u32 x=0; x<If->body.count; x+=1){
+	    compileToBytecode(If->body[x], lexer, see, bca, bf);
+	};
+	u32 blockOverOff = bf.getCursorOff();
+	bf.setBytecodeAtCursor(bytecodeOffToModify, (Bytecode)(blockOverOff-bytecodeOffToModify));
+	IfSe->uninit();
+	mem::free(IfSe);
+	bca.pop().uninit();
+    }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
 	u32 procBytecodeID = procID;
@@ -534,6 +556,12 @@ namespace dbg{
 	    if(flag){printf("setle"); flag = false;};
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::JMPNS:{
+	    printf("jmpns");
+	    DUMP_NEXT_BYTECODE;
+	    x += 1;
+	    printf(" %d", page[x]);
 	}break;
 	case Bytecode::CAST:{
 	    printf("cast");

@@ -22,6 +22,7 @@ enum class ASTType {
     VARIABLE,
     TYPE,
     UNI_NEG,
+    IF,
 };
 
 struct ASTBase {
@@ -54,6 +55,12 @@ struct ASTMultiVar : ASTBase{
 struct ASTUniOp : ASTBase{
     ASTBase *node;
 };
+struct ASTIf : ASTBase{
+    DynamicArray<ASTBase*> body;
+    ASTBase *expr;
+    void *IfSe;                  //scope of the body
+    u32 tokenOff;
+};
 struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> body;    //NOTE: also includes input
     DynamicArray<ASTBase*> out;
@@ -72,8 +79,36 @@ struct AST_Type : ASTBase{
 	Type type;
     };
 };
-//cpp sucks
+
 void freeNodeInternal(ASTBase *base);
+void freeBody(DynamicArray<ASTBase*> &body){
+    if(body.len != 0){
+	for(u32 x=0; x<body.count; x+=1){
+	    freeNodeInternal(body[x]);
+	};
+	body.uninit();
+    };
+};
+void freeNodeInternal(ASTBase *base){
+    switch(base->type){
+    case ASTType::MULTI_DECLERATION:
+    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:
+    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
+	ASTMultiVar *mv = (ASTMultiVar*)base;
+	mv->names.uninit();
+    }break;
+    case ASTType::PROC_DEFENITION:{
+	ASTProcDef *proc = (ASTProcDef*)base;
+        freeBody(proc->body);
+	if(proc->out.len != 0){proc->out.uninit();};
+    }break;
+    case ASTType::IF:{
+	ASTIf *If = (ASTIf*)base;
+	freeBody(If->body);
+    }break;
+    };
+};
+
 struct ASTFile {
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
@@ -332,6 +367,15 @@ ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
     type->tokenOff = x;
     return (ASTBase*)type;
 };
+s32 getTokenOff(Token_Type tok, Lexer &lexer, u32 cur){
+    BRING_TOKENS_TO_SCOPE;
+    s32 x = cur;
+    while(tokTypes[x] != tok){
+	if(tokTypes[x] == Token_Type::END_OF_FILE){return -1;};
+	x += 1;
+    };
+    return x;
+};
 ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &flagStart) {
     BRING_TOKENS_TO_SCOPE;
     flagStart = x;
@@ -345,6 +389,30 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
     };
     u32 start = x;
     switch (tokTypes[x]) {
+    case Token_Type::K_IF:{
+	ASTIf *If = (ASTIf*)allocAST(sizeof(ASTIf), ASTType::IF, file);
+	If->tokenOff = x;
+	x += 1;
+	If->body.len = 0;
+	s32 end = getTokenOff((Token_Type)'{', lexer, x);
+	if(end == -1){
+	    lexer.emitErr(tokOffs[x-1].off, "Expected '{' from the 'if' statement");
+	    return nullptr;
+	};
+	If->expr = genASTExprTree(lexer, file, x, end);
+	if(If->expr == nullptr){return nullptr;};
+	x = end + 1;
+	If->body.init();
+	eatNewlines(lexer.tokenTypes, x);
+	while(tokTypes[x] != (Token_Type)'}'){
+	    ASTBase *base = parseBlock(lexer, file, x);
+	    if(base == nullptr){return nullptr;};
+	    If->body.push(base);
+	    eatNewlines(lexer.tokenTypes, x);
+	};
+	x += 1;
+	return (ASTBase*)If;
+    }break;
     case Token_Type::IDENTIFIER: {
 	x += 1;
 	switch (tokTypes[x]) {
@@ -617,6 +685,21 @@ namespace dbg {
 	u8 flag = false;
 	u8 printEqual = false;
 	switch (type) {
+	case ASTType::IF:{
+	    printf("if");
+	    PAD;
+	    printf("[EXPR]");
+	    PAD;
+	    ASTIf *If = (ASTIf*)node;
+	    if(If->expr){__dumpNodesWithoutEndPadding(If->expr, lexer, padding + 1);};
+	    PAD;
+	    printf("[BODY]");
+	    for(u32 x=0; x<If->body.count; x+=1){
+		ASTBase *node = If->body[x];
+		PAD;
+		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
+	    };
+	}break;
 	case ASTType::NUM_INTEGER: {
 	    ASTNumInt *numInt = (ASTNumInt*)node;
 	    printf("num_integer");
@@ -711,7 +794,7 @@ namespace dbg {
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	    PAD;
-	    printf("RHS");
+	    printf("[RHS]");
 	    if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
 	} break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
@@ -735,7 +818,7 @@ namespace dbg {
 		printf("      %.*s", name.len, name.mem);
 	    };
 	    PAD;
-	    printf("RHS");
+	    printf("[RHS]");
 	    if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
 	} break;
 	case ASTType::PROC_DEFENITION: {

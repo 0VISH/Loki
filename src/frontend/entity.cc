@@ -200,6 +200,22 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     ScopeEntities *se = see[see.count-1]; //current scope
     switch (node->type) {
+    case ASTType::IF:{
+	BRING_TOKENS_TO_SCOPE;
+	ASTIf *If = (ASTIf*)node;
+	Flag treeFlag;
+	Type treeType = getTreeType(If->expr, treeFlag, see, lexer);
+	if(treeType == Type::UNKOWN){return false;};
+	switch(treeType){
+	case Type::XE_VOID:
+	    lexer.emitErr(tokOffs[If->tokenOff].off, "Expression under 'if' cannot be void");
+	    return false;
+	};
+        ScopeEntities *IfSe = pushNewScope(see, Scope::BLOCK);
+	If->IfSe = IfSe;
+	if(checkEntities(If->body, lexer, see) == false) { return false; };
+	see.pop();
+    }break;
     case ASTType::PROC_DEFENITION: {
 	BRING_TOKENS_TO_SCOPE;
 	ASTProcDef *proc = (ASTProcDef*)node;
@@ -301,24 +317,4 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
 	if(checkEntity(node, lexer, see) == false){return false;};
     };
     return true;
-};
-void freeNodeInternal(ASTBase *base){
-    switch(base->type){
-    case ASTType::MULTI_DECLERATION:
-    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:
-    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
-	ASTMultiVar *mv = (ASTMultiVar*)base;
-	mv->names.uninit();
-    }break;
-    case ASTType::PROC_DEFENITION:{
-	ASTProcDef *proc = (ASTProcDef*)base;
-        if(proc->body.len != 0){
-	    for(u32 x=0; x<proc->body.count; x+=1){
-		freeNodeInternal(proc->body[x]);
-	    };
-	    proc->body.uninit();
-	};
-	if(proc->out.len != 0){proc->out.uninit();};
-    }break;
-    };
 };
