@@ -32,15 +32,11 @@ enum class Bytecode : u16{
     CMPS,
     CMPU,
     CMPF,
-    RPS,          //is the given register positive number
-    RPU,
-    RPF,
-    RNS,          //is the given register negative number
-    RNU,
-    RNF,
-    RZS,          //is the given register 0
-    RZU,
-    RZF,
+    SETG,
+    SETL,
+    SETE,
+    SETGE,
+    SETLE,
     DEF,
     PROC_GIVES,
     PROC_START,
@@ -85,6 +81,7 @@ struct BytecodeFile{
     };
     //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
+	emit(Bytecode::CONST_INT);
 	bcs.reserve(const_in_stream);
 	Bytecode *loc = bcs.mem + bcs.count;
 	s64 *mem = (s64*)(loc);
@@ -92,6 +89,7 @@ struct BytecodeFile{
         bcs.count += const_in_stream;
     };
     void emitConstDec(f64 num){
+	emit(Bytecode::CONST_DEC);
         bcs.reserve(const_in_stream);
 	Bytecode *loc = bcs.mem + bcs.count;
 	f64 *mem = (f64*)(loc);
@@ -205,7 +203,6 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	s64 num = string2int(str);
 	bf.emit(Bytecode::MOVS);
 	bf.emitReg(outputReg);
-	bf.emit(Bytecode::CONST_INT);
 	bf.emitConstInt(num);
 	return outputReg;
     }break;
@@ -216,7 +213,6 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	f64 num = string2float(str);
 	bf.emit(Bytecode::MOVF);
 	bf.emitReg(outputReg);
-	bf.emit(Bytecode::CONST_DEC);
 	bf.emitConstDec(num);
 	return outputReg;
     }break;
@@ -272,64 +268,30 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 		rhsReg = newReg;						
 	    };								
 	};
-	Bytecode regCheck1;
-	Bytecode regCheck2 = Bytecode::NONE;
+	Bytecode set;
+	Bytecode cmp;
+	switch(op->type){
+	case ASTType::BIN_GRTE: set = Bytecode::SETGE; break;
+	case ASTType::BIN_GRT:  set = Bytecode::SETG; break;
+	case ASTType::BIN_EQU:  set = Bytecode::SETE; break;
+	};
 	switch(abt){							
-	case BytecodeType::INTEGER_S:{
-	    bf.emit(Bytecode::CMPS);
-	    switch(op->type){
-	    case ASTType::BIN_GRTE:
-		regCheck2 = Bytecode::RZS;
-	    case ASTType::BIN_GRT:
-		regCheck1 = Bytecode::RPS;
-		break;
-	    case ASTType::BIN_EQU:
-		regCheck1 = Bytecode::RZS;
-		break;
-	    };
-	}break;	
-	case BytecodeType::INTEGER_U:{
-	    bf.emit(Bytecode::CMPU);
-	    switch(op->type){
-	    case ASTType::BIN_GRTE:
-		regCheck2 = Bytecode::RZU;
-	    case ASTType::BIN_GRT:
-		regCheck1 = Bytecode::RPU;
-		break;
-	    case ASTType::BIN_EQU:
-		regCheck1 = Bytecode::RZU;
-		break;
-	    };
-	}break;	
-	case BytecodeType::DECIMAL_S:{
-	    bf.emit(Bytecode::CMPF);
-	    switch(op->type){
-	    case ASTType::BIN_GRTE:
-		regCheck2 = Bytecode::RZF;
-	    case ASTType::BIN_GRT:
-		regCheck1 = Bytecode::RPF;
-		break;
-	    case ASTType::BIN_EQU:
-		regCheck1 = Bytecode::RZF;
-		break;
-	    };
-	}break;	
-	};									
+	case BytecodeType::INTEGER_S: cmp = Bytecode::CMPS; break;	
+	case BytecodeType::INTEGER_U: cmp = Bytecode::CMPU; break;
+	case BytecodeType::DECIMAL_S: cmp = Bytecode::CMPF; break;
+	};
+	
+	outputReg = bc.newReg(ansType);
+	
+	bf.emit(cmp);
 	bf.emitReg(cmpOutReg);						
 	bf.emitReg(lhsReg);							
 	bf.emitReg(rhsReg);
 
-	outputReg = bc.newReg(ansType);
-	
-	bf.emit(regCheck1);
+	bf.emit(set);
 	bf.emitReg(outputReg);
 	bf.emitReg(cmpOutReg);
-
-	if(regCheck2 != Bytecode::NONE){
-	    bf.emit(regCheck2);
-	    bf.emitReg(outputReg);
-	    bf.emitReg(cmpOutReg);
-	};
+	
 	return outputReg;
     }break;
     case ASTType::UNI_NEG:{
@@ -564,24 +526,12 @@ namespace dbg{
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;
-	case Bytecode::RPS: printf("rps");flag = false;
-	case Bytecode::RPU: if(flag){printf("rpu");flag = false;};
-	case Bytecode::RPF:{
-	    if(flag){printf("rpf");flag = false;};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	}break;
-	case Bytecode::RNS: printf("rns");flag = false;
-	case Bytecode::RNU: if(flag){printf("rnu");flag = false;};
-	case Bytecode::RNF:{
-	    if(flag){printf("rnf");flag = false;};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	}break;
-	case Bytecode::RZS: printf("rzs");flag = false;
-	case Bytecode::RZU: if(flag){printf("rzu");flag = false;};
-	case Bytecode::RZF:{
-	    if(flag){printf("rzf");flag = false;};
+	case Bytecode::SETG:  printf("setg"); flag = false;
+	case Bytecode::SETL:  if(flag){printf("setl");  flag = false;};
+	case Bytecode::SETE:  if(flag){printf("sete");  flag = false;};
+	case Bytecode::SETGE: if(flag){printf("setge"); flag = false;};
+	case Bytecode::SETLE:{
+	    if(flag){printf("setle"); flag = false;};
 	    DUMP_NEXT_BYTECODE;
 	    DUMP_NEXT_BYTECODE;
 	}break;

@@ -137,9 +137,6 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	if(tokTypes[x] == (Token_Type)'='){
 	    type = ASTType::BIN_GRTE;
 	    x += 1;
-	}else{
-	     lexer.emitErr(tokOffs[x].off, "Expected '='");
-	    return nullptr;
 	};
     }break;
     case (Token_Type)'<':{
@@ -148,9 +145,6 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	if(tokTypes[x] == (Token_Type)'<'){
 	    type = ASTType::BIN_LSRE;
 	    x += 1;
-	}else{
-	    lexer.emitErr(tokOffs[x].off, "Expected '='");
-	    return nullptr; 
 	};
     }break;
     default: DEBUG_UNREACHABLE;

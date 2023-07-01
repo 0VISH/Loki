@@ -66,11 +66,11 @@ s8 ret(BYTECODE_INPUT){return 0;};
     vm.registers[outputReg].sint = vm.registers[lhsReg].TYPE - vm.registers[rhsReg].TYPE; \
     return 6;								\
 
-#define REGISTER_CHECK_TEMPLATE(TYPE, OP)			\
-    u16 outReg = (u16)page[2];					\
-    u16 inReg  = (u16)page[4];					\
-    vm.registers[outReg].uint = vm.registers[inReg].TYPE OP 0;	\
-    return 4;							\
+#define SET_TEMPLATE(OP)						\
+    u16 outputReg = (u16)page[2];					\
+    u16 inputReg  = (u16)page[4];					\
+    vm.registers[outputReg].uint = (vm.registers[inputReg].sint OP 0)?1:0; \
+    return 4;								\
 
 s8 cast(BYTECODE_INPUT){
     /*
@@ -215,32 +215,20 @@ s8 cmpu(BYTECODE_INPUT){
 s8 cmpf(BYTECODE_INPUT){
     BIN_CMP_TEMPLATE(dec);
 };
-s8 rps(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(sint, >);
+s8 setg(BYTECODE_INPUT){
+    SET_TEMPLATE(>);
 };
-s8 rpu(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(uint, >);
+s8 setl(BYTECODE_INPUT){
+    SET_TEMPLATE(<);
 };
-s8 rpf(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(dec, >);
+s8 sete(BYTECODE_INPUT){
+    SET_TEMPLATE(==);
 };
-s8 rns(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(sint, <);
+s8 setge(BYTECODE_INPUT){
+    SET_TEMPLATE(>=);
 };
-s8 rnu(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(uint, <);
-};
-s8 rnf(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(dec, <);
-};
-s8 rzs(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(sint, ==);
-};
-s8 rzu(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(uint, ==);
-};
-s8 rzf(BYTECODE_INPUT){
-    REGISTER_CHECK_TEMPLATE(dec, ==);
+s8 setle(BYTECODE_INPUT){
+    SET_TEMPLATE(<=);
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
@@ -295,15 +283,11 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     cmps,
     cmpu,
     cmpf,
-    rps,
-    rpu,
-    rpf,
-    rns,
-    rnu,
-    rnf,
-    rzs,
-    rzu,
-    rzf,
+    setg,
+    setl,
+    sete,
+    setge,
+    setle,
     def,
     proc_gives, proc_start, proc_end,
     ret,
