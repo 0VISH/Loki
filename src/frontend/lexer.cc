@@ -24,6 +24,7 @@ enum class Token_Type {
     K_FOR,
     K_CONSTANT,
     K_COMPTIME,
+    K_ELSE,
     K_END,    //keywords end
     ARROW,
     END_OF_FILE,
@@ -58,6 +59,7 @@ void initKeywords() {
 	{"for", Token_Type::K_FOR},
 	{"const", Token_Type::K_CONSTANT},
 	{"comptime", Token_Type::K_COMPTIME},
+	{"else", Token_Type::K_ELSE},
     };
     keywords.init(keywordCount);
     
@@ -260,10 +262,11 @@ struct Lexer {
 				continue;
 			    };
 			    u32 y = 0;
-			    while (mask != 0) {
+			    while (mask != 0 && level != 0) {
 				while (IS_BIT(mask, y) == 0) {
 				    x += 1;
-				    y += 1; };
+				    y += 1;
+				};
 				CLEAR_BIT(mask, y);
 				y += 1;
 				switch (src[x]) {

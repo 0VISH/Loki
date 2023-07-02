@@ -38,6 +38,7 @@ s8 const_dec(BYTECODE_INPUT){return 0;};
 s8 proc_gives(BYTECODE_INPUT){return 0;};
 s8 proc_start(BYTECODE_INPUT){return 0;};
 s8 proc_end(BYTECODE_INPUT){return 0;};
+s8 label(BYTECODE_INPUT){return 0;};
 //TODO: 
 s8 ret(BYTECODE_INPUT){return 0;};
 
@@ -237,6 +238,9 @@ s8 jmpns(BYTECODE_INPUT){
     };
     return 3;
 };
+s8 jmp(BYTECODE_INPUT){
+    return 0;
+};
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
     u32 count = 0;
@@ -296,10 +300,12 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     setge,
     setle,
     jmpns,
+    jmp,
     def,
     proc_gives, proc_start, proc_end,
     ret,
     neg,
+    label,
 };
 
 bool execBytecode(u32 endOff, VM &vm){

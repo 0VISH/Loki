@@ -57,8 +57,10 @@ struct ASTUniOp : ASTBase{
 };
 struct ASTIf : ASTBase{
     DynamicArray<ASTBase*> body;
+    DynamicArray<ASTBase*> elseBody;
     ASTBase *expr;
     void *IfSe;                  //scope of the body
+    void *ElseSe;                //scope of else body
     u32 tokenOff;
 };
 struct ASTProcDef : ASTBase {
@@ -105,6 +107,7 @@ void freeNodeInternal(ASTBase *base){
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)base;
 	freeBody(If->body);
+	freeBody(If->elseBody);
     }break;
     };
 };
@@ -394,6 +397,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	If->tokenOff = x;
 	x += 1;
 	If->body.len = 0;
+	If->elseBody.len = 0;
 	s32 end = getTokenOff((Token_Type)'{', lexer, x);
 	if(end == -1){
 	    lexer.emitErr(tokOffs[x-1].off, "Expected '{' from the 'if' statement");
@@ -411,6 +415,27 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    eatNewlines(lexer.tokenTypes, x);
 	};
 	x += 1;
+	if(tokTypes[x] != Token_Type::K_ELSE){return (ASTBase*)If;};
+	If->elseBody.init();
+	x += 1;
+	switch(tokTypes[x]){
+	case (Token_Type)'{':{
+	    x += 1;
+	    eatNewlines(lexer.tokenTypes, x);
+	    while(tokTypes[x] != (Token_Type)'}'){
+		ASTBase *base = parseBlock(lexer, file, x);
+		if(base == nullptr){return nullptr;};
+		If->elseBody.push(base);
+		eatNewlines(lexer.tokenTypes, x);
+	    };
+	    x += 1;
+	}break;
+	case Token_Type::K_IF:{
+	    ASTBase *base = parseBlock(lexer, file, x);
+	    if(base == nullptr){return nullptr;};
+	    If->elseBody.push(base);
+	}break;
+	};
 	return (ASTBase*)If;
     }break;
     case Token_Type::IDENTIFIER: {
@@ -699,6 +724,14 @@ namespace dbg {
 		PAD;
 		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
 	    };
+	    PAD;
+	    printf("[ELSE BODY]");
+	    PAD;
+	    for(u32 x=0; x<If->elseBody.count; x+=1){
+		ASTBase *node = If->elseBody[x];
+		PAD;
+		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
+	    };
 	}break;
 	case ASTType::NUM_INTEGER: {
 	    ASTNumInt *numInt = (ASTNumInt*)node;
@@ -720,7 +753,7 @@ namespace dbg {
 	case ASTType::BIN_GRTE: if(c == NULL) { c = '>'; printf("bin_grte"); printEqual=true;};
 	case ASTType::BIN_LSR:  if(c == NULL) { c = '<'; printf("bin_lsr");};
 	case ASTType::BIN_LSRE: if(c == NULL) { c = '<'; printf("bin_lsre"); printEqual=true;};
-	case ASTType::BIN_EQU:  if(c == NULL) { c = '='; printf("bin_equ"); printEqual=true;};
+	case ASTType::BIN_EQU:  if(c == NULL) { c = '='; printf("bin_equ");};
 	case ASTType::BIN_ADD:  if(c == NULL) { c = '+'; printf("bin_add"); };
 	case ASTType::BIN_MUL:  if(c == NULL) { c = '*'; printf("bin_mul"); };
 	case ASTType::BIN_DIV:{

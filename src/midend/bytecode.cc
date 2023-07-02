@@ -38,12 +38,14 @@ enum class Bytecode : u16{
     SETGE,
     SETLE,
     JMPNS,        //jumps if given register is 0
+    JMP,
     DEF,
     PROC_GIVES,
     PROC_START,
     PROC_END,
     RET,
     NEG,
+    LABEL,
     BYTECODE_COUNT,
 };
 enum class BytecodeType : u16{
@@ -68,17 +70,21 @@ struct BytecodeFile{
     void emit(Bytecode bc){
 	bcs.push(bc);
     };
-    void emitReg(u32 regID){
+    void emitReg(u16 regID){
 	emit(Bytecode::REG);
 	emit((Bytecode)regID);
     };
-    void emitGlobal(u32 globID){
+    void emitGlobal(u16 globID){
 	emit(Bytecode::GLOBAL);
 	emit((Bytecode)globID);
     };
     void emitType(Type type){
 	emit(Bytecode::TYPE);
 	emit((Bytecode)type);
+    };
+    void emitLabel(u16 labelID){
+        emit(Bytecode::LABEL);
+	emit((Bytecode)labelID);
     };
     u32 getCursorOff(){return bcs.count;};
     void setBytecodeAtCursor(u32 cursor, Bytecode bc){bcs[cursor] = bc;};
@@ -101,7 +107,14 @@ struct BytecodeFile{
     };
 };
 
-static u32 procID = 0;
+static u16 procID  = 0;
+static u16 labelID = 1;
+
+u16 newLabel(){
+    u16 lbl = labelID;
+    labelID += 1;
+    return lbl;
+};
 
 struct BytecodeContext{
     Map procToID;
@@ -109,9 +122,9 @@ struct BytecodeContext{
     Type *types;
     u16 registerID;
 
-    void init(u32 varCount, u32 procCount){
+    void init(u32 varCount, u32 procCount, u16 rgsID = 0){
 	varToReg = nullptr;
-	registerID = 0;
+	registerID = rgsID;
 	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
 	if(varCount != 0){
 	    varToReg = (u32*)mem::alloc(sizeof(u32)*varCount);
@@ -371,20 +384,41 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	u32 exprID = compileExprToBytecode(If->expr, lexer, see, bca, bf);
 	BytecodeContext &blockBC = bca.newElem();
 	ScopeEntities *IfSe = (ScopeEntities*)If->IfSe;
-	blockBC.init(IfSe->varMap.count, IfSe->procMap.count);
+	blockBC.init(IfSe->varMap.count, IfSe->procMap.count, bc.registerID);
 	see.push(IfSe);
+	u16 outIfLbl = newLabel();
+	u16 inElseLbl = outIfLbl;
+	if(If->elseBody.count != 0){
+	    inElseLbl = newLabel();
+	};
 	bf.emit(Bytecode::JMPNS);
 	bf.emitReg(exprID);
-	u32 bytecodeOffToModify = bf.getCursorOff();
-	bf.emit(Bytecode::NONE);        //filler for now
+	bf.emitLabel(inElseLbl);
 	for(u32 x=0; x<If->body.count; x+=1){
 	    compileToBytecode(If->body[x], lexer, see, bca, bf);
 	};
-	u32 blockOverOff = bf.getCursorOff();
-	bf.setBytecodeAtCursor(bytecodeOffToModify, (Bytecode)(blockOverOff-bytecodeOffToModify));
+	see.pop();
 	IfSe->uninit();
 	mem::free(IfSe);
 	bca.pop().uninit();
+	if(If->elseBody.count != 0){
+	    bf.emit(Bytecode::JMP);
+	    bf.emitLabel(outIfLbl);
+
+	    bf.emitLabel(inElseLbl);
+	    ScopeEntities *ElseSe = (ScopeEntities*)If->ElseSe;
+	    see.push(ElseSe);
+	    BytecodeContext &elseBC = bca.newElem();
+	    elseBC.init(ElseSe->varMap.count, ElseSe->procMap.count, bc.registerID);
+	    for(u32 x=0; x<If->elseBody.count; x+=1){
+		compileToBytecode(If->elseBody[x], lexer, see, bca, bf);
+	    };
+	    see.pop();
+	    ElseSe->uninit();
+	    mem::free(ElseSe);
+	    bca.pop().uninit();
+	};
+	bf.emitLabel(outIfLbl);
     }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
@@ -394,7 +428,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	u32 procID = se->procMap.getValue(proc->name);
 	ScopeEntities *procSE = se->procEntities[procID].se;
 	BytecodeContext &procBC = bca.newElem();
-        procBC.init(procSE->varMap.count, procSE->procMap.count);
+        procBC.init(procSE->varMap.count, procSE->procMap.count, bc.registerID);
 	bf.emit(Bytecode::DEF);
 	bf.emit((Bytecode)procBytecodeID);
 	for(u32 x=0; x<proc->inCount;){
@@ -560,8 +594,15 @@ namespace dbg{
 	case Bytecode::JMPNS:{
 	    printf("jmpns");
 	    DUMP_NEXT_BYTECODE;
+	    DUMP_NEXT_BYTECODE;
+	}break;
+	case Bytecode::JMP:{
+	    printf("jmp");
+	    DUMP_NEXT_BYTECODE;;
+	}break;
+	case Bytecode::LABEL:{
 	    x += 1;
-	    printf(" %d", page[x]);
+	    printf("%#010x", page[x]);
 	}break;
 	case Bytecode::CAST:{
 	    printf("cast");

@@ -215,6 +215,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	If->IfSe = IfSe;
 	if(checkEntities(If->body, lexer, see) == false) { return false; };
 	see.pop();
+	if(If->elseBody.count == 0){break;};
+	ScopeEntities *ElseSe = pushNewScope(see, Scope::BLOCK);
+	If->ElseSe = ElseSe;
+	if(checkEntities(If->elseBody, lexer, see) == false) { return false; };
+	see.pop();
     }break;
     case ASTType::PROC_DEFENITION: {
 	BRING_TOKENS_TO_SCOPE;
