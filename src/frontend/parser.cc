@@ -398,6 +398,8 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	x += 1;
 	If->body.len = 0;
 	If->elseBody.len = 0;
+	If->body.count = 0;
+	If->elseBody.count = 0;
 	s32 end = getTokenOff((Token_Type)'{', lexer, x);
 	if(end == -1){
 	    lexer.emitErr(tokOffs[x-1].off, "Expected '{' from the 'if' statement");
