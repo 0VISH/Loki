@@ -4,12 +4,12 @@ namespace mem {
     //TODO: write an allocator
     void *alloc(u64 size) {
 	void *mem;
-#if(XE_DBG)
-	calls += 1;
+#if(XE_DBG)	
 	if(size == 0){
 	    printf("\n[ERROR]: trying to allocate memory of size 0");
 	    return nullptr;
 	};
+	calls += 1;
 	notFreed += size;
 	mem = malloc(size + sizeof(u64));
 	u64 *num = (u64*)mem;
@@ -20,10 +20,11 @@ namespace mem {
     };
     void free(void *mem) {
 #if(XE_DBG)
-	calls -= 1;
 	if (mem == nullptr) {
 	    printf("\n[ERROR]: trying to free a nullptr\n");
+	    return;
 	};
+	calls -= 1;
 	u64 *num = reinterpret_cast<u64*>((char*)mem - sizeof(u64));
 	notFreed -= *num;
 	mem = num;
