@@ -1,26 +1,13 @@
-if 4 > 5{
-   x := 9
-} else if 4 = 4{
-  x := 2
-} else if 3 > 4{
-  x := 33
-}else{
-  x := 3
+main :: proc(){
+     foo :: proc(){
+     }
 }
-
 /*
-if 4 > 5{
-   x := 69
-} else {
-  if 5= 5{
-     x := 4
-  } else{
-    if 5 < 3{
-       x := 5
-    }  else {
-       x := 2
-    }
-  }
-}
+aklsdfj
 */
 
+
+
+/*
+alskdfj
+*/

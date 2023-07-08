@@ -396,10 +396,8 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	ASTIf *If = (ASTIf*)allocAST(sizeof(ASTIf), ASTType::IF, file);
 	If->tokenOff = x;
 	x += 1;
-	If->body.len = 0;
-	If->elseBody.len = 0;
-	If->body.count = 0;
-	If->elseBody.count = 0;
+	If->body.zero();
+	If->elseBody.zero();
 	s32 end = getTokenOff((Token_Type)'{', lexer, x);
 	if(end == -1){
 	    lexer.emitErr(tokOffs[x-1].off, "Expected '{' from the 'if' statement");
@@ -479,8 +477,8 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		proc->flag = flag;
 		proc->name = makeStringFromTokOff(start, lexer);
 		proc->body.init();
-		proc->out.count = 0;
-		proc->out.len = 0;
+		proc->out.zero();
+		proc->inCount = 0;
 		if (tokTypes[x] == (Token_Type)')') {
 		    goto PARSE_AFTER_ARGS;
 		};
