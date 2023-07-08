@@ -1,0 +1,23 @@
+1) Have features such as
+  - Catch exceptions, and show usefull msg.
+  - Array bounds check.
+  - Integer bounds check.
+  - Stack trace(use lvl).
+These features can be chosen by user when he is building. For dbg build we would like to enable all. For rls build nothing will be enabled.
+But if the usr wants certain feature he can enable it even during rls build.
+
+2) Multiple backends compiled to .dll
+  - C backend.
+  - Compile directly to LLVM ir. Then feed it to clang, etc...
+  - Custon backend.
+
+3) Have a build.xe file, telling the compiler how to build the solution.
+
+4) Symmetry, simplicity, and singularity(syntax which does one thing at a time. No overloading, etc...).
+
+5) Push type and/or size of the argument when calling a function???
+
+6) Allow comptime execution to
+  - Run math operations
+  - Fill a ds and bake it into the exe. Load the baked data during runtime.
+  - Get info about the build system.
