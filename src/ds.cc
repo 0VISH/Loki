@@ -58,10 +58,10 @@ struct DynamicArray {
     u32 count;
     u32 len;
 
-	void zero(){
-		count = 0;
-		len = 0;
-	}
+    void zero(){
+	count = 0;
+	len = 0;
+    }
     void realloc(u32 newCap) {
 	void *newMem = mem::alloc(sizeof(T) * newCap);
 	memcpy(newMem, mem, sizeof(T) * len);

@@ -262,7 +262,7 @@ struct Lexer {
 				continue;
 			    };
 			    u32 y = 0;
-			    while (mask != 0 && level != 0) {
+			    while (mask != 0) {
 				while (IS_BIT(mask, y) == 0) {
 				    x += 1;
 				    y += 1;
@@ -271,8 +271,12 @@ struct Lexer {
 				y += 1;
 				switch (src[x]) {
 				case '\0': {
-				    emitErr(beg, "%d multi line comment%snot terminated", level, (level==1)?" ":"s ");
-				    return false;
+				    if(level == 0){
+					CLEAR_BIT(mask, y);
+				    }else{
+					emitErr(beg, "%d multi line comment%snot terminated", level, (level==1)?" ":"s ");
+					return false;
+				    };
 				} break;
 				case '*': {
 				    x += 1;

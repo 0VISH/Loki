@@ -16,7 +16,7 @@ bool compile(char *fileName){
 	return true;
     };
     //dbg::dumpLexerStat(lexer);
-    dbg::dumpLexerTokens(lexer);
+    //dbg::dumpLexerTokens(lexer);
     ASTFile astFile;
     astFile.init();
     DEFER(astFile.uninit());
