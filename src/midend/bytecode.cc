@@ -8,15 +8,13 @@
 */
 enum class Bytecode : u16{
     NONE = 0,
-    REG,
-    GLOBAL,
     CAST,
     TYPE,
-    CONST_INT,
-    CONST_DEC,
     MOVS,
     MOVU,
     MOVF,
+    MOV_CONSTS,
+    MOV_CONSTF,
     ADDS,
     ADDU,
     ADDF,
@@ -74,12 +72,7 @@ struct BytecodeFile{
 	bcs.push(bc);
     };
     void emitReg(u16 regID){
-	emit(Bytecode::REG);
 	emit((Bytecode)regID);
-    };
-    void emitGlobal(u16 globID){
-	emit(Bytecode::GLOBAL);
-	emit((Bytecode)globID);
     };
     void emitType(Type type){
 	emit(Bytecode::TYPE);
@@ -100,7 +93,6 @@ struct BytecodeFile{
     void setBytecodeAtCursor(u32 cursor, Bytecode bc){bcs[cursor] = bc;};
     //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
-	emit(Bytecode::CONST_INT);
 	bcs.reserve(const_in_stream);
 	Bytecode *loc = bcs.mem + bcs.count;
 	s64 *mem = (s64*)(loc);
@@ -108,7 +100,6 @@ struct BytecodeFile{
         bcs.count += const_in_stream;
     };
     void emitConstDec(f64 num){
-	emit(Bytecode::CONST_DEC);
         bcs.reserve(const_in_stream);
 	Bytecode *loc = bcs.mem + bcs.count;
 	f64 *mem = (f64*)(loc);
@@ -226,7 +217,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	s64 num = string2int(str);
-	bf.emit(Bytecode::MOVS);
+	bf.emit(Bytecode::MOV_CONSTS);
 	bf.emitReg(outputReg);
 	bf.emitConstInt(num);
 	return outputReg;
@@ -236,7 +227,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
 	f64 num = string2float(str);
-	bf.emit(Bytecode::MOVF);
+	bf.emit(Bytecode::MOV_CONSTS);
 	bf.emitReg(outputReg);
 	bf.emitConstDec(num);
 	return outputReg;
@@ -344,6 +335,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
+	//TODO: compile decleration
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
@@ -376,9 +368,6 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	if(type == BytecodeType::DECIMAL_S){byte = Bytecode::MOVF;}
 	else if(type == BytecodeType::INTEGER_S){byte = Bytecode::MOVS;}
 	else{byte = Bytecode::MOVU;};
-	Bytecode globalOrReg;
-	if(IS_BIT(firstEntityID.flag, Flags::GLOBAL)){globalOrReg = Bytecode::GLOBAL;}
-	else{globalOrReg=Bytecode::REG;};
 	for(u32 x=0; x<names.count; x+=1){
 	    u32 id = se->varMap.getValue(names[x]);
 	    const VariableEntity &entity = se->varEntities[id];
@@ -386,8 +375,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bc.varToReg[id] = regID;
 	    bc.types[regID] = bc.types[ansReg];
 	    bf.emit(byte);
-	    bf.emit(globalOrReg);
-	    bf.emit((Bytecode)regID);
+	    bf.emitReg(regID);
 	    bf.emitReg(ansReg);
 	};
     }break;
@@ -468,6 +456,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	for(u32 x=0; x<proc->inCount;){
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
+		//TODO: compile input body?
 	    case ASTType::UNI_DECLERATION:{
 		ASTUniVar *var = (ASTUniVar*)node;
 		u32 id = procSE->varMap.getValue(var->name);
@@ -529,26 +518,42 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
     x += 1;					\
     dumpBytecode(page, x);			\
 
+#define DUMP_REG				\
+    x += 1;					\
+    dumpReg(page[x]);				\
+
 namespace dbg{
+    void dumpReg(Bytecode id){
+	printf(" %%%d ", id);
+    };
+    
     bool dumpBytecode(Bytecode *page, u32 &x){
 	printf(" ");
 	bool flag = true;
 	switch(page[x]){
 	case Bytecode::NONE: printf("NONE");return false;
-	case Bytecode::REG:{
+	case Bytecode::MOV_CONSTS:{
+	    printf("mov_consts");
+	    DUMP_REG;
 	    x += 1;
-	    printf("%%%d", page[x]);
+	    s64 num = getConstInt(page+x);
+	    x += const_in_stream - 1;
+	    printf("%lld", num);
 	}break;
-	case Bytecode::GLOBAL:{
+	case Bytecode::MOV_CONSTF:{
+	    printf("mov_constf");
+	    DUMP_REG;
 	    x += 1;
-	    printf("@%d", page[x]);
+	    f64 num = getConstDec(page+x);
+	    x += const_in_stream - 1;
+	    printf("%f", num);
 	}break;
 	case Bytecode::MOVS: printf("movs");flag = false;
 	case Bytecode::MOVU: if(flag){printf("movu");flag = false;};
 	case Bytecode::MOVF:{
 	    if(flag){printf("movf");};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;	    
 	}break;
 	case Bytecode::TYPE:{
 	    x += 1;
@@ -566,55 +571,45 @@ namespace dbg{
 	    case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
 	    };
 	}break;
-	case Bytecode::CONST_INT:{
-	    s64 num = getConstInt(page+x+1);
-	    x += const_in_stream;
-	    printf("%lld", num);
-	}break;
-	case Bytecode::CONST_DEC:{
-	    f64 num = getConstDec(page+x+1);
-	    x += const_in_stream;
-	    printf("%f", num);
-	}break;
 	case Bytecode::ADDS: printf("adds");flag = false;
 	case Bytecode::ADDU: if(flag){printf("addu");flag = false;};
 	case Bytecode::ADDF:{
 	    if(flag){printf("addf");};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;
 	}break;
 	case Bytecode::SUBS: printf("subs");flag = false;
 	case Bytecode::SUBU: if(flag){printf("subu");flag = false;};
 	case Bytecode::SUBF:{
 	    if(flag){printf("subf");};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;;
 	}break;
 	case Bytecode::MULS: printf("muls");flag = false;
 	case Bytecode::MULU: if(flag){printf("mulu");flag = false;};
 	case Bytecode::MULF:{
 	    if(flag){printf("mulf");};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;
 	}break;
 	case Bytecode::DIVS: printf("divs");flag = false;
 	case Bytecode::DIVU: if(flag){printf("divu");flag = false;};
 	case Bytecode::DIVF:{
 	    if(flag){printf("divf");};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;
 	}break;
 	case Bytecode::CMPS: printf("cmps");flag = false;
 	case Bytecode::CMPU: if(flag){printf("cmpu");flag = false;};
 	case Bytecode::CMPF:{
 	    if(flag){printf("cmpf");};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;
 	}break;
 	case Bytecode::SETG:  printf("setg"); flag = false;
 	case Bytecode::SETL:  if(flag){printf("setl");  flag = false;};
@@ -622,17 +617,19 @@ namespace dbg{
 	case Bytecode::SETGE: if(flag){printf("setge"); flag = false;};
 	case Bytecode::SETLE:{
 	    if(flag){printf("setle"); flag = false;};
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    DUMP_REG;
 	}break;
 	case Bytecode::JMPNS:{
 	    printf("jmpns");
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
+	    x += 2;
+	    printf("%#010x", page[x]);
 	}break;
 	case Bytecode::JMP:{
 	    printf("jmp");
-	    DUMP_NEXT_BYTECODE;;
+	    x += 2;
+	    printf(" %#010x", page[x]);
 	}break;
 	case Bytecode::LABEL:{
 	    x += 1;
@@ -641,9 +638,9 @@ namespace dbg{
 	case Bytecode::CAST:{
 	    printf("cast");
 	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
 	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
 	}break;
 	case Bytecode::PROC_GIVES:
 	case Bytecode::PROC_START:
@@ -656,6 +653,7 @@ namespace dbg{
 	    u8 comma = 0;
 	    while(page[x] != Bytecode::PROC_GIVES){
 		dumpBytecode(page, x);
+		DUMP_REG;
 		x += 1;
 	        comma += 1;
 		if(comma == 2){
@@ -677,6 +675,7 @@ namespace dbg{
 	    x += 1;
 	    while(page[x] != Bytecode::PROC_END){
 		dumpBytecode(page, x);
+		DUMP_REG;
 		x += 1;
 		printf("\n");
 	    };
@@ -685,7 +684,7 @@ namespace dbg{
 	case Bytecode::NEG:{
 	    printf("neg");
 	    DUMP_NEXT_BYTECODE;
-	    DUMP_NEXT_BYTECODE;
+	    DUMP_REG;
 	}break;
 	default:
 	    DEBUG_UNREACHABLE;

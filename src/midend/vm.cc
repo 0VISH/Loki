@@ -32,8 +32,6 @@ struct VM{
 
 //NOTE: these functions are for continuity
 s8 none(BYTECODE_INPUT){return -1;};
-s8 reg(BYTECODE_INPUT){return 0;};
-s8 global(BYTECODE_INPUT){return 0;};
 s8 type(BYTECODE_INPUT){return 0;};
 s8 const_int(BYTECODE_INPUT){return 0;};
 s8 const_dec(BYTECODE_INPUT){return 0;};
@@ -44,36 +42,36 @@ s8 label(BYTECODE_INPUT){return 1;};
 //TODO: 
 s8 ret(BYTECODE_INPUT){return 0;};
 
-#define BIN_OP_TEMPLATE(SIGN, TYPE)						\
-    u16 dest = (u16)page[2];						\
-    u16 lhs = (u16)page[4];						\
-    u16 rhs = (u16)page[6];						\
+#define BIN_OP_TEMPLATE(SIGN, TYPE)					\
+    u16 dest = (u16)page[1];						\
+    u16 lhs = (u16)page[2];						\
+    u16 rhs = (u16)page[3];						\
     vm.registers[dest].TYPE = vm.registers[lhs].TYPE SIGN vm.registers[rhs].TYPE; \
-    return 6;								\
+    return 3;								\
 
 #define BIN_DIV_TEMPLATE(TYPE)						\
-    u16 dest = (u16)page[2];						\
-    u16 lhs = (u16)page[4];						\
-    u16 rhs = (u16)page[6];						\
+    u16 dest = (u16)page[1];						\
+    u16 lhs = (u16)page[2];						\
+    u16 rhs = (u16)page[3];						\
     if(vm.registers[rhs].TYPE == 0){					\
 	printf("TODO: div by 0 VM");					\
 	return 0;							\
     }									\
     vm.registers[dest].TYPE = vm.registers[lhs].TYPE / vm.registers[rhs].TYPE; \
-    return 6;								\
+    return 3;								\
 
 #define BIN_CMP_TEMPLATE(TYPE)						\
-    u16 outputReg = (u16)page[2];					\
-    u16 lhsReg = (u16)page[4];						\
-    u16 rhsReg = (u16)page[6];						\
+    u16 outputReg = (u16)page[1];					\
+    u16 lhsReg = (u16)page[2];						\
+    u16 rhsReg = (u16)page[3];						\
     vm.registers[outputReg].sint = vm.registers[lhsReg].TYPE - vm.registers[rhsReg].TYPE; \
-    return 6;								\
+    return 3;								\
 
 #define SET_TEMPLATE(OP)						\
-    u16 outputReg = (u16)page[2];					\
-    u16 inputReg  = (u16)page[4];					\
+    u16 outputReg = (u16)page[1];					\
+    u16 inputReg  = (u16)page[2];					\
     vm.registers[outputReg].uint = (vm.registers[inputReg].sint OP 0)?1:0; \
-    return 4;								\
+    return 2;								\
 
 s8 cast(BYTECODE_INPUT){
     /*
@@ -83,13 +81,13 @@ s8 cast(BYTECODE_INPUT){
       sint  -> float
       uint  -> float
      */
-    u16 newReg = (u16)page[4];
-    u16 oldReg = (u16)page[8];
+    u16 newReg = (u16)page[3];
+    u16 oldReg = (u16)page[6];
     BytecodeType newType = typeToBytecodeType((Type)page[2]);
-    BytecodeType oldType = typeToBytecodeType((Type)page[6]);
+    BytecodeType oldType = typeToBytecodeType((Type)page[4]);
     if(newType == oldType){
 	vm.registers[newReg] = vm.registers[oldReg];
-	return 8;
+	return 6;
     };
     switch(newType){
     case BytecodeType::INTEGER_S:{
@@ -123,55 +121,35 @@ s8 cast(BYTECODE_INPUT){
 	};
     };
     };
-    return 8;
+    return 6;
 };
-s8 movi(BYTECODE_INPUT){
-    u16 dest = (u16)page[2];
-    s8 x = reg_in_stream;
-    switch(page[3]){
-    case Bytecode::REG:{
-	u16 src = (u16)page[4];
-	vm.registers[dest].sint = vm.registers[src].sint;
-	x += reg_in_stream;
-    }break;
-    case Bytecode::CONST_INT:{
-	vm.registers[dest].sint = getConstInt(page + 4);
-	x += const_in_stream + 1;
-    }break;
-    };
-    return x;
+s8 mov_consts(BYTECODE_INPUT){
+    u16 dest = (u16)page[1];
+    vm.registers[dest].sint = getConstInt(page + 2);
+    return 1 + const_in_stream;
+};
+s8 mov_constf(BYTECODE_INPUT){
+    u16 dest = (u16)page[1];
+    vm.registers[dest].sint = getConstDec(page + 2);
+    return 1 + const_in_stream;
+};
+s8 movs(BYTECODE_INPUT){
+    u16 dest = (u16)page[1];
+    u16 src = (u16)page[2];
+    vm.registers[dest].sint = vm.registers[src].sint;
+    return 2;
 };
 s8 movu(BYTECODE_INPUT){
-    u16 dest = (u16)page[2];
-    s8 x = reg_in_stream;
-    switch(page[3]){
-    case Bytecode::REG:{
-	u16 src = (u16)page[4];
-	vm.registers[dest].sint = vm.registers[src].sint;
-	x += reg_in_stream;
-    }break;
-    case Bytecode::CONST_INT:{
-	vm.registers[dest].uint = getConstInt(page + 4);
-	x += const_in_stream + 1;
-    }break;
-    };
-    return x;
+    u16 dest = (u16)page[1];
+    u16 src = (u16)page[2];
+    vm.registers[dest].uint = vm.registers[src].uint;
+    return 2;
 };
 s8 movf(BYTECODE_INPUT){
-    u16 dest = (u16)page[2];
-    s8 x = reg_in_stream;
-    switch(page[3]){
-    case Bytecode::REG:{
-u32 src = (u16)page[4];
-	vm.registers[dest].dec = vm.registers[src].dec;
-	x += reg_in_stream;
-    }break;
-    case Bytecode::CONST_DEC:{
-	vm.registers[dest].dec = getConstDec(page + 4);
-	x += const_in_stream+1;
-    }break;
-    };
-    return x;
+    u16 dest = (u16)page[1];
+    u16 src = (u16)page[2];
+    vm.registers[dest].dec = vm.registers[src].dec;
+    return 2;
 };
 s8 addi(BYTECODE_INPUT){
     BIN_OP_TEMPLATE(+, sint);
@@ -234,13 +212,13 @@ s8 setle(BYTECODE_INPUT){
     SET_TEMPLATE(<=);
 };
 s8 jmpns(BYTECODE_INPUT){
-    u16 reg = (u16)page[2];
+    u16 reg = (u16)page[1];
     if(vm.registers[reg].uint == 0){
-	u16 off = (u16)page[4];
+	u16 off = (u16)page[3];
 	vm.off = vm.labels->getElement(off) - 1;
 	return 0;
     };
-    return 4;
+    return 3;
 };
 s8 jmp(BYTECODE_INPUT){
     u16 off = (u16)page[2];
@@ -261,7 +239,7 @@ s8 def(BYTECODE_INPUT){
 };
 s8 neg(BYTECODE_INPUT){
     BytecodeType bt = typeToBytecodeType((Type)page[2]);
-    u16 reg = (u32)page[4];
+    u16 reg = (u32)page[3];
     switch(bt){
     case BytecodeType::INTEGER_S: vm.registers[reg].sint *= -1; break;
     case BytecodeType::INTEGER_U:
@@ -279,12 +257,14 @@ s8 neg(BYTECODE_INPUT){
    NEG will return 4
 */
 s8 (*byteProc[])(BYTECODE_INPUT) = {
-    none, reg, global,
+    none,
     cast,
-    type, const_int, const_dec,
-    movi,
+    type,
+    movs,
     movu,
     movf,
+    mov_consts,
+    mov_constf,
     addi,
     addu,
     addf,
