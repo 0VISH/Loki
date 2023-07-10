@@ -23,6 +23,10 @@ enum class ASTType {
     TYPE,
     UNI_NEG,
     IF,
+    FOR,
+};
+enum class ForType{
+    FOR_EVER,
 };
 
 struct ASTBase {
@@ -47,7 +51,7 @@ struct ASTBinOp : ASTBase{
     Type rhsType;
 };
 struct ASTMultiVar : ASTBase{
-    DynamicArray<String> names;
+     DynamicArray<String> names;
     ASTBase *rhs;
     u32 tokenOff;
     u8 flag;
@@ -81,6 +85,14 @@ struct AST_Type : ASTBase{
 	Type type;
     };
 };
+struct ASTFor : ASTBase{
+    DynamicArray<ASTBase*> body;
+    ASTBase *start;
+    ASTBase *end;
+    ASTBase *increment;
+    void    *ForSe;
+    ForType loopType;
+};
 
 void freeNodeInternal(ASTBase *base);
 void freeBody(DynamicArray<ASTBase*> &body){
@@ -108,6 +120,10 @@ void freeNodeInternal(ASTBase *base){
 	ASTIf *If = (ASTIf*)base;
 	freeBody(If->body);
 	freeBody(If->elseBody);
+    }break;
+    case ASTType::FOR:{
+	ASTFor *For = (ASTFor*)base;
+	freeBody(For->body);
     }break;
     };
 };
@@ -392,6 +408,24 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
     };
     u32 start = x;
     switch (tokTypes[x]) {
+    case Token_Type::K_FOR:{
+	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);
+	For->body.init();
+	x += 1;
+	if(tokTypes[x] == (Token_Type)'{'){
+	    For->loopType = ForType::FOR_EVER;
+	    x += 1;
+	    eatNewlines(lexer.tokenTypes, x);
+	    while(tokTypes[x] != (Token_Type)'}'){
+		ASTBase *base = parseBlock(lexer, file, x);
+		if(base == nullptr){return nullptr;};
+		For->body.push(base);
+		eatNewlines(lexer.tokenTypes, x);
+	    };
+	    x += 1;
+	    return (ASTBase*)For;
+	};
+    }break;
     case Token_Type::K_IF:{
 	ASTIf *If = (ASTIf*)allocAST(sizeof(ASTIf), ASTType::IF, file);
 	If->tokenOff = x;
@@ -429,6 +463,10 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		eatNewlines(lexer.tokenTypes, x);
 	    };
 	    x += 1;
+	    if(tokTypes[x] == Token_Type::K_ELSE){
+		lexer.emitErr(tokOffs[x].off, "Unexpected 'else'");
+		return nullptr;
+	    };
 	}break;
 	case Token_Type::K_IF:{
 	    ASTBase *base = parseBlock(lexer, file, x);
@@ -699,6 +737,13 @@ f64 string2float(String &str){
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
 
 namespace dbg {
+    void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding);
+    void __dumpDynamicArrayNodes(DynamicArray<ASTBase*> body, Lexer &lexer, u8 padding){
+	for(u32 x=0; x<body.count; x+=1){
+	    ASTBase *node = body[x];
+	    __dumpNodesWithoutEndPadding(node, lexer, padding + 1);
+	};
+    };
     void __dumpNodesWithoutEndPadding(ASTBase *node, Lexer &lexer, u8 padding) {
 	BRING_TOKENS_TO_SCOPE;
 	PAD;
@@ -713,19 +758,14 @@ namespace dbg {
 	case ASTType::IF:{
 	    printf("if");
 	    PAD;
-	    printf("[EXPR]");
-	    PAD;
+	    printf("EXPR");
 	    ASTIf *If = (ASTIf*)node;
 	    if(If->expr){__dumpNodesWithoutEndPadding(If->expr, lexer, padding + 1);};
 	    PAD;
-	    printf("[BODY]");
-	    for(u32 x=0; x<If->body.count; x+=1){
-		ASTBase *node = If->body[x];
-		PAD;
-		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
-	    };
+	    printf("BODY");
+	    __dumpDynamicArrayNodes(If->body, lexer, padding);
 	    PAD;
-	    printf("[ELSE BODY]");
+	    printf("ELSE BODY");
 	    PAD;
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
 		ASTBase *node = If->elseBody[x];
@@ -827,7 +867,7 @@ namespace dbg {
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	    PAD;
-	    printf("[RHS]");
+	    printf("RHS");
 	    if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
 	} break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
@@ -851,33 +891,39 @@ namespace dbg {
 		printf("      %.*s", name.len, name.mem);
 	    };
 	    PAD;
-	    printf("[RHS]");
+	    printf("RHS");
 	    if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
 	} break;
+	case ASTType::FOR:{
+	    ASTFor *For = (ASTFor*)node;
+	    printf("for");
+	    PAD;
+	    printf("type: ");
+	    switch(For->loopType){
+	    case ForType::FOR_EVER:{
+		printf("for_ever");
+	    }break;
+	    };
+	    __dumpDynamicArrayNodes(For->body, lexer, padding);
+	}break;
 	case ASTType::PROC_DEFENITION: {
 	    ASTProcDef *proc = (ASTProcDef*)node;
 	    printf("proc_defenition");
 	    PAD;
 	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
-	    printf("[IN]");
+	    printf("IN");
 	    for(u32 x=0; x<proc->inCount; x+=1){
 		ASTBase *node = proc->body[x];
-		PAD;
 		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
 	    };
 	    PAD;
-	    printf("[OUT]");
-	    for(u32 x=0; x<proc->out.count; x+=1){
-		ASTBase *node = proc->out[x];
-		PAD;
-		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
-	    };
-	    PAD;
+	    printf("OUT");
+	    __dumpDynamicArrayNodes(proc->out, lexer, padding);
 	    DynamicArray<ASTBase*> &table = proc->body;
-	    printf("[BODY]");
+	    PAD;
+	    printf("BODY");
 	    for (u32 v=proc->inCount; v < table.count; v += 1) {
-		PAD;
 		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
 	    PAD;

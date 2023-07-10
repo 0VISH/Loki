@@ -27,6 +27,8 @@ enum class Token_Type {
     K_ELSE,
     K_END,    //keywords end
     ARROW,
+    DDOT,
+    TDOT,
     END_OF_FILE,
 };
 struct TokenOffset {
@@ -214,6 +216,13 @@ struct Lexer {
 		    if (src[x] == '-' && src[x+1] == '>') {
 			type = Token_Type::ARROW;
 			x += 1;
+		    } else if(src[x] == '.' && src[x+1] == '.'){
+			type = Token_Type::DDOT;
+			x += 1;
+			if(src[x+1] == '.'){
+			    type = Token_Type::TDOT;
+			    x += 1;
+			};
 		    } else if (src[x] == '/' && src[x + 1] == '/') {
 			x += 2;
 			//Since the src buffer is padded we do not have to worry

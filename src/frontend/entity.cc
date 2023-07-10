@@ -200,6 +200,18 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     ScopeEntities *se = see[see.count-1]; //current scope
     switch (node->type) {
+    case ASTType::FOR:{
+	BRING_TOKENS_TO_SCOPE;
+	ASTFor *For = (ASTFor*)node;
+	switch(For->loopType){
+	case ForType::FOR_EVER:{
+	    ScopeEntities *ForSe = pushNewScope(see, Scope::BLOCK);
+	    For->ForSe = ForSe;
+	    if(checkEntities(For->body, lexer, see) == false){return false;};
+	    see.pop();
+	}break;
+	};
+    }break;
     case ASTType::IF:{
 	BRING_TOKENS_TO_SCOPE;
 	ASTIf *If = (ASTIf*)node;

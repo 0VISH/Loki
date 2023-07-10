@@ -243,8 +243,9 @@ s8 jmpns(BYTECODE_INPUT){
     return 4;
 };
 s8 jmp(BYTECODE_INPUT){
-    vm.off = vm.labels->getElement(1);
-    return 1;
+    u16 off = (u16)page[2];
+    vm.off = vm.labels->getElement(off) - 1;
+    return 0;
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;

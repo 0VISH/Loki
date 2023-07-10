@@ -87,7 +87,10 @@ struct BytecodeFile{
     };
     void emitLabel(u16 labelID){
         emit(Bytecode::LABEL);
-	emit((Bytecode)labelID);
+	emit((Bytecode)labelID);	
+    };
+    void beginLabel(u16 labelID){
+	emitLabel(labelID);
 	if(labelID > labels.len){
 	    labels.realloc(labelID);
 	};
@@ -388,6 +391,28 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bf.emitReg(ansReg);
 	};
     }break;
+    case ASTType::FOR:{
+	ASTFor *For = (ASTFor*)node;
+	switch(For->loopType){
+	case ForType::FOR_EVER:{
+	    u16 loopStartLbl = newLabel();
+	    ScopeEntities *ForSe = (ScopeEntities*)For->ForSe;
+	    BytecodeContext &blockBC = bca.newElem();
+	    blockBC.init(ForSe->varMap.count, ForSe->procMap.count, bc.registerID);
+	    see.push(ForSe);
+	    bf.beginLabel(loopStartLbl);
+	    for(u32 x=0; x<For->body.count; x+=1){
+		compileToBytecode(For->body[x], lexer, see, bca, bf);
+	    };
+	    bf.emit(Bytecode::JMP);
+	    bf.emitLabel(loopStartLbl);
+	    see.pop();
+	    ForSe->uninit();
+	    mem::free(ForSe);
+	    bca.pop().uninit();
+	}break;
+	};
+    }break;
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)node;
 	u32 exprID = compileExprToBytecode(If->expr, lexer, see, bca, bf);
@@ -414,7 +439,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bf.emit(Bytecode::JMP);
 	    bf.emitLabel(outIfLbl);
 
-	    bf.emitLabel(inElseLbl);
+	    bf.beginLabel(inElseLbl);
 	    ScopeEntities *ElseSe = (ScopeEntities*)If->ElseSe;
 	    see.push(ElseSe);
 	    BytecodeContext &elseBC = bca.newElem();
@@ -427,7 +452,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    mem::free(ElseSe);
 	    bca.pop().uninit();
 	};
-	bf.emitLabel(outIfLbl);
+	bf.beginLabel(outIfLbl);
     }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
