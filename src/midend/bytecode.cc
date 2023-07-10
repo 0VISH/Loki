@@ -294,8 +294,10 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	Bytecode cmp;
 	switch(op->type){
 	case ASTType::BIN_GRTE: set = Bytecode::SETGE; break;
-	case ASTType::BIN_GRT:  set = Bytecode::SETG; break;
-	case ASTType::BIN_EQU:  set = Bytecode::SETE; break;
+	case ASTType::BIN_GRT:  set = Bytecode::SETG;  break;
+	case ASTType::BIN_LSR:  set = Bytecode::SETL;  break;
+	case ASTType::BIN_LSRE: set = Bytecode::SETLE; break;
+	case ASTType::BIN_EQU:  set = Bytecode::SETE;  break;
 	};
 	switch(abt){							
 	case BytecodeType::INTEGER_S: cmp = Bytecode::CMPS; break;	
