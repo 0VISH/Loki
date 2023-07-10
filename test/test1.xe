@@ -1,13 +1,7 @@
-main :: proc(){
-     foo :: proc(){
-     }
+if 1 >= 2{
+   x := 3
+} else if 3=5{
+   x := 5
+} else{
+x := 4
 }
-/*
-aklsdfj
-*/
-
-
-
-/*
-alskdfj
-*/

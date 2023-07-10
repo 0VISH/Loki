@@ -8,8 +8,9 @@ struct Register{
     };
 };
 struct VM{
-    Register *registers;
     DynamicArray<Bytecode*> procs;
+    DynamicArray<u32>      *labels;
+    Register *registers;
     Bytecode *page;
     u32 off;
 
@@ -17,6 +18,7 @@ struct VM{
 	page = bf.bcs.mem;
 	off = offset;
 	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
+	labels = &bf.labels;
 	procs.init(3);
     };
     void uninit(){
@@ -29,7 +31,7 @@ struct VM{
 };
 
 //NOTE: these functions are for continuity
-s8 none(BYTECODE_INPUT){return 0;};
+s8 none(BYTECODE_INPUT){return -1;};
 s8 reg(BYTECODE_INPUT){return 0;};
 s8 global(BYTECODE_INPUT){return 0;};
 s8 type(BYTECODE_INPUT){return 0;};
@@ -38,7 +40,7 @@ s8 const_dec(BYTECODE_INPUT){return 0;};
 s8 proc_gives(BYTECODE_INPUT){return 0;};
 s8 proc_start(BYTECODE_INPUT){return 0;};
 s8 proc_end(BYTECODE_INPUT){return 0;};
-s8 label(BYTECODE_INPUT){return 0;};
+s8 label(BYTECODE_INPUT){return 1;};
 //TODO: 
 s8 ret(BYTECODE_INPUT){return 0;};
 
@@ -160,7 +162,7 @@ s8 movf(BYTECODE_INPUT){
     s8 x = reg_in_stream;
     switch(page[3]){
     case Bytecode::REG:{
-	u32 src = (u16)page[4];
+u32 src = (u16)page[4];
 	vm.registers[dest].dec = vm.registers[src].dec;
 	x += reg_in_stream;
     }break;
@@ -234,12 +236,15 @@ s8 setle(BYTECODE_INPUT){
 s8 jmpns(BYTECODE_INPUT){
     u16 reg = (u16)page[2];
     if(vm.registers[reg].uint == 0){
-	vm.off += (u16)page[3];
+	u16 off = (u16)page[4];
+	vm.off = vm.labels->getElement(off) - 1;
+	return 0;
     };
-    return 3;
+    return 4;
 };
 s8 jmp(BYTECODE_INPUT){
-    return 0;
+    vm.off = vm.labels->getElement(1);
+    return 1;
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
@@ -313,7 +318,7 @@ bool execBytecode(u32 endOff, VM &vm){
 	Bytecode bc = vm.page[vm.off];
 	if(bc == Bytecode::NONE){return true;};
 	s8 x = byteProc[(u16)bc](vm.page+vm.off, vm) + 1;
-	if(x == 0){return false;};
+	if(x == -1){return false;};
 	vm.off += x;
     };
     return true;

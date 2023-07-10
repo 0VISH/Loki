@@ -60,12 +60,15 @@ const u16 type_in_stream = 2;
 
 struct BytecodeFile{
     DynamicArray<Bytecode> bcs;
+    DynamicArray<u32>      labels;
 
     void init(){
 	bcs.init(50);
+	labels.init();
     };
     void uninit(){
 	bcs.uninit();
+	labels.uninit();
     };
     void emit(Bytecode bc){
 	bcs.push(bc);
@@ -85,6 +88,10 @@ struct BytecodeFile{
     void emitLabel(u16 labelID){
         emit(Bytecode::LABEL);
 	emit((Bytecode)labelID);
+	if(labelID > labels.len){
+	    labels.realloc(labelID);
+	};
+	labels[labelID] = bcs.count;
     };
     u32 getCursorOff(){return bcs.count;};
     void setBytecodeAtCursor(u32 cursor, Bytecode bc){bcs[cursor] = bc;};
