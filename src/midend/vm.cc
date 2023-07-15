@@ -32,7 +32,6 @@ struct VM{
 
 //NOTE: these functions are for continuity
 s8 none(BYTECODE_INPUT){return -1;};
-s8 type(BYTECODE_INPUT){return 0;};
 s8 const_int(BYTECODE_INPUT){return 0;};
 s8 const_dec(BYTECODE_INPUT){return 0;};
 s8 proc_gives(BYTECODE_INPUT){return 0;};
@@ -81,10 +80,10 @@ s8 cast(BYTECODE_INPUT){
       sint  -> float
       uint  -> float
      */
-    u16 newReg = (u16)page[3];
-    u16 oldReg = (u16)page[6];
-    BytecodeType newType = typeToBytecodeType((Type)page[2]);
-    BytecodeType oldType = typeToBytecodeType((Type)page[4]);
+    BytecodeType newType = typeToBytecodeType((Type)page[1]);
+    u16 newReg = (u16)page[2];
+    BytecodeType oldType = typeToBytecodeType((Type)page[3]);
+    u16 oldReg = (u16)page[4];
     if(newType == oldType){
 	vm.registers[newReg] = vm.registers[oldReg];
 	return 6;
@@ -121,7 +120,7 @@ s8 cast(BYTECODE_INPUT){
 	};
     };
     };
-    return 6;
+    return 4;
 };
 s8 mov_consts(BYTECODE_INPUT){
     u16 dest = (u16)page[1];
@@ -214,32 +213,30 @@ s8 setle(BYTECODE_INPUT){
 s8 jmpns(BYTECODE_INPUT){
     u16 reg = (u16)page[1];
     if(vm.registers[reg].uint == 0){
-	u16 off = (u16)page[3];
+	u16 off = (u16)page[2];
 	vm.off = vm.labels->getElement(off) - 1;
 	return 0;
     };
-    return 3;
+    return 2;
 };
 s8 jmp(BYTECODE_INPUT){
-    u16 off = (u16)page[2];
+    u16 off = (u16)page[1];
     vm.off = vm.labels->getElement(off) - 1;
     return 0;
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
-    u32 count = 0;
     while(page[x] != Bytecode::PROC_END){x += 1;};
-    x -= 2;
-    count = x;
-    Bytecode *proc = (Bytecode*)mem::alloc(sizeof(Bytecode) * count);  //TODO: change allocator?
+    u32 count = x - 2;
+    Bytecode *proc = (Bytecode*)mem::alloc(sizeof(Bytecode) * count + 1);  //TODO: change allocator?
     memcpy(proc, page+2, sizeof(Bytecode)*count);
-    proc[x] = Bytecode::NONE;
+    proc[count] = Bytecode::NONE;
     vm.procs.push(proc);
-    return count+2;
+    return x;
 };
 s8 neg(BYTECODE_INPUT){
-    BytecodeType bt = typeToBytecodeType((Type)page[2]);
-    u16 reg = (u32)page[3];
+    BytecodeType bt = typeToBytecodeType((Type)page[1]);
+    u16 reg = (u32)page[2];
     switch(bt){
     case BytecodeType::INTEGER_S: vm.registers[reg].sint *= -1; break;
     case BytecodeType::INTEGER_U:
@@ -247,7 +244,7 @@ s8 neg(BYTECODE_INPUT){
 	break;
     case BytecodeType::DECIMAL_S: vm.registers[reg].dec  *= -1; break;
     };
-    return 4;
+    return 2;
 };
 
 /*
@@ -259,7 +256,6 @@ s8 neg(BYTECODE_INPUT){
 s8 (*byteProc[])(BYTECODE_INPUT) = {
     none,
     cast,
-    type,
     movs,
     movu,
     movf,
