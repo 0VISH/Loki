@@ -219,6 +219,15 @@ s8 jmpns(BYTECODE_INPUT){
     };
     return 2;
 };
+s8 jmps(BYTECODE_INPUT){
+    u16 reg = (u16)page[1];
+    if(vm.registers[reg].uint != 0){
+	u16 off = (u16)page[2];
+	vm.off = vm.labels->getElement(off) - 1;
+	return 0;
+    };
+    return 2;
+};
 s8 jmp(BYTECODE_INPUT){
     u16 off = (u16)page[1];
     vm.off = vm.labels->getElement(off) - 1;
@@ -282,6 +291,7 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     setge,
     setle,
     jmpns,
+    jmps,
     jmp,
     def,
     proc_gives, proc_start, proc_end,

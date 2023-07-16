@@ -27,7 +27,8 @@ enum class ASTType {
 };
 enum class ForType{
     FOR_EVER,
-    C,
+    C_LES,
+    C_EQU,
 };
 
 struct ASTBase {
@@ -442,7 +443,6 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    if(tokTypes[x] != (Token_Type)':'){
 		goto PARSE_FOR_EXPR;
 	    };
-	    For->loopType = ForType::C;
 	    For->increment = nullptr;
 	    x += 1;
 	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
@@ -466,6 +466,15 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		end = bend;
 	    }else{
 		end = nend;
+	    };
+	    switch(tokTypes[x]){
+	    case (Token_Type)'<':{
+		For->loopType = ForType::C_LES;
+		x += 1;
+	    }break;
+	    default:{
+		For->loopType = ForType::C_EQU;
+	    }break;
 	    };
 	    For->end = genASTExprTree(lexer, file, x, end);
 	    if(For->end == nullptr){return nullptr;};
@@ -990,6 +999,7 @@ namespace dbg {
 	    if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
 	} break;
 	case ASTType::FOR:{
+	    bool printed = false;
 	    ASTFor *For = (ASTFor*)node;
 	    printf("for");
 	    PAD;
@@ -998,8 +1008,13 @@ namespace dbg {
 	    case ForType::FOR_EVER:{
 		printf("for_ever");
 	    }break;
-	    case ForType::C:{
-		printf("c");
+	    case ForType::C_LES:
+		if(printed == false){
+		    printf("c_les");
+		    printed = true;
+		};
+	    case ForType::C_EQU:{
+		if(printed == false){printf("c_equ");};
 		PAD;
 		printf("it");
 		__dumpNodesWithoutEndPadding(For->body[0], lexer, padding+1);

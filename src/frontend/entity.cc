@@ -210,18 +210,20 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    if(checkEntities(For->body, lexer, see) == false){return false;};
 	    see.pop();
 	}break;
-	case ForType::C:{
+	case ForType::C_LES:
+	case ForType::C_EQU:{
 	    Flag endTreeFlag = 0;
 	    Type endTreeType = getTreeType(For->end, endTreeFlag, see, lexer);
 	    if(isTypeNum(endTreeType) == false){
-		lexer.emitErr(tokOffs[For->endOff].off, "Tree type is not a number");
+		lexer.emitErr(tokOffs[For->endOff].off, "Upper bound type is not a number");
 		return false;
 	    };
+	    Type incrementTreeType = Type::UNKOWN;
 	    if(For->increment != nullptr){
 		Flag incrementTreeFlag = 0;
-		Type incrementTreeType = getTreeType(For->increment, endTreeFlag, see, lexer);
+		incrementTreeType = getTreeType(For->increment, endTreeFlag, see, lexer);
 		if(isTypeNum(incrementTreeType) == false){
-		    lexer.emitErr(tokOffs[For->incrementOff].off, "Tree type is not a number");
+		    lexer.emitErr(tokOffs[For->incrementOff].off, "Upper bound type is not a number");
 		    return false;
 		};
 	    };
@@ -235,6 +237,16 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    if(isTypeNum(ent.type) == false){
 		lexer.emitErr(tokOffs[For->endOff].off, "Iterator should have a numeric type");
 		return false;
+	    };
+	    if(isSameTypeRange(ent.type, endTreeType) == false){
+		lexer.emitErr(tokOffs[For->endOff].off, "Iterator is not the same type as upper bound expression. Explicit cast required");
+		return false;
+	    };
+	    if(incrementTreeType != Type::UNKOWN){
+		if(isSameTypeRange(ent.type, incrementTreeType) == false){
+		    lexer.emitErr(tokOffs[For->endOff].off, "Iterator is not the same type as increment expression. Explicit cast required");
+		    return false;
+		};
 	    };
 	}break;
 	};

@@ -35,6 +35,7 @@ enum class Bytecode : u16{
     SETGE,
     SETLE,
     JMPNS,        //jumps if given register is 0
+    JMPS,         //jumps if given register is not 0
     JMP,
     DEF,
     PROC_GIVES,
@@ -265,7 +266,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	BytecodeType rbt = typeToBytecodeType(rhsType);			
 	BytecodeType abt = typeToBytecodeType(ansType);			
 	if(lbt != rbt){							
-	    u32 newReg = bc.newReg(ansType);				
+	    u16 newReg = bc.newReg(ansType);				
 	    bf.emit(Bytecode::CAST);					
 	    bf.emit(ansType);						
 	    bf.emit(newReg);						
@@ -378,25 +379,99 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
     }break;
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
+	ScopeEntities *ForSe = (ScopeEntities*)For->ForSe;
+	BytecodeContext &blockBC = bca.newElem();
+	blockBC.init(ForSe->varMap.count, ForSe->procMap.count, bc.registerID);
+	see.push(ForSe);
 	switch(For->loopType){
 	case ForType::FOR_EVER:{
 	    u16 loopStartLbl = newLabel();
-	    ScopeEntities *ForSe = (ScopeEntities*)For->ForSe;
-	    BytecodeContext &blockBC = bca.newElem();
-	    blockBC.init(ForSe->varMap.count, ForSe->procMap.count, bc.registerID);
-	    see.push(ForSe);
 	    bf.emitLabel(loopStartLbl);
 	    for(u32 x=0; x<For->body.count; x+=1){
 		compileToBytecode(For->body[x], lexer, see, bca, bf);
 	    };
 	    bf.emit(Bytecode::JMP);
 	    bf.emit(loopStartLbl);
-	    see.pop();
-	    ForSe->uninit();
-	    mem::free(ForSe);
-	    bca.pop().uninit();
+	}break;
+	case ForType::C_LES:
+	case ForType::C_EQU:{
+	    ASTUniVar *var = (ASTUniVar*)For->body[0];
+	    u32 id = ForSe->varMap.getValue(var->name);
+	    VariableEntity &ent = ForSe->varEntities[id];
+	    BytecodeType varBcType = typeToBytecodeType(ent.type);
+	    Bytecode cmp;
+	    Bytecode add;
+	    switch(varBcType){
+	    case BytecodeType::INTEGER_S:
+		cmp = Bytecode::CMPS;
+		add = Bytecode::ADDS;
+		break;
+	    case BytecodeType::INTEGER_U:
+		cmp = Bytecode::CMPU;
+		add = Bytecode::ADDU;
+		break;
+	    case BytecodeType::DECIMAL_S:
+		cmp = Bytecode::CMPF;
+		add = Bytecode::ADDF;
+		break;
+	    };
+
+	    u16 loopStartLbl = newLabel();
+	    u16 loopEndLbl = newLabel();
+
+	    u16 incrementReg;
+	    if(For->increment == nullptr){
+		incrementReg = blockBC.newReg(ent.type);
+		bf.emit(Bytecode::MOV_CONSTS);
+		bf.emit(incrementReg);
+		bf.emitConstInt(1);
+	    };
+	    compileToBytecode(For->body[0], lexer, see, bca, bf);
+	    u16 varReg = blockBC.registerID-1;
+	    bf.emitLabel(loopStartLbl);
+	    
+	    u16 cond = compileExprToBytecode(For->end, lexer, see, bca, bf);
+	    u16 cmpOutReg = blockBC.newReg(ent.type);
+	    bf.emit(cmp);
+	    bf.emit(cmpOutReg);
+	    bf.emit(varReg);
+	    bf.emit(cond);
+	    
+	    if(For->loopType == ForType::C_EQU){
+		bf.emit(Bytecode::SETE);
+	    }else{
+		bf.emit(Bytecode::SETL);
+	    };
+	    u16 outputReg = blockBC.newReg(ent.type);
+	    bf.emit(outputReg);
+	    bf.emit(cmpOutReg);
+
+	    bf.emit(Bytecode::JMPS);
+	    bf.emit(outputReg);
+	    bf.emit(loopEndLbl);
+
+	    for(u32 x=1; x<For->body.count; x+=1){
+		compileToBytecode(For->body[x], lexer, see, bca, bf);
+	    };
+
+	    if(For->increment != nullptr){
+		incrementReg = compileExprToBytecode(For->increment, lexer, see, bca, bf);
+	    };
+	    bf.emit(add);
+	    bf.emit(varReg);
+	    bf.emit(varReg);
+	    bf.emit(incrementReg);
+
+	    bf.emit(Bytecode::JMP);
+	    bf.emit(loopStartLbl);
+
+	    bf.emitLabel(loopEndLbl);
 	}break;
 	};
+	see.pop();
+	bca.pop().uninit();
+	ForSe->uninit();
+	mem::free(ForSe);
     }break;
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)node;
@@ -619,6 +694,12 @@ namespace dbg{
 	    if(flag){printf("setle"); flag = false;};
 	    DUMP_REG;
 	    DUMP_REG;
+	}break;
+	case Bytecode::JMPS:{
+	    printf("jmps");
+	    DUMP_REG;
+	    x += 1;
+	    printf("%#010x", page[x]);
 	}break;
 	case Bytecode::JMPNS:{
 	    printf("jmpns");
