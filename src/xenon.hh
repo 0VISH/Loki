@@ -21,12 +21,18 @@ typedef float                   f32;
 typedef double                  f64;
 
 #if(XE_DBG)
-void debugUnreachable(char *file, u32 line) {
-    printf("\n[ERROR] unreachable area reached: %s(%d)", file, line);
+void unreachable(char *file, u32 line) {
+    printf("\n[ERROR] unreachable area reached: %s:%d", file, line);
 };
-#define DEBUG_UNREACHABLE debugUnreachable(__FILE__, __LINE__);
+#define UNREACHABLE unreachable(__FILE__, __LINE__)
+void ass(bool x, char *file, u32 line){
+    if(x){return;};
+    printf("\n%s:%d assertion failed\n", file, line);
+};
+#define ASSERT(expr)   ass(expr, __FILE__, __LINE__)
 #else
-#define DEBUG_UNREACHABLE
+#define UNREACHABLE
+#define ASSERT(expr)
 #endif
 
 //DEFER IN CPP

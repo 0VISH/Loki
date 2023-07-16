@@ -1,5 +1,5 @@
 1) Complete for loops
-2) Reduce bytecode emition
+2) Remove zero() method and just init body arrays
 3) Factor out/ Simplify
    3.1) blockBC.init
    3.2) Se->uninit();free(Se);

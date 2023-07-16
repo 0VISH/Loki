@@ -198,7 +198,7 @@ struct Lexer {
 		CHECK_NUM_DEC:
 		    x += 1;
 		    while (isNum(src[x]) || src[x] == '_') { x += 1; };
-		    if (src[x] == '.') {
+		    if (src[x] == '.' && src[x+1] != '.') {
 			if (numType == Token_Type::DECIMAL) {
 			    emitErr(start, "Decimal cannot have 2 decimals");
 			    return false;

@@ -320,7 +320,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	return outputReg;
     }break;
     default:
-	DEBUG_UNREACHABLE;
+	UNREACHABLE;
 	break;
     };
     return 0;
@@ -496,7 +496,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	bf.emit(Bytecode::PROC_END);
     }break;
     default:
-	DEBUG_UNREACHABLE;
+	UNREACHABLE;
 	break;
     };
 };
@@ -686,7 +686,7 @@ namespace dbg{
 	    DUMP_REG;
 	}break;
 	default:
-	    DEBUG_UNREACHABLE;
+	    UNREACHABLE;
 	    return false;
 	};
 	return true;

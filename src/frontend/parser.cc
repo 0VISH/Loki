@@ -27,6 +27,7 @@ enum class ASTType {
 };
 enum class ForType{
     FOR_EVER,
+    C,
 };
 
 struct ASTBase {
@@ -87,10 +88,11 @@ struct AST_Type : ASTBase{
 };
 struct ASTFor : ASTBase{
     DynamicArray<ASTBase*> body;
-    ASTBase *start;
     ASTBase *end;
     ASTBase *increment;
     void    *ForSe;
+    u32      endOff;
+    u32      incrementOff;
     ForType loopType;
 };
 
@@ -201,7 +203,7 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	    x += 1;
 	};
     }break;
-    default: DEBUG_UNREACHABLE;
+    default: UNREACHABLE;
     };
     return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
 };
@@ -386,11 +388,15 @@ ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
     type->tokenOff = x;
     return (ASTBase*)type;
 };
-s32 getTokenOff(Token_Type tok, Lexer &lexer, u32 cur){
+s32 getTokenOffInLine(Token_Type tok, Lexer &lexer, u32 cur){
     BRING_TOKENS_TO_SCOPE;
     s32 x = cur;
     while(tokTypes[x] != tok){
-	if(tokTypes[x] == Token_Type::END_OF_FILE){return -1;};
+	switch(tokTypes[x]){
+	case Token_Type::END_OF_FILE:
+	case (Token_Type)'\n':
+	    return -1;
+	};
 	x += 1;
     };
     return x;
@@ -412,7 +418,9 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);
 	For->body.init();
 	x += 1;
-	if(tokTypes[x] == (Token_Type)'{'){
+	switch(tokTypes[x]){
+	case (Token_Type)'{':{
+	    //for ever
 	    For->loopType = ForType::FOR_EVER;
 	    x += 1;
 	    eatNewlines(lexer.tokenTypes, x);
@@ -424,6 +432,79 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    };
 	    x += 1;
 	    return (ASTBase*)For;
+	}break;
+	case Token_Type::IDENTIFIER:{
+	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_ASSIGNMENT_T_UNKNOWN, file);
+	    var->tokenOff = x;
+	    var->name = makeStringFromTokOff(x, lexer);
+	    For->body.push(var);
+	    x += 1;
+	    if(tokTypes[x] != (Token_Type)':'){
+		goto PARSE_FOR_EXPR;
+	    };
+	    For->loopType = ForType::C;
+	    For->increment = nullptr;
+	    x += 1;
+	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
+		var->type = ASTType::UNI_ASSIGNMENT_T_KNOWN;
+		x += 1;
+	    };
+	    s32 end = getTokenOffInLine(Token_Type::TDOT, lexer, x);
+	    if(end == -1){
+		lexer.emitErr(tokOffs[x].off, "Expected '...' to specify the upper bound");
+		return nullptr;
+	    };
+	    var->rhs = genASTExprTree(lexer, file, x, end);
+	    if(var->rhs == nullptr){return nullptr;};
+	    x = end + 1;
+	    s32 dend = getTokenOffInLine(Token_Type::DDOT, lexer, x);
+	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
+	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
+	    if(dend != -1){
+		end = dend;
+	    }else if(bend != -1){
+		end = bend;
+	    }else{
+		end = nend;
+	    };
+	    For->end = genASTExprTree(lexer, file, x, end);
+	    if(For->end == nullptr){return nullptr;};
+	    For->endOff = end;
+	    x = end;
+	    if(dend != -1){
+		x += 1;
+		if(bend != -1){
+		    end = bend;
+		}else{
+		    end = nend;
+		};
+		For->increment = genASTExprTree(lexer, file, x, end);
+		if(For->increment == nullptr){return nullptr;};
+		For->incrementOff = end;
+		x = end;
+	    };
+	    if(bend == -1){
+		eatNewlines(lexer.tokenTypes, x);
+	    };
+	    if(tokTypes[x] != (Token_Type)'{'){
+		lexer.emitErr(tokOffs[x].off, "Expected '{' here");
+		return nullptr;
+	    };
+	    x += 1;
+	    eatNewlines(lexer.tokenTypes, x);
+	    while(tokTypes[x] != (Token_Type)'}'){
+		ASTBase *base = parseBlock(lexer, file, x);
+		if(base == nullptr){return nullptr;};
+		For->body.push(base);
+		eatNewlines(lexer.tokenTypes, x);
+	    };
+	    x += 1;
+	    return (ASTBase*)For;
+	}break;
+	default:{
+	    PARSE_FOR_EXPR:
+	    printf("TODO:");
+	}break;
 	};
     }break;
     case Token_Type::K_IF:{
@@ -432,15 +513,27 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	x += 1;
 	If->body.zero();
 	If->elseBody.zero();
-	s32 end = getTokenOff((Token_Type)'{', lexer, x);
-	if(end == -1){
-	    lexer.emitErr(tokOffs[x-1].off, "Expected '{' from the 'if' statement");
-	    return nullptr;
+	s32 end;
+	s32 bend = getTokenOffInLine((Token_Type)'{', lexer, x);
+	s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
+	if(bend == -1){
+	    end = nend;
+	}else{
+	    end = bend;
 	};
 	If->expr = genASTExprTree(lexer, file, x, end);
 	if(If->expr == nullptr){return nullptr;};
-	x = end + 1;
+	x = end;
+	if(bend == -1){
+	    x += 1;
+	    eatNewlines(lexer.tokenTypes, x);
+	};
+	if(tokTypes[x] != (Token_Type)'{'){
+	    lexer.emitErr(tokOffs[x].off, "Expected '{' here");
+	    return nullptr;
+	};
 	If->body.init();
+	x += 1;
 	eatNewlines(lexer.tokenTypes, x);
 	while(tokTypes[x] != (Token_Type)'}'){
 	    ASTBase *base = parseBlock(lexer, file, x);
@@ -449,9 +542,11 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    eatNewlines(lexer.tokenTypes, x);
 	};
 	x += 1;
+	eatNewlines(lexer.tokenTypes, x);
 	if(tokTypes[x] != Token_Type::K_ELSE){return (ASTBase*)If;};
 	If->elseBody.init();
 	x += 1;
+	eatNewlines(lexer.tokenTypes, x);
 	switch(tokTypes[x]){
 	case (Token_Type)'{':{
 	    x += 1;
@@ -903,7 +998,23 @@ namespace dbg {
 	    case ForType::FOR_EVER:{
 		printf("for_ever");
 	    }break;
+	    case ForType::C:{
+		printf("c");
+		PAD;
+		printf("it");
+		__dumpNodesWithoutEndPadding(For->body[0], lexer, padding+1);
+		PAD;
+		printf("END");
+		__dumpNodesWithoutEndPadding(For->end, lexer, padding+1);
+		PAD;
+		if(For->increment != nullptr){
+		    printf("INCREMENT");
+		    __dumpNodesWithoutEndPadding(For->increment, lexer, padding+1);
+		    PAD;
+		};
+	    }break;
 	    };
+	    printf("BODY");
 	    __dumpDynamicArrayNodes(For->body, lexer, padding);
 	}break;
 	case ASTType::PROC_DEFENITION: {
@@ -933,7 +1044,7 @@ namespace dbg {
 	    printf("%d", type->type);
 	    PAD;
 	}break;
-	default: DEBUG_UNREACHABLE;
+	default: UNREACHABLE;
 	};
     };
     void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding = 0) {

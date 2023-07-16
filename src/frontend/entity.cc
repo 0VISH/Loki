@@ -198,10 +198,10 @@ VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
 };
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+    BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1]; //current scope
     switch (node->type) {
     case ASTType::FOR:{
-	BRING_TOKENS_TO_SCOPE;
 	ASTFor *For = (ASTFor*)node;
 	switch(For->loopType){
 	case ForType::FOR_EVER:{
@@ -209,6 +209,33 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    For->ForSe = ForSe;
 	    if(checkEntities(For->body, lexer, see) == false){return false;};
 	    see.pop();
+	}break;
+	case ForType::C:{
+	    Flag endTreeFlag = 0;
+	    Type endTreeType = getTreeType(For->end, endTreeFlag, see, lexer);
+	    if(isTypeNum(endTreeType) == false){
+		lexer.emitErr(tokOffs[For->endOff].off, "Tree type is not a number");
+		return false;
+	    };
+	    if(For->increment != nullptr){
+		Flag incrementTreeFlag = 0;
+		Type incrementTreeType = getTreeType(For->increment, endTreeFlag, see, lexer);
+		if(isTypeNum(incrementTreeType) == false){
+		    lexer.emitErr(tokOffs[For->incrementOff].off, "Tree type is not a number");
+		    return false;
+		};
+	    };
+	    ScopeEntities *ForSe = pushNewScope(see, Scope::BLOCK);
+	    For->ForSe = ForSe;
+	    if(checkEntities(For->body, lexer, see) == false){return false;};
+	    see.pop();
+	    ASTUniVar *var = (ASTUniVar*)For->body[0];
+	    u32 id = ForSe->varMap.getValue(var->name);
+	    VariableEntity &ent = ForSe->varEntities[id];
+	    if(isTypeNum(ent.type) == false){
+		lexer.emitErr(tokOffs[For->endOff].off, "Iterator should have a numeric type");
+		return false;
+	    };
 	}break;
 	};
     }break;
@@ -320,7 +347,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	}break;
 	};
     }break;
-    default: DEBUG_UNREACHABLE;return false;
+    default:
+	UNREACHABLE;
+	return false;
     };
     return true;
 };
