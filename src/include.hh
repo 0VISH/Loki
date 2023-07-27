@@ -7,22 +7,22 @@
 #include <immintrin.h>
 #include <mutex>
 
-#include "xenon.hh"
+#include "basic.hh"
 #include "mem.cc"
 #include "ds.cc"
 #include "threadpool.hh"
 
-#if(XE_PLAT_WIN)
+#if(PLAT_WIN)
 #include "windowsOS.cc"
-#elif(XE_PLAT_LIN)
+#elif(PLAT_LIN)
 #include "linuxOS.cc"
 #endif
 
-#if(XE_DBG)
+#if(DBG)
 #include <typeinfo>
 #endif
 
-#if(XE_DBG)
+#if(DBG)
 #include "debug/timer.cc"
 #include "debug/exception.cc"
 #endif
@@ -35,8 +35,8 @@
 #include "frontend/entity.cc"
 #include "midend/bytecode.cc"
 #include "midend/vm.cc"
-#include "xenon.cc"
+#include "loki.cc"
 
-#if(XE_DBG)
+#if(DBG)
 #include "debug/tester.cc"
 #endif

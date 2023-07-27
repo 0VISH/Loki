@@ -1,4 +1,4 @@
-#if(XE_PLAT_WIN && MSVC_COMPILER)
+#if(PLAT_WIN && MSVC_COMPILER)
 
 #define SEH_EXCEPTION_BLOCK_START		\
     __try{					\

@@ -113,7 +113,7 @@ Type tokenKeywordToType(Lexer &lexer, u32 off){
     return Type::UNKOWN;
 };
 
-#if(XE_DBG)
+#if(DBG)
 char *Type2CString[] =  {
     "unkown",
     "xe_void",

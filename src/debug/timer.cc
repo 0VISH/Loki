@@ -32,7 +32,7 @@ namespace dbg{
     }
 };
 
-#if(XE_PLAT_WIN)
+#if(PLAT_WIN)
 namespace dbg{
     u64 freq;
     void initTimer() {
@@ -63,7 +63,7 @@ namespace dbg{
 };
 #endif
 
-#if(XE_DBG)
+#if(DBG)
 #define TIME_BLOCK_(name) dbg::Timer timer(name);
 #define TIME_BLOCK dbg::Timer timer(__FUNCTION__);
 #else

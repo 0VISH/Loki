@@ -6,7 +6,7 @@ struct StaticArray {
     T mem[len];
 
     T& operator[](u32 index) {
-#if(XE_DBG == true)
+#if(DBG == true)
 	if (index >= len) {
 	    printf("\n[ERROR]: abc(static_array) failed for type %s. index = %d\n", typeid(T).name(), index);
 	};
@@ -22,7 +22,7 @@ struct Array {
     u32 len;
 
     T& operator[](u32 index) {
-#if(XE_DBG == true)
+#if(DBG == true)
 	if (index >= len) {
 	    printf("\n[ERROR]: abc(array) failed for type %s. index = %d\n", typeid(T).name(), index);
 	};
@@ -37,7 +37,7 @@ struct String {
     u32 len;
 
     char operator[](u32 index) {
-#if(XE_DBG == true)
+#if(DBG == true)
 	if (index >= len) {
 	    printf("\n[ERROR]: abc(string) failed. mem: %p, len: %d, index = %d\n", mem, len, index);
 	};
@@ -70,7 +70,7 @@ struct DynamicArray {
 	len = newCap;
     };
     T &getElement(u32 index) {
-#if(XE_DBG == true)
+#if(DBG == true)
 	if (index >= len) {
 	    printf("\n[ERROR]: abc(dynamic_array) failed for type %s. index = %d\n", typeid(T).name(), index);
 	};
@@ -103,7 +103,7 @@ struct DynamicArray {
 	    realloc(count+rCount);
 	}
     }
-#if(XE_DBG)
+#if(DBG)
     void dumpStat() {
 	printf("\n[DYNAMIC_ARRAY] mem: %p; count: %d; len: %d\n", mem, count, len);
     };
@@ -150,7 +150,7 @@ public:
 	mem::free(keys);
     };
     bool isFull() { return count == len; };
-#if(XE_DBG)
+#if(DBG)
     void dumpMap(){
 	for(u32 x=0; x<len; x+=1){
 	    printf("%d: ", x);

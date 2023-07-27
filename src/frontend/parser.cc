@@ -836,7 +836,7 @@ f64 string2float(String &str){
     return (f64)num/pow(10, str.len-decimal-1-postDecimalBadChar);
 };
 
-#if(XE_DBG)
+#if(DBG)
 
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
 

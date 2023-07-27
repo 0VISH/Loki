@@ -14,7 +14,7 @@ s32 main(s32 argc, char **argv) {
 	printf("main file path not provided\n");
 	return EXIT_SUCCESS;
     };
-#if(XE_DBG)
+#if(DBG)
     if (strcmp(argv[1], "test") == 0) {
 	tester::getAllTestFiles();
 	tester::runTests();
@@ -33,7 +33,7 @@ s32 main(s32 argc, char **argv) {
     if(report::errorOff == 0){printf("\n");};
     printf("Total time: %fsec\n", x);
     
-#if(XE_DBG)
+#if(DBG)
     dbg::dumpBlockTimes();
     printf("\nNOT FREED: %lld\nCALLS NOT FREED: %d\n", mem::notFreed, mem::calls);
 #endif

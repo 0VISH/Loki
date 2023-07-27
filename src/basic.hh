@@ -20,7 +20,7 @@ typedef unsigned long long int  b64;
 typedef float                   f32;
 typedef double                  f64;
 
-#if(XE_DBG)
+#if(DBG)
 void unreachable(char *file, u32 line) {
     printf("\n[ERROR] unreachable area reached: %s:%d", file, line);
 };
@@ -53,9 +53,9 @@ privDefer<F> defer_func(F f) {
 //DEFER IN CPP
 
 //@NOTE: these are defined in the cmd line scripts
-//#define XE_DBG
-//#define XE_TEST
+//#define DBG
+//#define TEST
 //#define MSVC_COMPILER
 //#define CLANG_COMPILER
-//#define XE_PLAT_WIN
-//#define XE_PLAT_LIN
+//#define PLAT_WIN
+//#define PLAT_LIN

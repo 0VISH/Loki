@@ -583,7 +583,7 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
     bf.emit(Bytecode::NONE);
 };
 
-#if(XE_DBG)
+#if(DBG)
 
 #define DUMP_NEXT_BYTECODE			\
     x += 1;					\

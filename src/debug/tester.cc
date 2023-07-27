@@ -1,7 +1,7 @@
 namespace tester{
     char buff[1024];
     DynamicArray<char*> files;
-#if(XE_PLAT_WIN)
+#if(PLAT_WIN)
     void getAllTestFiles() {
 	files.init();
 	WIN32_FIND_DATA data;

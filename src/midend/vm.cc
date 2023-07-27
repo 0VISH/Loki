@@ -311,6 +311,6 @@ bool execBytecode(u32 endOff, VM &vm){
     return true;
 };
 
-#if(XE_DBG)
+#if(DBG)
 static_assert((u16)Bytecode::BYTECODE_COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
 #endif

@@ -67,7 +67,7 @@ void initKeywords() {
     
     for (u8 i = 0; i < keywordCount; i += 1) {
 	s32 k = keywords.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
-#if(XE_DBG)
+#if(DBG)
 	if (k == -1) {
 	    printf("\n[LEXER] Could not register keyword\n");
 	    return;
@@ -325,7 +325,7 @@ struct Lexer {
     };
 };
 
-#if(XE_DBG)
+#if(DBG)
 namespace dbg {
     void dumpLexerStat(Lexer &lexer) {
 	printf("\n[LEXER_STAT]\nfileName: %s\ntokenCount: %d\n----\n", lexer.fileName, lexer.tokenTypes.count);
