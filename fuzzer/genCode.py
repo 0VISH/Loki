@@ -5,10 +5,14 @@ import subprocess
 import os
 
 GARBAGE_COUNT = 100
-fuzzFile = "bin\\fuzz.xe"
-command = "bin\\win\\dbg\\loki.exe " + fuzzFile
-outputFileName = "bin\\fuzzOutput.txt"
+ENTITY_COUNT  = 7
+fuzzFileName = "bin\\fuzz\\fuzz.xe"
+command = "bin\\win\\dbg\\loki.exe " + fuzzFileName
+outputFileName = "bin\\fuzz\\fuzzOutput.txt"
 tab = "    "
+dots = ".................."
+
+if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
 
 class Type():
     u8  = 0
@@ -34,6 +38,9 @@ def genDecimal(type):
     return str(round(rawDecimal, 5))
 def genOperator():
     operators = ['+', '-', '*', '/']
+    return operators[randint(0, len(operators)-1)]
+def genBoolOperator():
+    operators = ['>', '>=', '==', '<=', '<']
     return operators[randint(0, len(operators)-1)]
 def genOperandStrict(type):
     if isFloat(type): return genDecimal(type)
@@ -83,7 +90,7 @@ def genIdentifier():
 
 pyScope = {}
 
-def genVarDef(varToType, tabs):
+def genVarDef(varToType, tabs, depth):
     type = genType()
     name = genIdentifier()
     expr = genExpression(type)
@@ -97,7 +104,7 @@ def genVarDef(varToType, tabs):
 
     loCode += '\n' + tabs*tab + "//" + name + " should be " + str(round(pyScope[name], 5))
     return loCode
-def genVarDecl(varToType, tabs):
+def genVarDecl(varToType, tabs, depth):
     type = genType()
     name = genIdentifier()
 
@@ -110,19 +117,22 @@ def genVarDecl(varToType, tabs):
 
     loCode += '\n' + tabs*tab + "//" + name + " should be 0"
     return loCode
-def genBody(varToType, tabs, dontAddTabsForFirstBracket = False):
+def genBody(varToType, tabs, depth, shouldBeExecuted):
     body = None
-    if dontAddTabsForFirstBracket: body = "{\n"
-    else: body = tabs*tab + "{\n"
+    if randBool(): body = "\n" + tabs*tab + "{\n"
+    else: body = "{\n"
 
+    if shouldBeExecuted: body += (tabs+1)*tab + "//should be executed\n"
+    else: body += (tabs+1)*tab + "//should NOT be executed\n"
+    
     len = randint(0, 5)
     varToTypeBody = {}
     for i in range(0, len):
-        body += genEntity(varToTypeBody, tabs+1) + "\n"
+        body += genEntity(varToTypeBody, tabs+1, depth+1) + "\n"
         
     body += tabs*tab + "}"
     return body
-def genProcDef(varToType, tabs):
+def genProcDef(varToType, tabs, depth):
     name = genIdentifier()
     input = randint(0, 5)
     output = randint(0, 5)
@@ -152,18 +162,100 @@ def genProcDef(varToType, tabs):
         loCode += ")"
 
     varToTypeBody = {}
+    loCode += genBody(varToTypeBody, tabs, depth, True)
+    return loCode
+def genIf(varToType, tabs, depth):
+    loCode = tabs*tab + "if "
+    type = genType()
+    brackets = False
     if randBool():
-        loCode += "\n"
-        loCode += genBody(varToTypeBody, tabs)
-    else:
-        loCode += genBody(varToTypeBody, tabs, True)
+        brackets = True
+        loCode += "("
+        
+    lhsExpr = genExpression(type)
+    rhsExpr = genExpression(type)
+    op      = genBoolOperator()
+
+    boolExpr = lhsExpr + " " + op + " " + rhsExpr
+    loCode += boolExpr
+    tempScope = {}
+    exec("__value="+boolExpr, tempScope)
+    shouldIfBodyBeExecuted = tempScope["__value"]
+    
+    if brackets: loCode += ")"
+
+    varToTypeIfBody = {}
+    loCode += genBody(varToTypeIfBody, tabs, depth, shouldIfBodyBeExecuted)
+    if randBool(): return loCode
+
+    #else if
+    lhsExpr = genExpression(type)
+    rhsExpr = genExpression(type)
+    op      = genBoolOperator()
+    
+    loCode += "else if "
+    if brackets: loCode += "("
+    boolExpr = lhsExpr + " " + op + " " + rhsExpr
+    loCode += boolExpr
+    shouldElseIfBodyBeExecuted = False
+    if shouldIfBodyBeExecuted == False:
+        tempScope = {}
+        exec("__value="+boolExpr, tempScope)
+        shouldElseIfBodyBeExecuted = tempScope["__value"]
+    if brackets: loCode += ")"
+
+    varToTypElseIfBody = {}
+    loCode += genBody(varToTypeIfBody, tabs, depth, shouldElseIfBodyBeExecuted)
+
+    #else
+    shouldElseBodyBeExecuted = (shouldIfBodyBeExecuted == False) and (shouldElseIfBodyBeExecuted == False)
+    varToTypeElseBody = {}
+    loCode += "else"
+    loCode += genBody(varToTypeElseBody, tabs, depth, shouldElseBodyBeExecuted)
     return loCode
     
-entities = [genVarDef, genVarDecl, genProcDef]
+entities = [genVarDef, genVarDecl, genProcDef, genIf]
 
-def genEntity(varToType, tabs):
+def genEntity(varToType, tabs, depth):
+    if depth >= 4: return tabs*tab + "//depth limit exceeded, hence not generating code"
     rand = randint(0, len(entities)-1)
-    return entities[rand](varToType, tabs)
+    return entities[rand](varToType, tabs, depth)
 
-x = {}
-print(genProcDef(x, 0))
+
+
+outputFile = open(outputFileName, "w")
+fail = 0
+failed = []
+for i in range(0, GARBAGE_COUNT):
+    print("["+str(i)+"] Generating garbage...")
+    x = {}
+    fuzzFile = open(fuzzFileName, "w")
+    fuzzFile.write("main :: proc(){\n")
+    for i in range(0, ENTITY_COUNT):
+        fuzzFile.write(genEntity(x, 1, 0) + "\n")
+    fuzzFile.write("}")
+    fuzzFile.close()
+    
+    print(tab + "calling " + command, end="")
+    
+    process = subprocess.Popen(command, shell=True, stdout=outputFile)
+    process.wait()
+    if process.returncode != 0:
+        print(dots + colored("FAIL", "red"))
+        fName = "bin\\fuzz"+str(i)+".loki"
+        f = open(fName, "w")
+        f.write(xeCode)
+        f.close()
+        print(tab + "wrote to", fName)
+        fail += 1
+        failed.append(i)
+    else:
+        print(dots + colored("OK", "green"))
+outputFile.close()
+
+print("\n[STATUS]")
+print(tab + "total:", GARBAGE_COUNT)
+print(tab + "ok:", GARBAGE_COUNT - fail)
+print(tab + "fail:", fail)
+for i in failed:
+    print(2*tab + i)
