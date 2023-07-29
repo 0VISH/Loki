@@ -1,3 +1,7 @@
+#if(DBG)
+#include <typeinfo>
+#endif
+
 //TODO: optimize these data structures
 
 //array whose length is known at compiletime

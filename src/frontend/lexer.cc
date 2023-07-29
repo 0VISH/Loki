@@ -224,6 +224,7 @@ struct Lexer {
 			    x += 1;
 			};
 		    } else if (src[x] == '/' && src[x + 1] == '/') {
+#if(SIMD)
 			x += 2;
 			//Since the src buffer is padded we do not have to worry
 			u32 times = 0;
@@ -250,7 +251,17 @@ struct Lexer {
 			x += times + xy + 1;
 			eatUnwantedChars(src, x);
 			continue;
+#else
+			while(src[x] != '\n'){
+			    x += 1;
+			    if(src[x] == '\0'){goto LEXER_EMIT_END_OF_FILE;};
+			};
+			x += 1;
+			eatUnwantedChars(src, x);
+			continue;		
+#endif
 		    } else if (src[x] == '/' && src[x+1] == '*') {
+#if(SIMD)
 			u8 level = 1;
 			u64 beg = x;
 			x += 3;
@@ -308,6 +319,30 @@ struct Lexer {
 			};
 			eatUnwantedChars(src, x);
 			continue;
+#else
+			u8 level = 1;
+			u64 beg = x;
+			x += 3;
+			while (level != 0) {
+			    switch (src[x]) {
+			    case '\0': {
+				emitErr(beg, "%d multi line comment%snot terminated", level, (level==1)?" ":"s ");
+				return false;
+			    } break;
+			    case '*': {
+				x += 1;
+				if (src[x] == '/') { level -= 1; };
+			    } break;
+			    case '/': {
+				x += 1;
+				if (src[x] == '*') { level += 1; };
+			    } break;
+			    };
+			    x += 1;
+			};
+			eatUnwantedChars(src, x);
+			continue;
+#endif
 		    };
 		    TokenOffset offset;
 		    offset.off = x;
@@ -319,6 +354,7 @@ struct Lexer {
 	    };
 	    eatUnwantedChars(src, x);
 	};
+    LEXER_EMIT_END_OF_FILE:
 	tokenTypes.push(Token_Type::END_OF_FILE);
 	tokenOffsets.push( { x, 0 });
 	return true;

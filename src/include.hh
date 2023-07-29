@@ -4,8 +4,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <immintrin.h>
 #include <mutex>
+
+#if(SIMD)
+#include <immintrin.h>
+#endif
 
 #include "basic.hh"
 #include "mem.cc"
@@ -18,14 +21,8 @@
 #include "linuxOS.cc"
 #endif
 
-#if(DBG)
-#include <typeinfo>
-#endif
+#include "debug/include.hh"
 
-#if(DBG)
-#include "debug/timer.cc"
-#include "debug/exception.cc"
-#endif
 #include "report.cc"
 #include "threadpool.cc"
 #include "frontend/lexer.cc"

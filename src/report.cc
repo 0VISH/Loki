@@ -1,6 +1,6 @@
 #define MAX_REPORTS 30
 
-#if(MSVC_COMPILER)
+#if(MSVC_COMPILER && SIMD)
 #define __builtin_popcount __popcnt
 #endif
 
@@ -19,6 +19,7 @@ namespace report{
     u32 reportBuffTop = 0;
 
     char *getLineAndOff(char *mem, u64 offset, u32 &line, u32 &off) {
+#if(SIMD)
 	__m128i tocmp =  _mm_set1_epi8('\n');
 	u32 x = 0;
 	while (true) {
@@ -40,6 +41,15 @@ namespace report{
 	    off += 1;
 	};
 	return mem + offset-off+1;
+#else
+	for (u64 i = 0; i < offset; i += 1) {
+	    if (mem[i] == '\n') { line += 1; };
+	};
+	while (mem[offset-off] != '\n') {
+	    off += 1;
+	};
+	return mem + offset-off+1;
+#endif
     };
 
     void flushReports() {

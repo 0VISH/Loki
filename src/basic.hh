@@ -54,7 +54,7 @@ privDefer<F> defer_func(F f) {
 
 //@NOTE: these are defined in the cmd line scripts
 //#define DBG
-//#define TEST
+//#define SIMD
 //#define MSVC_COMPILER
 //#define CLANG_COMPILER
 //#define PLAT_WIN

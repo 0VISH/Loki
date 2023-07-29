@@ -21,7 +21,4 @@
 	};					\
       };					\
 
-#else
-#define SEH_EXCEPTION_BLOCK_START
-#define SEH_EXCEPTION_BLOCK_END
 #endif

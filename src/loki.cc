@@ -16,7 +16,7 @@ bool compile(char *fileName){
 	return true;
     };
     //dbg::dumpLexerStat(lexer);
-    dbg::dumpLexerTokens(lexer);
+    //dbg::dumpLexerTokens(lexer);
     ASTFile astFile;
     astFile.init();
     DEFER(astFile.uninit());
@@ -30,7 +30,7 @@ bool compile(char *fileName){
 	report::flushReports();
 	return false;
     };
-    dbg::dumpASTFile(astFile, lexer);
+    //dbg::dumpASTFile(astFile, lexer);
     DynamicArray<ScopeEntities*> see;
     see.init(3);
     DEFER({
@@ -81,7 +81,7 @@ bool compile(char *fileName){
     BytecodeContext &bc = bca.newElem();
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
-    dbg::dumpBytecodeFile(bf);
+    //dbg::dumpBytecodeFile(bf);
     VM vm;
     vm.init(bf, 0);
     DEFER(vm.uninit());

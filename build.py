@@ -6,21 +6,41 @@ def runCmd(cmd, lin = False):
     print("[CMD]", cmd)
     if(run(cmd, shell=(lin==True)).returncode != 0): quit()
 
-isDbg = not("rls" in argv)
-plat = "win"
-if("lin" in argv): plat = "lin"
+defines = {}
+defines["DBG"] = not("rls" in argv)
+defines["SIMD"] = "simd" in argv
+
+plat = False
+if("lin" in argv):
+    plat = "lin"
+    defines["PLAT_LIN"] = True
+if("win" in argv) or (plat == False):
+    plat = "win"
+    defines["PLAT_WIN"] = True
 
 folder = "bin/"+plat+"/"
-if(isDbg): folder += "dbg/"
+if(defines["DBG"]): folder += "dbg/"
 else: folder += "rls/"
 
 if not os.path.isdir(folder): os.makedirs(folder)
 
+def genDefinesString(define):
+    d = ""
+    for i in defines:
+        d += define + " " + i + "=" + str(defines[i]).lower() + " "
+    return d
+
+loki = folder + "loki"
 if plat == "win":
-    if isDbg:
-        runCmd("cl /nologo /std:c++14 /Zi /arch:AVX /EHsc /D PLAT_WIN=true /D MSVC_COMPILER=true /D DBG=true /D TEST=true src/main.cc /Fo:"+folder+"loki.obj /Fd:"+folder+"loki.pdb /Fe:"+folder+"loki.exe")
+    if defines["DBG"]:
+        defines["MSVC_COMPILER"] = True
+        defineStr = genDefinesString("/D")
+        runCmd("cl /nologo /std:c++14 /Zi /arch:AVX /EHsc " + defineStr +  " src/main.cc /Fo:"+loki+".obj /Fd:"+loki+".pdb /Fe:"+loki+".exe")
     else:
-        runCmd("clang++ -Ofast -D PLAT_WIN=true -D CLANG_COMPILER=true -D DBG=false -D TEST=false src\main.cc -o "+folder+"loki.exe")
+        defines["CLANG_COMPILER"] = True
+        defineStr = genDefinesString("-D")
+        runCmd("clang++ -Ofast -D PLAT_WIN=true " + defineStr + " src\main.cc -o "+folder+"loki.exe")
 elif plat == "lin":
-    print(folder)
-    runCmd("clang++ -Ofast -D PLAT_LIN=true -D CLANG_COMPILER=true -D DBG=false -D TEST=false src/main.cc -o "+folder+"loki", True)
+    defines["CLANG_COMPILER"] = True
+    defineStr = genDefinesString("-D")
+    runCmd("clang++ -Ofast " + defineStr + " src/main.cc -o "+folder+"loki", True)
