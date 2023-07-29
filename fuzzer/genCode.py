@@ -27,6 +27,7 @@ def getTypeName(type):
     typeNames = ["u8", "s8", "u16", "s16", "f16", "u32", "s32", "f32"]
     return typeNames[type]
 def genType(): return randint(0, Type.TYPE_LEN-1)
+def randBool(): return randint(0, 1)
 
 def genDecimal(type):
     rawDecimal = uniform(-10, 10)
@@ -40,8 +41,7 @@ def genOperandStrict(type):
     return str(randint(-10, 10))
 def genOperandLoose(type):
     if isFloat(type):
-        generateNewType = randint(0, 1)
-        if generateNewType:
+        if randBool():
             newType = randint(0, type)
             return genOperandStrict(newType)
     return genOperandStrict(type)
@@ -110,3 +110,60 @@ def genVarDecl(varToType, tabs):
 
     loCode += '\n' + tabs*tab + "//" + name + " should be 0"
     return loCode
+def genBody(varToType, tabs, dontAddTabsForFirstBracket = False):
+    body = None
+    if dontAddTabsForFirstBracket: body = "{\n"
+    else: body = tabs*tab + "{\n"
+
+    len = randint(0, 5)
+    varToTypeBody = {}
+    for i in range(0, len):
+        body += genEntity(varToTypeBody, tabs+1) + "\n"
+        
+    body += tabs*tab + "}"
+    return body
+def genProcDef(varToType, tabs):
+    name = genIdentifier()
+    input = randint(0, 5)
+    output = randint(0, 5)
+
+    inputTypes  = []
+    outputTypes = []
+
+    for i in range(0, input):
+        inputTypes.append(genType())
+    for i in range(0, output):
+        outputTypes.append(genType())
+
+    loCode = tabs*tab + name + " :: proc("
+
+    if len(inputTypes) != 0:
+        for i in inputTypes:
+            inputName = genIdentifier()
+            loCode += inputName + ": " + getTypeName(i) + ", "
+        loCode = loCode[:-2] #removing ', '
+
+    loCode += ')'
+    if len(outputTypes) != 0:
+        loCode += " -> ("
+        for i in outputTypes:
+            loCode += getTypeName(i) + ", "
+        loCode = loCode[:-2]
+        loCode += ")"
+
+    varToTypeBody = {}
+    if randBool():
+        loCode += "\n"
+        loCode += genBody(varToTypeBody, tabs)
+    else:
+        loCode += genBody(varToTypeBody, tabs, True)
+    return loCode
+    
+entities = [genVarDef, genVarDecl, genProcDef]
+
+def genEntity(varToType, tabs):
+    rand = randint(0, len(entities)-1)
+    return entities[rand](varToType, tabs)
+
+x = {}
+print(genProcDef(x, 0))
