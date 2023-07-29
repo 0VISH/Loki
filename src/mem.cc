@@ -15,6 +15,8 @@ namespace mem {
 	u64 *num = (u64*)mem;
 	*num = size;
 	mem = (char*)mem + sizeof(u64);
+#else
+	mem = malloc(size);
 #endif
 	return mem;
     };

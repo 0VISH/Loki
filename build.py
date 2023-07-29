@@ -39,7 +39,7 @@ if plat == "win":
     else:
         defines["CLANG_COMPILER"] = True
         defineStr = genDefinesString("-D")
-        runCmd("clang++ -Ofast -D PLAT_WIN=true " + defineStr + " src\main.cc -o "+folder+"loki.exe")
+        runCmd("clang++ -Ofast " + defineStr + " src\main.cc -o "+folder+"loki.exe")
 elif plat == "lin":
     defines["CLANG_COMPILER"] = True
     defineStr = genDefinesString("-D")

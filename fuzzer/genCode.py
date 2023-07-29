@@ -1,5 +1,6 @@
 from termcolor import colored        #pip install termcolor
 from random import randint, sample, uniform
+from sys import argv
 import string
 import subprocess
 import os
@@ -7,10 +8,18 @@ import os
 GARBAGE_COUNT = 100
 ENTITY_COUNT  = 7
 fuzzFileName = "bin\\fuzz\\fuzz.xe"
-command = "bin\\win\\dbg\\loki.exe " + fuzzFileName
+command = None
 outputFileName = "bin\\fuzz\\fuzzOutput.txt"
 tab = "    "
 dots = ".................."
+
+for i in argv:
+    if i.startswith("exe:"):
+        command = i[len("exe:"):] + " " + fuzzFileName
+        command = command.lstrip()
+if command == None:
+    print("which compiler?")
+    quit()
 
 if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
 
@@ -226,14 +235,15 @@ def genEntity(varToType, tabs, depth):
 outputFile = open(outputFileName, "w")
 fail = 0
 failed = []
-for i in range(0, GARBAGE_COUNT):
-    print("["+str(i)+"] Generating garbage...")
+for j in range(0, GARBAGE_COUNT):
+    loCode = None
+    print("["+str(j)+"] Generating garbage...")
     x = {}
     fuzzFile = open(fuzzFileName, "w")
     fuzzFile.write("main :: proc(){\n")
     for i in range(0, ENTITY_COUNT):
-        fuzzFile.write(genEntity(x, 1, 0) + "\n")
-    fuzzFile.write("}")
+        loCode = genEntity(x, 1, 0) + "\n"
+    fuzzFile.write(loCode + "}")
     fuzzFile.close()
     
     print(tab + "calling " + command, end="")
@@ -242,13 +252,13 @@ for i in range(0, GARBAGE_COUNT):
     process.wait()
     if process.returncode != 0:
         print(dots + colored("FAIL", "red"))
-        fName = "bin\\fuzz"+str(i)+".loki"
+        fName = "bin\\fuzz\\fuzz"+str(j)+".loki"
         f = open(fName, "w")
-        f.write(xeCode)
+        f.write(loCode)
         f.close()
         print(tab + "wrote to", fName)
         fail += 1
-        failed.append(i)
+        failed.append(fName)
     else:
         print(dots + colored("OK", "green"))
 outputFile.close()

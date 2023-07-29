@@ -144,11 +144,11 @@ public:
     void init(u32 length) {
 	len = length;
 	count = 0;
-	char *mem = (char*)mem::alloc(length * (sizeof(String)+sizeof(u16)+sizeof(u8)));
+	char *mem = (char*)mem::alloc(length * (sizeof(String)+sizeof(u16)+sizeof(bool)));
 	keys = (String*)mem;
 	values = (u16*) ((char*)keys   + (length*sizeof(String)));
 	status = (bool*)  ((char*)values + (length*sizeof(u16)));
-	memset(status, false, sizeof(u8)*length);
+	memset(status, false, sizeof(bool)*length);
     };
     void uninit() {
 	mem::free(keys);

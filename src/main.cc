@@ -39,7 +39,7 @@ s32 main(s32 argc, char **argv) {
     dbg::dumpBlockTimes();
     printf("\nNOT FREED: %lld\nCALLS NOT FREED: %d\n", mem::notFreed, mem::calls);
 #endif
-    
+
     return EXIT_SUCCESS;
     
     SEH_EXCEPTION_BLOCK_END;
