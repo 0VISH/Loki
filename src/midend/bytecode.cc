@@ -237,6 +237,7 @@ s64 getConstInt(BytecodeBucket **pbuc, u32 &x){
 	x = 0;
     };
     s64 *mem = (s64*)(buc->bytecodes + x);
+    x += const_in_stream;
     return *mem;
 };
 f64 getConstDec(BytecodeBucket **pbuc, u32 &x){
@@ -246,6 +247,7 @@ f64 getConstDec(BytecodeBucket **pbuc, u32 &x){
 	x = 0;
     };
     f64 *mem = (f64*)(buc->bytecodes + x);
+    x += const_in_stream;
     return *mem;
 };
 Bytecode *getPointer(BytecodeBucket **pbuc, u32 &x){
@@ -255,6 +257,7 @@ Bytecode *getPointer(BytecodeBucket **pbuc, u32 &x){
 	x = 0;
     };
     Bytecode *mem = (Bytecode*)(buc->bytecodes + x);
+    x += pointer_in_stream;
     return mem;
 };
 u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
@@ -641,11 +644,11 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
 
 #if(DBG)
 
-#define DUMP_NEXT_BYTECODE dumpBytecode(getNextBytecode(pbuc, x), pbuc, x);
+#define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(pbuc, x), pbuc, x);
 
-#define DUMP_REG dumpReg(getNextBytecode(pbuc, x));
+#define DUMP_REG dumpReg(getBytecode(pbuc, x));
 
-#define DUMP_TYPE dumpType(getNextBytecode(pbuc, x));
+#define DUMP_TYPE dumpType(getBytecode(pbuc, x));
 
 namespace dbg{
     void dumpReg(Bytecode id){
@@ -667,20 +670,25 @@ namespace dbg{
 	case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
 	};
     };
-    Bytecode getNextBytecode(BytecodeBucket **pbuc, u32 &x){
+    Bytecode getBytecode(BytecodeBucket **pbuc, u32 &x){
 	BytecodeBucket *buc = *pbuc;
-	x += 1;
 	if(x == bytecodes_in_bucket){
 	    x = 0;
 	    buc = buc->next;
 	};
-	return buc->bytecodes[x];
+	u32 v = x;
+	x += 1;
+	return buc->bytecodes[v];
     };
-    void dumpBytecode(Bytecode bc, BytecodeBucket **pbuc, u32 &x){
+    void dumpBytecode(BytecodeBucket **pbuc, u32 &x){
 	printf(" ");
 	bool flag = true;
+	Bytecode bc = getBytecode(pbuc, x);
 	switch(bc){
-	case Bytecode::NONE: printf("NONE"); *pbuc = nullptr;
+	case Bytecode::NONE: *pbuc = nullptr; break;
+	case Bytecode::NEXT_BUCKET:{
+	    nextBucket(pbuc);
+	}break;
 	case Bytecode::MOV_CONSTS:{
 	    printf("mov_consts");
 	    DUMP_REG;
@@ -775,14 +783,14 @@ namespace dbg{
 	case Bytecode::PROC_END:break;
 	case Bytecode::DEF:{
 	    printf("def _");
-	    Bytecode bc = getNextBytecode(pbuc, x);
+	    Bytecode bc = getBytecode(pbuc, x);
 	    printf("%d(", (u32)bc);
 	    u8 comma = 0;
-	    bc = getNextBytecode(pbuc, x);
+	    bc = getBytecode(pbuc, x);
 	    while(bc != Bytecode::PROC_GIVES){
 		dumpType(bc);
 		DUMP_REG;
-		bc = getNextBytecode(pbuc, x);
+		bc = getBytecode(pbuc, x);
 	        comma += 1;
 		if(comma == 2){
 		    comma = 0;
@@ -790,24 +798,29 @@ namespace dbg{
 		};
 	    };
 	    printf(")");
-	    bc = getNextBytecode(pbuc, x);
+	    bc = getBytecode(pbuc, x);
 	    if(bc != Bytecode::PROC_START){
 		printf(" -> (");
 		while(bc != Bytecode::PROC_START){
 		    dumpType(bc);
-		    bc = getNextBytecode(pbuc, x);
+		    bc = getBytecode(pbuc, x);
 		};
 		printf(")");
 	    };
-	    printf("\n{\n");
-	    bc = getNextBytecode(pbuc, x);
 	    
+	    printf("\n{");
+	    
+	    x -= 1;
 	    while(bc != Bytecode::PROC_END){
-		dumpBytecode(bc, pbuc, x);
-		bc = getNextBytecode(pbuc, x);
+		dumpBytecode(pbuc, x);
+		BytecodeBucket *buc = *pbuc;
+		bc = buc->bytecodes[x];
 		printf("\n");
 	    };
+	    x += 1;
+	    
 	    printf("}");
+	    
 	}break;
 	case Bytecode::NEG:{
 	    printf("neg");
@@ -822,10 +835,8 @@ namespace dbg{
 	printf("\n\n[DUMPING BYTECODE FILE]\n");
 	BytecodeBucket *buc = bf.firstBucket;
 	u32 x = 0;
-	Bytecode bc = buc->bytecodes[0];
 	while(buc){
-	    dumpBytecode(bc, &buc, x);
-	    bc = getNextBytecode(&buc, x);
+	    dumpBytecode(&buc, x);
 	    printf("\n");
 	};
 	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");
