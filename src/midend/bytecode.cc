@@ -651,6 +651,8 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
 #define DUMP_TYPE dumpType(getBytecode(pbuc, x));
 
 namespace dbg{
+    char *spaces = "    ";
+    
     void dumpReg(Bytecode id){
 	printf(" %%%d ", id);
     };
@@ -681,7 +683,6 @@ namespace dbg{
 	return buc->bytecodes[v];
     };
     void dumpBytecode(BytecodeBucket **pbuc, u32 &x){
-	printf(" ");
 	bool flag = true;
 	Bytecode bc = getBytecode(pbuc, x);
 	switch(bc){
@@ -808,18 +809,18 @@ namespace dbg{
 		printf(")");
 	    };
 	    
-	    printf("\n{");
-	    
-	    x -= 1;
+	    printf("{");
+
+	    BytecodeBucket *buc = *pbuc;
+	    bc = buc->bytecodes[x];
 	    while(bc != Bytecode::PROC_END){
+		printf("\n%p|%s   ", buc->bytecodes + x, spaces);
 		dumpBytecode(pbuc, x);
-		BytecodeBucket *buc = *pbuc;
 		bc = buc->bytecodes[x];
-		printf("\n");
 	    };
 	    x += 1;
 	    
-	    printf("}");
+	    printf("\n%p|%s}", buc->bytecodes + x, spaces);
 	    
 	}break;
 	case Bytecode::NEG:{
@@ -832,12 +833,12 @@ namespace dbg{
 	};
     };
     void dumpBytecodeFile(BytecodeFile &bf){
-	printf("\n\n[DUMPING BYTECODE FILE]\n");
+	printf("\n\n[DUMPING BYTECODE FILE]");
 	BytecodeBucket *buc = bf.firstBucket;
 	u32 x = 0;
 	while(buc){
+	    printf("\n%p|%s", buc->bytecodes + x, spaces);
 	    dumpBytecode(&buc, x);
-	    printf("\n");
 	};
 	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");
     };
