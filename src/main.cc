@@ -12,29 +12,21 @@
 s32 main(s32 argc, char **argv) {
     SEH_EXCEPTION_BLOCK_START;
 
+    os::initTimer();
+    os::startTimer(TimeSlot::TOTAL);
+    
     if (argc < 2) {
 	printf("main file path not provided\n");
 	return EXIT_SUCCESS;
     };
-#if(DBG)
-    if (strcmp(argv[1], "test") == 0) {
-	tester::getAllTestFiles();
-	tester::runTests();
-	return EXIT_SUCCESS;
-    };
-    dbg::initTimer();
-#endif
-
-    os::compilerStartTimer();
     
     initKeywords();
     compile(argv[1]);
     uninitKeywords();
 
-    f64 x = os::compilerEndTimer();
+    os::endTimer(TimeSlot::TOTAL);
     if(report::errorOff == 0){printf("\n");};
-    printf("Total time: %fsec\n", x);
-    
+    dumpTimers(os::times);
 #if(DBG)
     dbg::dumpBlockTimes();
     printf("\nNOT FREED: %lld\nCALLS NOT FREED: %d\n", mem::notFreed, mem::calls);

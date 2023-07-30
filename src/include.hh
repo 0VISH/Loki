@@ -14,12 +14,7 @@
 #include "mem.cc"
 #include "ds.cc"
 #include "threadpool.hh"
-
-#if(PLAT_WIN)
-#include "windowsOS.cc"
-#elif(PLAT_LIN)
-#include "linuxOS.cc"
-#endif
+#include "os.cc"
 
 #include "debug/include.hh"
 
@@ -33,7 +28,3 @@
 #include "midend/bytecode.cc"
 #include "midend/vm.cc"
 #include "loki.cc"
-
-#if(DBG)
-#include "debug/tester.cc"
-#endif

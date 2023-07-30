@@ -1,0 +1,32 @@
+//if
+
+main :: proc(){
+     //we only use 1 '=' for comparison
+     if 2 = 2{
+     
+     } else {
+       
+     }
+
+     //if else-if else
+     if(3 >= 5){
+     
+     } else if 6 = 8 {
+       //foo
+     } else{
+       //bar
+     }
+     /*
+	the above statement gets rearranged to
+
+	if 3>= 5{
+	
+	} else{
+	  if 6 = 8{
+	     //foo
+	  } else{
+	     //bar
+	  }
+	}
+     */
+}

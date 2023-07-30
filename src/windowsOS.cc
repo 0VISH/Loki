@@ -3,6 +3,9 @@
 void doJob(TPool *pool);
 
 namespace os{
+    Timer times[TimeSlot::COUNT];
+    u64 freq;
+    
     char *getFileFullName(char *filePath) {
 	char fullFilePathBuff[1024];
 	u32 len = GetFullPathNameA(filePath, 1024, fullFilePathBuff, NULL);
@@ -22,18 +25,23 @@ namespace os{
 	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
     };
 
-    LARGE_INTEGER timeStart;
-    void compilerStartTimer(){
-	QueryPerformanceCounter(&timeStart);
+    void initTimer(){
+	memset(times, 0, sizeof(times)*(u16)TimeSlot::COUNT);
+	LARGE_INTEGER fr;
+	QueryPerformanceFrequency(&fr);
+	freq = fr.QuadPart;
     };
-    f64 compilerEndTimer(){
-	LARGE_INTEGER end;
-	QueryPerformanceCounter(&end);
-	u64 diff = end.QuadPart - timeStart.QuadPart;
-	LARGE_INTEGER freq;
-	QueryPerformanceFrequency(&freq);
-	f64 time = diff / (f64)freq.QuadPart;
-	return time;
+    void startTimer(TimeSlot slot){
+	LARGE_INTEGER temp;
+	QueryPerformanceCounter(&temp);
+	times[(u16)slot].start = temp.QuadPart;
+    };
+    void endTimer(TimeSlot slot){
+	LARGE_INTEGER temp;
+	QueryPerformanceCounter(&temp);
+	u64 diff = temp.QuadPart - times[(u16)slot].start;
+	
+	times[(u16)slot].time = diff / (f64)freq;
     };
 
     struct Thread{

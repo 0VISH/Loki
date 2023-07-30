@@ -1,4 +1,4 @@
-from termcolor import colored        #pip install termcolor
+from termcolor import colored
 from random import randint, sample, uniform
 from sys import argv
 import string
@@ -8,15 +8,14 @@ import os
 GARBAGE_COUNT = 100
 ENTITY_COUNT  = 7
 fuzzFileName = "bin\\fuzz\\fuzz.xe"
-command = None
 outputFileName = "bin\\fuzz\\fuzzOutput.txt"
 tab = "    "
 dots = ".................."
 
+command = None
 for i in argv:
     if i.startswith("exe:"):
         command = i[len("exe:"):] + " " + fuzzFileName
-        command = command.lstrip()
 if command == None:
     print("which compiler?")
     quit()

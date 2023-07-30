@@ -1,4 +1,5 @@
 bool compile(char *fileName){
+    os::startTimer(TimeSlot::FRONTEND);
     Lexer lexer;
     if(lexer.init(fileName) == false){
 	printf("invalid file path: %s", lexer.fileName);
@@ -69,6 +70,8 @@ bool compile(char *fileName){
 	    SET_BIT(entity.flag, Flags::GLOBAL);
 	};
     };
+    os::endTimer(TimeSlot::FRONTEND);
+    os::startTimer(TimeSlot::MIDEND);
     BytecodeFile bf;
     bf.init();
     DEFER(bf.uninit());
@@ -82,10 +85,12 @@ bool compile(char *fileName){
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     //dbg::dumpBytecodeFile(bf);
+    os::endTimer(TimeSlot::MIDEND);
+    os::startTimer(TimeSlot::EXEC_BC);
     VM vm;
     vm.init(bf, 0);
     DEFER(vm.uninit());
     execBytecode(1000000, vm);
-    report::flushReports();
+    os::endTimer(TimeSlot::EXEC_BC);
     return true;
 };

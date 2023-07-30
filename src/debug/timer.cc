@@ -34,13 +34,6 @@ namespace dbg{
 
 #if(PLAT_WIN)
 namespace dbg{
-    u64 freq;
-    void initTimer() {
-	LARGE_INTEGER temp;
-	QueryPerformanceFrequency(&temp);
-	freq = temp.QuadPart;
-    };
-
     struct Timer{
 	Timer(char *name) {
 	    dbg::depth += 1;
@@ -52,7 +45,9 @@ namespace dbg{
 	    QueryPerformanceCounter(&end);
 	    u64 diff = end.QuadPart - start.QuadPart;
 	    diff *= 1000000;
-	    f64 time = diff / (f64)freq;
+	    LARGE_INTEGER freq;
+	    QueryPerformanceFrequency(&freq);
+	    f64 time = diff / (f64)freq.QuadPart;
 	    dbg::depth -= 1;
 	    registerBlockTime(blockName, time, dbg::depth);
 	};
