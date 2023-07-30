@@ -87,7 +87,14 @@ struct BytecodeFile{
 	curBucket->next = nb;
 	curBucket = nb;
     };
+    void reserve(u16 reserve){
+	if(curBucket->cursor + reserve >= bytecodes_in_bucket){
+	    emit(Bytecode::NEXT_BUCKET);
+	    newBucketAndUpdateCurBucket();
+	};
+    };
     void emit(Bytecode bc){
+	//TODO: REMOVE CHECKS
         if(curBucket->cursor == bytecodes_in_bucket){
 	    newBucketAndUpdateCurBucket();
 	};
@@ -95,6 +102,7 @@ struct BytecodeFile{
 	curBucket->cursor += 1;
     };
     void emit(u16 bc){
+	//TODO: REMOVE CHECKS
         if(curBucket->cursor == bytecodes_in_bucket){
 	    newBucketAndUpdateCurBucket();
 	};
@@ -102,6 +110,7 @@ struct BytecodeFile{
 	curBucket->cursor += 1;
     };
     void emit(Type type){
+	//TODO: REMOVE CHECKS
 	if(curBucket->cursor == bytecodes_in_bucket){
 	    newBucketAndUpdateCurBucket();
 	};
@@ -111,13 +120,8 @@ struct BytecodeFile{
     Bytecode *getCurBytecodeAdd(){
 	return curBucket->bytecodes + curBucket->cursor;
     };
-    void reserve(u16 reserve){
-	if(curBucket->cursor + reserve >= bytecodes_in_bucket){
-	    emit(Bytecode::NEXT_BUCKET);
-	    newBucketAndUpdateCurBucket();
-	};
-    };
     void emitPointer(Bytecode* pointer){
+	//TODO: REMOVE CHECKS
         reserve(pointer_in_stream);
 	emit(Bytecode::NEXT_BUCKET);
 	Bytecode *mem = getCurBytecodeAdd();
@@ -127,6 +131,7 @@ struct BytecodeFile{
     };
     //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
+	//TODO: REMOVE CHECKS
 	reserve(const_in_stream);
 	Bytecode *mem = getCurBytecodeAdd();
 	u64 *memNum = (u64*)(mem);
@@ -134,11 +139,57 @@ struct BytecodeFile{
 	curBucket->cursor += const_in_stream;
     };
     void emitConstDec(f64 num){
+	//TODO: REMOVE CHECKS
 	reserve(const_in_stream);
 	Bytecode *mem = getCurBytecodeAdd();
 	f64 *memNum = (f64*)(mem);
 	*memNum = num;
 	curBucket->cursor += const_in_stream;
+    };
+    void movConstS(u16 regId, s64 num){
+	reserve(1 + 1 + const_in_stream);
+	emit(Bytecode::MOV_CONSTS);
+	emit(regId);
+	emitConstInt(num);
+    };
+    void movConstF(u16 outputReg, f64 num){
+	reserve(1 + 1 + const_in_stream);
+	emit(Bytecode::MOV_CONSTF);
+	emit(outputReg);
+	emitConstDec(num);
+    };
+    void binOp(Bytecode op, u16 outputReg, u16 lhsReg, u16 rhsReg){
+	reserve(1 + 1 + 1 + 1);
+	emit(op);
+	emit(outputReg);
+	emit(lhsReg);
+	emit(rhsReg);
+    };
+    void cast(Type finalType, u16 finalReg, Type type, u16 reg){
+	reserve(1 + 1 + 1 + 1 + 1);
+	emit(Bytecode::CAST);
+	emit(finalType);
+	emit(finalReg);
+	emit(type);
+	emit(reg);
+    };
+    void set(Bytecode op, u16 outputReg, u16 inputReg){
+	reserve(1 + 1 + 1);
+	emit(op);
+	emit(outputReg);
+	emit(inputReg);
+    };
+    void neg(Type type, u16 reg){
+	reserve(1 + 1 + 1);
+	emit(Bytecode::NEG);
+	emit(type);
+	emit(reg);
+    };
+    void mov(Bytecode op, u16 outputReg, u16 inputReg){
+	reserve(1 + 1 + 1);
+	emit(op);
+	emit(outputReg);
+	emit(inputReg);
     };
 };
 
@@ -202,27 +253,26 @@ u16 emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, Lexer &lexer,
     BytecodeType abt = typeToBytecodeType(ansType);
     if(lbt != rbt){
 	u32 newReg = bc.newReg(ansType);
-	bf.emit(Bytecode::CAST);
-	bf.emit(ansType);
-	bf.emit(newReg);
+	Type type;
+	u16 reg;
 	if(lbt != abt){
-	    bf.emit(lhsType);
-	    bf.emit(lhsReg);	
+	    type = lhsType;
+	    reg = lhsReg;	
 	    lhsReg = newReg;
 	}else{
-	    bf.emit(rhsType);
-	    bf.emit(rhsReg);
+	    type = rhsType;
+	    reg = rhsReg;
 	    rhsReg = newReg;
 	};
+	bf.cast(ansType, newReg, type, reg);
     };
+    Bytecode binOp;
     switch(abt){
-    case BytecodeType::INTEGER_S:   bf.emit(s);  break;
-    case BytecodeType::INTEGER_U:   bf.emit(u);  break;
-    case BytecodeType::DECIMAL_S:   bf.emit(d);  break;
+    case BytecodeType::INTEGER_S:   binOp = s;  break;
+    case BytecodeType::INTEGER_U:   binOp = u;  break;
+    case BytecodeType::DECIMAL_S:   binOp = d;  break;
     };
-    bf.emit(outputReg);
-    bf.emit(lhsReg);
-    bf.emit(rhsReg);
+    bf.binOp(binOp, outputReg, lhsReg, rhsReg);
     return outputReg;
 };
 
@@ -231,6 +281,7 @@ void nextBucket(BytecodeBucket **pbuc){
     buc = buc->next;
 };
 s64 getConstInt(BytecodeBucket **pbuc, u32 &x){
+    //TODO: REMOVE CHECKS
     BytecodeBucket *buc = *pbuc;
     if(x + const_in_stream >= bytecodes_in_bucket){
 	nextBucket(pbuc);
@@ -241,6 +292,7 @@ s64 getConstInt(BytecodeBucket **pbuc, u32 &x){
     return *mem;
 };
 f64 getConstDec(BytecodeBucket **pbuc, u32 &x){
+    //TODO: REMOVE CHECKS
     BytecodeBucket *buc = *pbuc;
     if(x + const_in_stream >= bytecodes_in_bucket){
 	nextBucket(pbuc);
@@ -251,6 +303,7 @@ f64 getConstDec(BytecodeBucket **pbuc, u32 &x){
     return *mem;
 };
 Bytecode *getPointer(BytecodeBucket **pbuc, u32 &x){
+    //TODO: REMOVE CHECKS
     BytecodeBucket *buc = *pbuc;
     if(x + pointer_in_stream >= bytecodes_in_bucket){
 	nextBucket(pbuc);
@@ -270,9 +323,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
 	s64 num = string2int(str);
-	bf.emit(Bytecode::MOV_CONSTS);
-	bf.emit(outputReg);
-	bf.emitConstInt(num);
+	bf.movConstS(outputReg, num);
 	return outputReg;
     }break;
     case ASTType::NUM_DECIMAL:{
@@ -280,9 +331,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
 	f64 num = string2float(str);
-	bf.emit(Bytecode::MOV_CONSTS);
-	bf.emit(outputReg);
-	bf.emitConstDec(num);
+	bf.movConstF(outputReg, num);
 	return outputReg;
     }break;
     case ASTType::VARIABLE:{
@@ -323,19 +372,19 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	BytecodeType rbt = typeToBytecodeType(rhsType);			
 	BytecodeType abt = typeToBytecodeType(ansType);			
 	if(lbt != rbt){							
-	    u16 newReg = bc.newReg(ansType);				
-	    bf.emit(Bytecode::CAST);					
-	    bf.emit(ansType);						
-	    bf.emit(newReg);						
-	    if(lbt != abt){							
-		bf.emit(lhsType);					
-		bf.emit(lhsReg);						
-		lhsReg = newReg;						
+	    u16 newReg = bc.newReg(ansType);
+	    Type type;
+	    u16 reg;
+	    if(lbt != abt){
+		type = lhsType;
+		reg = lhsReg;
+		lhsReg = newReg;
 	    }else{								
-		bf.emit(rhsType);					
-		bf.emit(rhsReg);						
-		rhsReg = newReg;						
-	    };								
+		type = rhsType;
+		reg = rhsReg;
+		rhsReg = newReg;
+	    };
+	    bf.cast(ansType, newReg, type, reg);
 	};
 	Bytecode set;
 	Bytecode cmp;
@@ -353,16 +402,10 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	};
 	
 	outputReg = bc.newReg(ansType);
-	
-	bf.emit(cmp);
-	bf.emit(cmpOutReg);						
-	bf.emit(lhsReg);							
-	bf.emit(rhsReg);
 
-	bf.emit(set);
-	bf.emit(outputReg);
-	bf.emit(cmpOutReg);
-	
+	bf.binOp(cmp, cmpOutReg, lhsReg, rhsReg);
+	bf.set(set, outputReg, cmpOutReg);
+
 	return outputReg;
     }break;
     case ASTType::UNI_NEG:{
@@ -372,9 +415,7 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
 	if(typeToBytecodeType(type) == BytecodeType::INTEGER_U){
 	    bc.types[outputReg] = Type::S_64;
 	};
-	bf.emit(Bytecode::NEG);
-	bf.emit(type);
-	bf.emit(outputReg);
+	bf.neg(type, outputReg);
 	return outputReg;
     }break;
     default:
@@ -399,11 +440,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	if(regType != Type::COMP_DECIMAL && regType != Type::COMP_INTEGER){
 	    if(regType != entity.type){
 		u32 newReg = bc.newReg(entity.type);
-		bf.emit(Bytecode::CAST);
-		bf.emit(entity.type);
-		bf.emit(newReg);
-		bf.emit(regType);
-		bf.emit(regID);
+		bf.cast(entity.type, newReg, regType, regID);
 		bc.varToReg[id] = newReg;
 	    }else{
 		bc.varToReg[id] = regID;
@@ -429,9 +466,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    u16 regID = bc.newReg(firstEntityType);
 	    bc.varToReg[id] = regID;
 	    bc.types[regID] = bc.types[ansReg];
-	    bf.emit(byte);
-	    bf.emit(regID);
-	    bf.emit(ansReg);
+	    bf.mov(byte, regID, ansReg);
 	};
     }break;
 #if 0 
