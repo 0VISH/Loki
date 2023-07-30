@@ -74,7 +74,9 @@ struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> out;
     String name;
     u32 tokenOff;
-    u32 inCount;
+    u32 uniInCount;
+    u32 multiInCount;
+    u32 multiInInputCount;
     u8 flag;
 };
 struct ASTVariable : ASTBase{
@@ -620,24 +622,26 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		proc->name = makeStringFromTokOff(start, lexer);
 		proc->body.init();
 		proc->out.zero();
-		proc->inCount = 0;
 		if (tokTypes[x] == (Token_Type)')') {
 		    goto PARSE_AFTER_ARGS;
 		};
-		u32 inCount = 0;
+		u32 uniInCount = 0;
+		u32 multiInCount = 0;
+		u32 multiInInputCount = 0;
 		//parse input
 		while (true) {
 		    eatNewlines(tokTypes, x);
 		    ASTBase *base = parseBlock(lexer, file, x);
 		    if(base == nullptr){return nullptr;};
 		    switch(base->type){
-		    case ASTType::UNI_DECLERATION:
-			inCount += 1;
-			break;
-		    case ASTType::MULTI_DECLERATION:
+		    case ASTType::MULTI_DECLERATION:{
 			ASTMultiVar *multiVar = (ASTMultiVar*)base;
-			inCount += multiVar->names.count;
-			break;
+			multiInCount += 1;
+			multiInInputCount = multiVar->names.count;
+		    }break;
+		    case ASTType::UNI_DECLERATION:{
+			uniInCount += 1;
+		    }break;
 		    };
 		    proc->body.push(base);
 		    if(tokTypes[x] == (Token_Type)','){
@@ -646,7 +650,9 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		    };
 		    break;
 		};
-		proc->inCount = inCount;
+		proc->uniInCount = uniInCount;
+		proc->multiInCount = multiInCount;
+		proc->multiInInputCount = multiInInputCount;
 		if(tokTypes[x] != (Token_Type)')'){
 		    lexer.emitErr(tokOffs[x].off, "Expected ')'");
 		    return nullptr;
@@ -1039,7 +1045,8 @@ namespace dbg {
 	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
 	    printf("IN");
-	    for(u32 x=0; x<proc->inCount; x+=1){
+	    u32 inCount = proc->uniInCount + proc->multiInCount;
+	    for(u32 x=0; x<inCount; x+=1){
 		ASTBase *node = proc->body[x];
 		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
 	    };
@@ -1049,7 +1056,7 @@ namespace dbg {
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    PAD;
 	    printf("BODY");
-	    for (u32 v=proc->inCount; v < table.count; v += 1) {
+	    for (u32 v=inCount; v < table.count; v += 1) {
 		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
 	    PAD;
