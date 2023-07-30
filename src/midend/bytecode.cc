@@ -3,8 +3,7 @@
 
 /*
   %d  register
-  @d  global
-  _d  proc
+  @d  proc
 */
 enum class Bytecode : u16{
     NONE = 0,
@@ -43,7 +42,7 @@ enum class Bytecode : u16{
     PROC_END,
     RET,
     NEG,
-    LABEL,
+    NEXT_BUCKET,
     BYTECODE_COUNT,
 };
 enum class BytecodeType : u16{
@@ -52,66 +51,98 @@ enum class BytecodeType : u16{
     DECIMAL_S,
 };
 
-const u16 const_in_stream = (sizeof(s64) / sizeof(Bytecode));
-const u16 reg_in_stream = 2;
-const u16 type_in_stream = 2;
+const u16 const_in_stream = sizeof(s64) / sizeof(Bytecode);
+const u16 pointer_in_stream = sizeof(Bytecode*) / sizeof(Bytecode);
+const u16 bytecodes_in_bucket = 30;
+
+struct BytecodeBucket{
+    BytecodeBucket *next;
+    Bytecode bytecodes[bytecodes_in_bucket];
+    u16 cursor;
+};
 
 struct BytecodeFile{
-    DynamicArray<Bytecode> bcs;
-    DynamicArray<u32>      labels;
+    BytecodeBucket          *firstBucket;
+    BytecodeBucket          *curBucket;
 
     void init(){
-	bcs.init(50);
-	labels.init();
+	firstBucket = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
+	firstBucket->next = nullptr;
+	firstBucket->cursor = 0;
+	curBucket = firstBucket;
     };
     void uninit(){
-	bcs.uninit();
-	labels.uninit();
+	BytecodeBucket *buc = firstBucket;
+	while(buc){
+	    mem::free(buc);
+	    buc = buc->next;
+	};
+    };
+    void newBucketAndUpdateCurBucket(){
+	ASSERT(curBucket);
+    
+	BytecodeBucket *nb = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
+	nb->next = nullptr;
+	nb->cursor = 0;
+	curBucket->next = nb;
+	curBucket = nb;
     };
     void emit(Bytecode bc){
-	bcs.push(bc);
+        if(curBucket->cursor == bytecodes_in_bucket){
+	    newBucketAndUpdateCurBucket();
+	};
+	curBucket->bytecodes[curBucket->cursor] = bc;
+	curBucket->cursor += 1;
     };
     void emit(u16 bc){
-	bcs.push((Bytecode)bc);
+        if(curBucket->cursor == bytecodes_in_bucket){
+	    newBucketAndUpdateCurBucket();
+	};
+	curBucket->bytecodes[curBucket->cursor] = (Bytecode)bc;
+	curBucket->cursor += 1;
     };
     void emit(Type type){
-	bcs.push((Bytecode)type);
-    };
-    void emitLabel(u16 labelID){
-	if(labelID > labels.len){
-	    labels.realloc(labelID);
+	if(curBucket->cursor == bytecodes_in_bucket){
+	    newBucketAndUpdateCurBucket();
 	};
-	labels[labelID] = bcs.count;
-        emit(Bytecode::LABEL);
-	emit(labelID);	
+	curBucket->bytecodes[curBucket->cursor] = (Bytecode)type;
+	curBucket->cursor += 1;
     };
-    u32 getCursorOff(){return bcs.count;};
-    void setBytecodeAtCursor(u32 cursor, Bytecode bc){bcs[cursor] = bc;};
+    Bytecode *getCurBytecodeAdd(){
+	return curBucket->bytecodes + curBucket->cursor;
+    };
+    void reserve(u16 reserve){
+	if(curBucket->cursor + reserve >= bytecodes_in_bucket){
+	    emit(Bytecode::NEXT_BUCKET);
+	    newBucketAndUpdateCurBucket();
+	};
+    };
+    void emitPointer(Bytecode* pointer){
+        reserve(pointer_in_stream);
+	emit(Bytecode::NEXT_BUCKET);
+	Bytecode *mem = getCurBytecodeAdd();
+	u64 *memTemp = (u64*)mem;
+	*memTemp = (u64)pointer;
+	curBucket->cursor += pointer_in_stream;
+    };
     //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
-	bcs.reserve(const_in_stream);
-	Bytecode *loc = bcs.mem + bcs.count;
-	s64 *mem = (s64*)(loc);
-	*mem = num;
-        bcs.count += const_in_stream;
+	reserve(const_in_stream);
+	Bytecode *mem = getCurBytecodeAdd();
+	u64 *memNum = (u64*)(mem);
+	*memNum = num;
+	curBucket->cursor += const_in_stream;
     };
     void emitConstDec(f64 num){
-        bcs.reserve(const_in_stream);
-	Bytecode *loc = bcs.mem + bcs.count;
-	f64 *mem = (f64*)(loc);
-	*mem = num;
-	bcs.count += const_in_stream;
+	reserve(const_in_stream);
+	Bytecode *mem = getCurBytecodeAdd();
+	f64 *memNum = (f64*)(mem);
+	*memNum = num;
+	curBucket->cursor += const_in_stream;
     };
 };
 
 static u16 procID  = 0;
-static u16 labelID = 1;
-
-u16 newLabel(){
-    u16 lbl = labelID;
-    labelID += 1;
-    return lbl;
-};
 
 struct BytecodeContext{
     Map procToID;
@@ -195,13 +226,36 @@ u16 emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, Lexer &lexer,
     return outputReg;
 };
 
-s64 getConstInt(Bytecode *bytes){
-    s64 *mem = (s64*)bytes;
+void nextBucket(BytecodeBucket **pbuc){
+    BytecodeBucket *buc = *pbuc;
+    buc = buc->next;
+};
+s64 getConstInt(BytecodeBucket **pbuc, u32 &x){
+    BytecodeBucket *buc = *pbuc;
+    if(x + const_in_stream >= bytecodes_in_bucket){
+	nextBucket(pbuc);
+	x = 0;
+    };
+    s64 *mem = (s64*)(buc->bytecodes + x);
     return *mem;
 };
-f64 getConstDec(Bytecode *bytes){
-    f64 *mem = (f64*)bytes;
+f64 getConstDec(BytecodeBucket **pbuc, u32 &x){
+    BytecodeBucket *buc = *pbuc;
+    if(x + const_in_stream >= bytecodes_in_bucket){
+	nextBucket(pbuc);
+	x = 0;
+    };
+    f64 *mem = (f64*)(buc->bytecodes + x);
     return *mem;
+};
+Bytecode *getPointer(BytecodeBucket **pbuc, u32 &x){
+    BytecodeBucket *buc = *pbuc;
+    if(x + pointer_in_stream >= bytecodes_in_bucket){
+	nextBucket(pbuc);
+	x = 0;
+    };
+    Bytecode *mem = (Bytecode*)(buc->bytecodes + x);
+    return mem;
 };
 u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     ASTType type = node->type;
@@ -377,6 +431,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    bf.emit(ansReg);
 	};
     }break;
+#if 0 
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
 	ScopeEntities *ForSe = (ScopeEntities*)For->ForSe;
@@ -514,6 +569,7 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	};
 	bf.emitLabel(outIfLbl);
     }break;
+#endif
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
 	u32 procBytecodeID = procID;
@@ -585,17 +641,11 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
 
 #if(DBG)
 
-#define DUMP_NEXT_BYTECODE			\
-    x += 1;					\
-    dumpBytecode(page, x);			\
+#define DUMP_NEXT_BYTECODE dumpBytecode(getNextBytecode(pbuc, x), pbuc, x);
 
-#define DUMP_REG				\
-    x += 1;					\
-    dumpReg(page[x]);				\
+#define DUMP_REG dumpReg(getNextBytecode(pbuc, x));
 
-#define DUMP_TYPE				\
-    x += 1;					\
-    dumpType(page[x]);				\
+#define DUMP_TYPE dumpType(getNextBytecode(pbuc, x));
 
 namespace dbg{
     void dumpReg(Bytecode id){
@@ -617,26 +667,30 @@ namespace dbg{
 	case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
 	};
     };
-    
-    bool dumpBytecode(Bytecode *page, u32 &x){
+    Bytecode getNextBytecode(BytecodeBucket **pbuc, u32 &x){
+	BytecodeBucket *buc = *pbuc;
+	x += 1;
+	if(x == bytecodes_in_bucket){
+	    x = 0;
+	    buc = buc->next;
+	};
+	return buc->bytecodes[x];
+    };
+    void dumpBytecode(Bytecode bc, BytecodeBucket **pbuc, u32 &x){
 	printf(" ");
 	bool flag = true;
-	switch(page[x]){
-	case Bytecode::NONE: printf("NONE");return false;
+	switch(bc){
+	case Bytecode::NONE: printf("NONE"); *pbuc = nullptr;
 	case Bytecode::MOV_CONSTS:{
 	    printf("mov_consts");
 	    DUMP_REG;
-	    x += 1;
-	    s64 num = getConstInt(page+x);
-	    x += const_in_stream - 1;
+	    s64 num = getConstInt(pbuc, x);
 	    printf("%lld", num);
 	}break;
 	case Bytecode::MOV_CONSTF:{
 	    printf("mov_constf");
 	    DUMP_REG;
-	    x += 1;
-	    f64 num = getConstDec(page+x);
-	    x += const_in_stream - 1;
+	    f64 num = getConstDec(pbuc, x);
 	    printf("%f", num);
 	}break;
 	case Bytecode::MOVS: printf("movs");flag = false;
@@ -698,23 +752,16 @@ namespace dbg{
 	case Bytecode::JMPS:{
 	    printf("jmps");
 	    DUMP_REG;
-	    x += 1;
-	    printf("%#010x", page[x]);
+	    printf("%p", getPointer(pbuc, x));
 	}break;
 	case Bytecode::JMPNS:{
 	    printf("jmpns");
 	    DUMP_REG;
-	    x += 1;
-	    printf("%#010x", page[x]);
+	    printf("%p", getPointer(pbuc, x));
 	}break;
 	case Bytecode::JMP:{
 	    printf("jmp");
-	    x += 1;
-	    printf(" %#010x", page[x]);
-	}break;
-	case Bytecode::LABEL:{
-	    x += 1;
-	    printf("%#010x", page[x]);
+	    printf(" %p", getPointer(pbuc, x));
 	}break;
 	case Bytecode::CAST:{
 	    printf("cast");
@@ -728,14 +775,14 @@ namespace dbg{
 	case Bytecode::PROC_END:break;
 	case Bytecode::DEF:{
 	    printf("def _");
-	    x += 1;
-	    printf("%d(", (u32)page[x]);
-	    x += 1;
+	    Bytecode bc = getNextBytecode(pbuc, x);
+	    printf("%d(", (u32)bc);
 	    u8 comma = 0;
-	    while(page[x] != Bytecode::PROC_GIVES){
-		dumpType(page[x]);
+	    bc = getNextBytecode(pbuc, x);
+	    while(bc != Bytecode::PROC_GIVES){
+		dumpType(bc);
 		DUMP_REG;
-		x += 1;
+		bc = getNextBytecode(pbuc, x);
 	        comma += 1;
 		if(comma == 2){
 		    comma = 0;
@@ -743,20 +790,21 @@ namespace dbg{
 		};
 	    };
 	    printf(")");
-	    x += 1;
-	    if(page[x] != Bytecode::PROC_START){
+	    bc = getNextBytecode(pbuc, x);
+	    if(bc != Bytecode::PROC_START){
 		printf(" -> (");
-		while(page[x] != Bytecode::PROC_START){
-		    dumpType(page[x]);
-		    x += 1;
+		while(bc != Bytecode::PROC_START){
+		    dumpType(bc);
+		    bc = getNextBytecode(pbuc, x);
 		};
 		printf(")");
 	    };
 	    printf("\n{\n");
-	    x += 1;
-	    while(page[x] != Bytecode::PROC_END){
-		dumpBytecode(page, x);
-		x += 1;
+	    bc = getNextBytecode(pbuc, x);
+	    
+	    while(bc != Bytecode::PROC_END){
+		dumpBytecode(bc, pbuc, x);
+		bc = getNextBytecode(pbuc, x);
 		printf("\n");
 	    };
 	    printf("}");
@@ -768,16 +816,16 @@ namespace dbg{
 	}break;
 	default:
 	    UNREACHABLE;
-	    return false;
 	};
-	return true;
     };
     void dumpBytecodeFile(BytecodeFile &bf){
 	printf("\n\n[DUMPING BYTECODE FILE]\n");
-	Bytecode *mem = bf.bcs.mem;
-	for(u32 x=0; x<bf.bcs.count; x+=1){
-	    if(mem[x] == Bytecode::NONE){break;};
-	    if(dumpBytecode(mem, x) == false){break;};
+	BytecodeBucket *buc = bf.firstBucket;
+	u32 x = 0;
+	Bytecode bc = buc->bytecodes[0];
+	while(buc){
+	    dumpBytecode(bc, &buc, x);
+	    bc = getNextBytecode(&buc, x);
 	    printf("\n");
 	};
 	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");

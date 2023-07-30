@@ -84,13 +84,15 @@ bool compile(char *fileName){
     BytecodeContext &bc = bca.newElem();
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
-    //dbg::dumpBytecodeFile(bf);
+    dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
+    /*
     os::startTimer(TimeSlot::EXEC_BC);
     VM vm;
     vm.init(bf, 0);
     DEFER(vm.uninit());
     execBytecode(1000000, vm);
     os::endTimer(TimeSlot::EXEC_BC);
+    */
     return true;
 };
