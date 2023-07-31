@@ -26,5 +26,5 @@
 #include "frontend/type.cc"
 #include "frontend/entity.cc"
 #include "midend/bytecode.cc"
-//#include "midend/vm.cc"
+#include "midend/vm.cc"
 #include "loki.cc"

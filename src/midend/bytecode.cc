@@ -75,8 +75,9 @@ struct BytecodeFile{
     void uninit(){
 	BytecodeBucket *buc = firstBucket;
 	while(buc){
-	    mem::free(buc);
+	    BytecodeBucket *temp = buc;
 	    buc = buc->next;
+	    mem::free(temp);
 	};
     };
     void newBucketAndUpdateCurBucket(){
@@ -263,19 +264,31 @@ void nextBucket(BytecodeBucket **pbuc){
     BytecodeBucket *buc = *pbuc;
     buc = buc->next;
 };
-s64 getConstInt(BytecodeBucket *buc, u32 &x){
-    s64 *mem = (s64*)(buc->bytecodes + x);
+s64 getConstIntAndUpdate(Bytecode *page, u32 &x){
+    s64 *mem = (s64*)(page + x);
     x += const_in_stream;
     return *mem;
 };
-f64 getConstDec(BytecodeBucket *buc, u32 &x){
-    f64 *mem = (f64*)(buc->bytecodes + x);
+s64 getConstInt(Bytecode *page){
+    s64 *mem = (s64*)page;
+    return *mem;
+};
+f64 getConstDecAndUpdate(Bytecode *page, u32 &x){
+    f64 *mem = (f64*)(page + x);
     x += const_in_stream;
     return *mem;
 };
-Bytecode *getPointer(BytecodeBucket *buc, u32 &x){
-    Bytecode *mem = (Bytecode*)(buc->bytecodes + x);
+f64 getConstDec(Bytecode *page){
+    f64 *mem = (f64*)page;
+    return *mem;
+};
+Bytecode *getPointerAndUpdate(Bytecode *page, u32 &x){
+    Bytecode *mem = (Bytecode*)(page + x);
     x += pointer_in_stream;
+    return mem;
+};
+Bytecode *getPointer(Bytecode *page){
+    Bytecode *mem = (Bytecode*)page;
     return mem;
 };
 u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
@@ -687,13 +700,13 @@ namespace dbg{
 	case Bytecode::MOV_CONSTS:{
 	    printf("mov_consts");
 	    DUMP_REG;
-	    s64 num = getConstInt(buc, x);
+	    s64 num = getConstIntAndUpdate(buc->bytecodes, x);
 	    printf("%lld", num);
 	}break;
 	case Bytecode::MOV_CONSTF:{
 	    printf("mov_constf");
 	    DUMP_REG;
-	    f64 num = getConstDec(buc, x);
+	    f64 num = getConstDecAndUpdate(buc->bytecodes, x);
 	    printf("%f", num);
 	}break;
 	case Bytecode::MOVS: printf("movs");flag = false;
@@ -755,16 +768,16 @@ namespace dbg{
 	case Bytecode::JMPS:{
 	    printf("jmps");
 	    DUMP_REG;
-	    printf("%p", getPointer(buc, x));
+	    printf("%p", getPointerAndUpdate(buc->bytecodes, x));
 	}break;
 	case Bytecode::JMPNS:{
 	    printf("jmpns");
 	    DUMP_REG;
-	    printf("%p", getPointer(buc, x));
+	    printf("%p", getPointerAndUpdate(buc->bytecodes, x));
 	}break;
 	case Bytecode::JMP:{
 	    printf("jmp");
-	    printf(" %p", getPointer(buc, x));
+	    printf(" %p", getPointerAndUpdate(buc->bytecodes, x));
 	}break;
 	case Bytecode::CAST:{
 	    printf("cast");

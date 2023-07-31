@@ -86,13 +86,11 @@ bool compile(char *fileName){
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
-    /*
     os::startTimer(TimeSlot::EXEC_BC);
     VM vm;
-    vm.init(bf, 0);
+    vm.init(bf.firstBucket, 0);
     DEFER(vm.uninit());
-    execBytecode(1000000, vm);
+    execBytecode(vm);
     os::endTimer(TimeSlot::EXEC_BC);
-    */
     return true;
 };

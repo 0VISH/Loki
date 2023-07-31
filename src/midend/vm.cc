@@ -12,8 +12,10 @@ struct VM{
     Register *registers;
     BytecodeBucket *buc;
     u32 off;
+    u32 procBlock;
 
-    void init(BytecodeBucket bucket, u32 offset = 0){
+    void init(BytecodeBucket *bucket, u32 procBlockID, u32 offset = 0){
+	procBlock = procBlockID;
 	buc = bucket;
 	off = offset;
 	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
@@ -21,9 +23,6 @@ struct VM{
     };
     void uninit(){
 	mem::free(registers);
-	for(u32 x=0; x<procs.count; x+=1){
-	    mem::free(procs[x]);
-	};
 	procs.uninit();
     };
 };
@@ -209,36 +208,22 @@ s8 setle(BYTECODE_INPUT){
     SET_TEMPLATE(<=);
 };
 s8 jmpns(BYTECODE_INPUT){
-    u16 reg = (u16)page[1];
-    if(vm.registers[reg].uint == 0){
-	u16 off = (u16)page[2];
-	vm.off = vm.labels->getElement(off) - 1;
-	return 0;
-    };
-    return 2;
+    //TODO:
+    return -1;
 };
 s8 jmps(BYTECODE_INPUT){
-    u16 reg = (u16)page[1];
-    if(vm.registers[reg].uint != 0){
-	u16 off = (u16)page[2];
-	vm.off = vm.labels->getElement(off) - 1;
-	return 0;
-    };
-    return 2;
+    //TODO:
+    return -1;
 };
 s8 jmp(BYTECODE_INPUT){
-    u16 off = (u16)page[1];
-    vm.off = vm.labels->getElement(off) - 1;
-    return 0;
+    //TODO:
+    return -1;
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
+    //@incomplete: SIMD?
     while(page[x] != Bytecode::PROC_END){x += 1;};
-    u32 count = x - 2;
-    Bytecode *proc = (Bytecode*)mem::alloc(sizeof(Bytecode) * count + 1);  //TODO: change allocator?
-    memcpy(proc, page+2, sizeof(Bytecode)*count);
-    proc[count] = Bytecode::NONE;
-    vm.procs.push(proc);
+    vm.procs.push(page+1);
     return x;
 };
 s8 neg(BYTECODE_INPUT){
@@ -252,6 +237,12 @@ s8 neg(BYTECODE_INPUT){
     case BytecodeType::DECIMAL_S: vm.registers[reg].dec  *= -1; break;
     };
     return 2;
+};
+s8 next_bucket(BYTECODE_INPUT){
+    vm.buc = vm.buc->next;
+    if(vm.buc == nullptr){return 0;};
+    vm.off = 0;
+    return 0;
 };
 
 /*
@@ -295,14 +286,15 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     proc_gives, proc_start, proc_end,
     ret,
     neg,
-    label,
+    next_bucket,
 };
 
 bool execBytecode(VM &vm){
-    while(vm.off != endOff){
-	Bytecode bc = vm.page[vm.off];
+    BytecodeBucket *buc = vm.buc;
+    while(true){
+	Bytecode bc = buc->bytecodes[vm.off];
 	if(bc == Bytecode::NONE){return true;};
-	s8 x = byteProc[(u16)bc](vm.page+vm.off, vm) + 1;
+	s8 x = byteProc[(u16)bc](buc->bytecodes+vm.off, vm) + 1;
 	if(x == -1){return false;};
 	vm.off += x;
     };

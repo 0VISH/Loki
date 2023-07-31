@@ -14,6 +14,8 @@ if exe == None:
     print("which compiler?")
     quit()
 
+if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
+
 def getFilesInFolder(folderPath):
     files = []
     entries = os.listdir(folderPath)
