@@ -8,16 +8,18 @@ struct Register{
     };
 };
 struct VM{
-    DynamicArray<Bytecode*> procs;
+    DynamicArray<Bytecode*>  procs;
+    DynamicArray<Bytecode*> *labels;
     Register *registers;
     BytecodeBucket *buc;
-    u32 off;
+    Bytecode *cursor;
     u32 procBlock;
 
-    void init(BytecodeBucket *bucket, u32 procBlockID, u32 offset = 0){
+    void init(BytecodeBucket *bucket, DynamicArray<Bytecode*> *lbls, u32 procBlockID, u32 offset = 0){
+	labels = lbls;
 	procBlock = procBlockID;
 	buc = bucket;
-	off = offset;
+	cursor = buc->bytecodes + offset;
 	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
 	procs.init(3);
     };
@@ -27,14 +29,32 @@ struct VM{
     };
 };
 
+BytecodeBucket *getBucketWithInsideAdd(BytecodeBucket *cur, Bytecode *add){
+    if(add >= cur->bytecodes){
+	while(cur){
+	    BytecodeBucket *nextBuc = cur->next;
+	    if((add >= cur->bytecodes) && (add <= nextBuc->bytecodes)){
+		return cur;
+	    };
+	    cur = nextBuc;
+	};
+    }else{
+	while(cur){
+	    BytecodeBucket *prevBuc = cur->prev;
+	    if((add >= prevBuc->bytecodes) && (add <= cur->bytecodes)){
+		return prevBuc;
+	    };
+	    cur = prevBuc;
+	};
+    }
+    return nullptr;
+};
+
 //NOTE: these functions are for continuity
 s8 none(BYTECODE_INPUT){return -1;};
-s8 const_int(BYTECODE_INPUT){return 0;};
-s8 const_dec(BYTECODE_INPUT){return 0;};
-s8 proc_gives(BYTECODE_INPUT){return 0;};
-s8 proc_start(BYTECODE_INPUT){return 0;};
-s8 proc_end(BYTECODE_INPUT){return 0;};
-s8 label(BYTECODE_INPUT){return 1;};
+s8 proc_gives(BYTECODE_INPUT){return -1;};
+s8 proc_start(BYTECODE_INPUT){return -1;};
+s8 proc_end(BYTECODE_INPUT){return -1;};
 //TODO: 
 s8 ret(BYTECODE_INPUT){return 0;};
 
@@ -69,6 +89,9 @@ s8 ret(BYTECODE_INPUT){return 0;};
     vm.registers[outputReg].uint = (vm.registers[inputReg].sint OP 0)?1:0; \
     return 2;								\
 
+s8 label(BYTECODE_INPUT){
+    return 1;
+};
 s8 cast(BYTECODE_INPUT){
     /*
        ot       nt
@@ -208,16 +231,36 @@ s8 setle(BYTECODE_INPUT){
     SET_TEMPLATE(<=);
 };
 s8 jmpns(BYTECODE_INPUT){
-    //TODO:
-    return -1;
+    u16 reg = (u16)page[1];
+    if(vm.registers[reg].uint == 0){
+	u16 label = (u16)page[2];
+	Bytecode *add = vm.labels->getElement(label);
+	BytecodeBucket *buc = getBucketWithInsideAdd(vm.buc, add);
+	vm.buc = buc;
+	vm.cursor = add - 1; //execBytecodes increments it by 1
+	return 0;
+    };
+    return 2;
 };
 s8 jmps(BYTECODE_INPUT){
-    //TODO:
-    return -1;
+    u16 reg = (u16)page[1];
+    if(vm.registers[reg].uint != 0){
+        u16 label = (u16)page[2];
+	Bytecode *add = vm.labels->getElement(label);
+	BytecodeBucket *buc = getBucketWithInsideAdd(vm.buc, add);
+	vm.buc = buc;
+	vm.cursor = add - 1; //execBytecodes increments it by 1
+	return 0;
+    };
+    return 2;
 };
 s8 jmp(BYTECODE_INPUT){
-    //TODO:
-    return -1;
+    u16 label = (u16)page[1];
+    Bytecode *add = vm.labels->getElement(label);
+    BytecodeBucket *buc = getBucketWithInsideAdd(vm.buc, add);
+    vm.buc = buc;
+    vm.cursor = add - 1; //execBytecodes increments it by 1
+    return 0;
 };
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
@@ -241,7 +284,7 @@ s8 neg(BYTECODE_INPUT){
 s8 next_bucket(BYTECODE_INPUT){
     vm.buc = vm.buc->next;
     if(vm.buc == nullptr){return 0;};
-    vm.off = 0;
+    vm.cursor = vm.buc->bytecodes - 1; //execBytecodes increments it by 1
     return 0;
 };
 
@@ -251,6 +294,7 @@ s8 next_bucket(BYTECODE_INPUT){
 
    NEG will return 4
 */
+//TODO: change i -> s
 s8 (*byteProc[])(BYTECODE_INPUT) = {
     none,
     cast,
@@ -287,16 +331,17 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     ret,
     neg,
     next_bucket,
+    label,
 };
 
 bool execBytecode(VM &vm){
     BytecodeBucket *buc = vm.buc;
     while(true){
-	Bytecode bc = buc->bytecodes[vm.off];
+	Bytecode bc = *vm.cursor;
 	if(bc == Bytecode::NONE){return true;};
-	s8 x = byteProc[(u16)bc](buc->bytecodes+vm.off, vm) + 1;
+	s8 x = byteProc[(u16)bc](vm.cursor, vm);
 	if(x == -1){return false;};
-	vm.off += x;
+	vm.cursor += x + 1;
     };
     return true;
 };

@@ -31,7 +31,7 @@ bool compile(char *fileName){
 	report::flushReports();
 	return false;
     };
-    //dbg::dumpASTFile(astFile, lexer);
+    dbg::dumpASTFile(astFile, lexer);
     DynamicArray<ScopeEntities*> see;
     see.init(3);
     DEFER({
@@ -88,9 +88,11 @@ bool compile(char *fileName){
     os::endTimer(TimeSlot::MIDEND);
     os::startTimer(TimeSlot::EXEC_BC);
     VM vm;
-    vm.init(bf.firstBucket, 0);
+    vm.init(bf.firstBucket, &bf.labels, 0);
     DEFER(vm.uninit());
-    execBytecode(vm);
+    if(execBytecode(vm) == false){
+	printf("TODO: VM ERRORs");
+    };
     os::endTimer(TimeSlot::EXEC_BC);
     return true;
 };
