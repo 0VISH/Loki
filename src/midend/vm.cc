@@ -9,16 +9,14 @@ struct Register{
 };
 struct VM{
     DynamicArray<Bytecode*> procs;
-    DynamicArray<u32>      *labels;
     Register *registers;
-    Bytecode *page;
+    BytecodeBucket *buc;
     u32 off;
 
-    void init(BytecodeFile &bf, u32 offset){
-	page = bf.bcs.mem;
+    void init(BytecodeBucket bucket, u32 offset = 0){
+	buc = bucket;
 	off = offset;
 	registers = (Register*)mem::alloc(sizeof(Register) * REGISTER_COUNT);
-	labels = &bf.labels;
 	procs.init(3);
     };
     void uninit(){
@@ -300,7 +298,7 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     label,
 };
 
-bool execBytecode(u32 endOff, VM &vm){
+bool execBytecode(VM &vm){
     while(vm.off != endOff){
 	Bytecode bc = vm.page[vm.off];
 	if(bc == Bytecode::NONE){return true;};

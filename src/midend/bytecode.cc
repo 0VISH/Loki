@@ -57,18 +57,19 @@ const u16 bytecodes_in_bucket = 30;
 
 struct BytecodeBucket{
     BytecodeBucket *next;
-    Bytecode bytecodes[bytecodes_in_bucket];
-    u16 cursor;
+    Bytecode bytecodes[bytecodes_in_bucket+1];     //padding with NEXT_BUCKET
 };
 
 struct BytecodeFile{
-    BytecodeBucket          *firstBucket;
-    BytecodeBucket          *curBucket;
+    BytecodeBucket  *firstBucket;
+    BytecodeBucket  *curBucket;
+    u16              cursor;  
 
     void init(){
+	cursor = 0;
 	firstBucket = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
 	firstBucket->next = nullptr;
-	firstBucket->cursor = 0;
+	firstBucket->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
 	curBucket = firstBucket;
     };
     void uninit(){
@@ -80,52 +81,53 @@ struct BytecodeFile{
     };
     void newBucketAndUpdateCurBucket(){
 	ASSERT(curBucket);
-    
+
+	cursor = 0;
 	BytecodeBucket *nb = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
 	nb->next = nullptr;
-	nb->cursor = 0;
+	nb->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
 	curBucket->next = nb;
 	curBucket = nb;
     };
     void reserve(u16 reserve){
-	if(curBucket->cursor + reserve >= bytecodes_in_bucket){
+	if(cursor + reserve >= bytecodes_in_bucket){
 	    emit(Bytecode::NEXT_BUCKET);
 	    newBucketAndUpdateCurBucket();
 	};
     };
     void emit(Bytecode bc){
-	curBucket->bytecodes[curBucket->cursor] = bc;
-	curBucket->cursor += 1;
+	curBucket->bytecodes[cursor] = bc;
+	cursor += 1;
     };
     void emit(u16 bc){
-	curBucket->bytecodes[curBucket->cursor] = (Bytecode)bc;
-	curBucket->cursor += 1;
+	curBucket->bytecodes[cursor] = (Bytecode)bc;
+	cursor += 1;
     };
     void emit(Type type){
-	curBucket->bytecodes[curBucket->cursor] = (Bytecode)type;
-	curBucket->cursor += 1;
+	curBucket->bytecodes[cursor] = (Bytecode)type;
+	cursor += 1;
     };
     Bytecode *getCurBytecodeAdd(){
-	return curBucket->bytecodes + curBucket->cursor;
+	return curBucket->bytecodes + cursor;
     };
     void emitPointer(Bytecode* pointer){
 	Bytecode *mem = getCurBytecodeAdd();
 	u64 *memTemp = (u64*)mem;
 	*memTemp = (u64)pointer;
-	curBucket->cursor += pointer_in_stream;
+	cursor += pointer_in_stream;
     };
     //encoding constant into bytecode page for cache
     void emitConstInt(s64 num){
 	Bytecode *mem = getCurBytecodeAdd();
 	u64 *memNum = (u64*)(mem);
 	*memNum = num;
-	curBucket->cursor += const_in_stream;
+	cursor += const_in_stream;
     };
     void emitConstDec(f64 num){
 	Bytecode *mem = getCurBytecodeAdd();
 	f64 *memNum = (f64*)(mem);
 	*memNum = num;
-	curBucket->cursor += const_in_stream;
+	cursor += const_in_stream;
     };
     void movConstS(u16 regId, s64 num){
 	reserve(1 + 1 + const_in_stream);
@@ -261,20 +263,17 @@ void nextBucket(BytecodeBucket **pbuc){
     BytecodeBucket *buc = *pbuc;
     buc = buc->next;
 };
-s64 getConstInt(BytecodeBucket **pbuc, u32 &x){
-    BytecodeBucket *buc = *pbuc;
+s64 getConstInt(BytecodeBucket *buc, u32 &x){
     s64 *mem = (s64*)(buc->bytecodes + x);
     x += const_in_stream;
     return *mem;
 };
-f64 getConstDec(BytecodeBucket **pbuc, u32 &x){
-    BytecodeBucket *buc = *pbuc;
+f64 getConstDec(BytecodeBucket *buc, u32 &x){
     f64 *mem = (f64*)(buc->bytecodes + x);
     x += const_in_stream;
     return *mem;
 };
-Bytecode *getPointer(BytecodeBucket **pbuc, u32 &x){
-    BytecodeBucket *buc = *pbuc;
+Bytecode *getPointer(BytecodeBucket *buc, u32 &x){
     Bytecode *mem = (Bytecode*)(buc->bytecodes + x);
     x += pointer_in_stream;
     return mem;
@@ -650,11 +649,11 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
 
 #if(DBG)
 
-#define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(pbuc, x), pbuc, x);
+#define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(buc, x), pbuc, x);
 
-#define DUMP_REG dumpReg(getBytecode(pbuc, x));
+#define DUMP_REG dumpReg(getBytecode(buc, x));
 
-#define DUMP_TYPE dumpType(getBytecode(pbuc, x));
+#define DUMP_TYPE dumpType(getBytecode(buc, x));
 
 namespace dbg{
     char *spaces = "    ";
@@ -678,34 +677,23 @@ namespace dbg{
 	case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
 	};
     };
-    Bytecode getBytecode(BytecodeBucket **pbuc, u32 &x){
-	BytecodeBucket *buc = *pbuc;
-	if(x == bytecodes_in_bucket){
-	    x = 0;
-	    buc = buc->next;
-	};
-	u32 v = x;
-	x += 1;
-	return buc->bytecodes[v];
+    inline Bytecode getBytecode(BytecodeBucket *buc, u32 &x){
+	return buc->bytecodes[x++];
     };
-    void dumpBytecode(BytecodeBucket **pbuc, u32 &x){
+    void dumpBytecode(BytecodeBucket *buc, u32 &x){
 	bool flag = true;
-	Bytecode bc = getBytecode(pbuc, x);
+	Bytecode bc = getBytecode(buc, x);
 	switch(bc){
-	case Bytecode::NONE: *pbuc = nullptr; break;
-	case Bytecode::NEXT_BUCKET:{
-	    nextBucket(pbuc);
-	}break;
 	case Bytecode::MOV_CONSTS:{
 	    printf("mov_consts");
 	    DUMP_REG;
-	    s64 num = getConstInt(pbuc, x);
+	    s64 num = getConstInt(buc, x);
 	    printf("%lld", num);
 	}break;
 	case Bytecode::MOV_CONSTF:{
 	    printf("mov_constf");
 	    DUMP_REG;
-	    f64 num = getConstDec(pbuc, x);
+	    f64 num = getConstDec(buc, x);
 	    printf("%f", num);
 	}break;
 	case Bytecode::MOVS: printf("movs");flag = false;
@@ -767,16 +755,16 @@ namespace dbg{
 	case Bytecode::JMPS:{
 	    printf("jmps");
 	    DUMP_REG;
-	    printf("%p", getPointer(pbuc, x));
+	    printf("%p", getPointer(buc, x));
 	}break;
 	case Bytecode::JMPNS:{
 	    printf("jmpns");
 	    DUMP_REG;
-	    printf("%p", getPointer(pbuc, x));
+	    printf("%p", getPointer(buc, x));
 	}break;
 	case Bytecode::JMP:{
 	    printf("jmp");
-	    printf(" %p", getPointer(pbuc, x));
+	    printf(" %p", getPointer(buc, x));
 	}break;
 	case Bytecode::CAST:{
 	    printf("cast");
@@ -790,33 +778,32 @@ namespace dbg{
 	case Bytecode::PROC_END:break;
 	case Bytecode::DEF:{
 	    printf("def _");
-	    Bytecode bc = getBytecode(pbuc, x);
+	    Bytecode bc = getBytecode(buc, x);
 	    printf("%d(", (u32)bc);
-	    bc = getBytecode(pbuc, x);
+	    bc = getBytecode(buc, x);
 	    while(bc != Bytecode::PROC_GIVES){
 		dumpType(bc);
 		DUMP_REG;
 		printf(",");
-		bc = getBytecode(pbuc, x);
+		bc = getBytecode(buc, x);
 	    };
 	    printf(")");
-	    bc = getBytecode(pbuc, x);
+	    bc = getBytecode(buc, x);
 	    if(bc != Bytecode::PROC_START){
 		printf(" -> (");
 		while(bc != Bytecode::PROC_START){
 		    dumpType(bc);
-		    bc = getBytecode(pbuc, x);
+		    bc = getBytecode(buc, x);
 		};
 		printf(")");
 	    };
 	    
 	    printf("{");
 
-	    BytecodeBucket *buc = *pbuc;
 	    bc = buc->bytecodes[x];
 	    while(bc != Bytecode::PROC_END){
 		printf("\n%p|%s   ", buc->bytecodes + x, spaces);
-		dumpBytecode(pbuc, x);
+		dumpBytecode(buc, x);
 		bc = buc->bytecodes[x];
 	    };
 	    x += 1;
@@ -837,11 +824,18 @@ namespace dbg{
 	printf("\n\n[DUMPING BYTECODE FILE]");
 	BytecodeBucket *buc = bf.firstBucket;
 	u32 x = 0;
-	while(buc){
+	while(true){
+	    //since ending of 'bytecodes' is padded with Bytecode::NEXT_BUCKET
+	    if(buc->bytecodes[x] == Bytecode::NEXT_BUCKET){
+		buc = buc->next;
+		if(buc == nullptr){break;};
+		x = 0;
+	    };
+	    if(buc->bytecodes[x] == Bytecode::NONE){break;};
 	    printf("\n%p|%s", buc->bytecodes + x, spaces);
-	    dumpBytecode(&buc, x);
+	    dumpBytecode(buc, x);
 	};
-	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");
+	printf("\n%p|\n[FINISHED DUMPING BYTECODE FILE]\n\n", buc->bytecodes + x);
     };
 };
 #endif
