@@ -43,7 +43,7 @@ enum class Bytecode : u16{
     NEG,
     NEXT_BUCKET,
     LABEL,
-    BYTECODE_COUNT,
+    COUNT,
 };
 enum class BytecodeType : u16{
     INTEGER_S,
@@ -288,10 +288,6 @@ u16 emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, Lexer &lexer,
     return outputReg;
 };
 
-void nextBucket(BytecodeBucket **pbuc){
-    BytecodeBucket *buc = *pbuc;
-    buc = buc->next;
-};
 s64 getConstIntAndUpdate(Bytecode *page, u32 &x){
     s64 *mem = (s64*)(page + x);
     x += const_in_stream;
@@ -559,7 +555,6 @@ ASTUniVar *var = (ASTUniVar*)node;
 	ForSe->uninit();
 	mem::free(ForSe);
     }break;
-#if 0
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)node;
 	u32 exprID = compileExprToBytecode(If->expr, lexer, see, bca, bf);
@@ -572,9 +567,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	if(If->elseBody.count != 0){
 	    inElseLbl = newLabel();
 	};
-	bf.emit(Bytecode::JMPNS);
-	bf.emit(exprID);
-	bf.emit(inElseLbl);
+	bf.jmp(Bytecode::JMPNS, exprID, inElseLbl);
 	for(u32 x=0; x<If->body.count; x+=1){
 	    compileToBytecode(If->body[x], lexer, see, bca, bf);
 	};
@@ -583,10 +576,8 @@ ASTUniVar *var = (ASTUniVar*)node;
 	mem::free(IfSe);
 	bca.pop().uninit();
 	if(If->elseBody.count != 0){
-	    bf.emit(Bytecode::JMP);
-	    bf.emit(outIfLbl);
-
-	    bf.emitLabel(inElseLbl);
+	    bf.jmp(outIfLbl);
+	    bf.label(inElseLbl);
 	    ScopeEntities *ElseSe = (ScopeEntities*)If->ElseSe;
 	    see.push(ElseSe);
 	    BytecodeContext &elseBC = bca.newElem();
@@ -599,9 +590,8 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    mem::free(ElseSe);
 	    bca.pop().uninit();
 	};
-	bf.emitLabel(outIfLbl);
+	bf.label(outIfLbl);
     }break;
-#endif
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
 	u32 procBytecodeID = procID;
@@ -709,10 +699,16 @@ namespace dbg{
     inline Bytecode getBytecode(BytecodeBucket *buc, u32 &x){
 	return buc->bytecodes[x++];
     };
-    void dumpBytecode(BytecodeBucket *buc, u32 &x, DynamicArray<Bytecode*> &labels){
+    BytecodeBucket *dumpBytecode(BytecodeBucket *buc, u32 &x, DynamicArray<Bytecode*> &labels){
 	bool flag = true;
 	Bytecode bc = getBytecode(buc, x);
 	switch(bc){
+	case Bytecode::NONE: return nullptr;
+	case Bytecode::NEXT_BUCKET:{
+	    printf("NEXT_BUCKET");
+	    buc = buc->next;
+	    x = 0;
+	}break;
 	case Bytecode::LABEL:{
 	    printf("%#010x:", getBytecode(buc, x));
 	}break;
@@ -838,7 +834,7 @@ namespace dbg{
 	    bc = buc->bytecodes[x];
 	    while(bc != Bytecode::PROC_END){
 		printf("\n%p|%s   ", buc->bytecodes + x, spaces);
-		dumpBytecode(buc, x, labels);
+		buc = dumpBytecode(buc, x, labels);
 		bc = buc->bytecodes[x];
 	    };
 	    x += 1;
@@ -854,24 +850,17 @@ namespace dbg{
 	default:
 	    UNREACHABLE;
 	};
+	return buc;
     };
     void dumpBytecodeFile(BytecodeFile &bf){
 	printf("\n\n[DUMPING BYTECODE FILE]");
 	BytecodeBucket *buc = bf.firstBucket;
 	u32 x = 0;
-	while(true){
-	    //since ending of 'bytecodes' is padded with Bytecode::NEXT_BUCKET
-	    if(buc->bytecodes[x] == Bytecode::NEXT_BUCKET){
-		printf("\n%p|%sNEXT_BUCKET", buc->bytecodes + x, spaces);
-		buc = buc->next;
-		if(buc == nullptr){break;};
-		x = 0;
-	    };
-	    if(buc->bytecodes[x] == Bytecode::NONE){break;};
+	while(buc){
 	    printf("\n%p|%s", buc->bytecodes + x, spaces);
-	    dumpBytecode(buc, x, bf.labels);
+	    buc = dumpBytecode(buc, x, bf.labels);
 	};
-	printf("\n%p|\n[FINISHED DUMPING BYTECODE FILE]\n\n", buc->bytecodes + x);
+	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");
     };
 };
 #endif

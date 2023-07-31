@@ -265,7 +265,16 @@ s8 jmp(BYTECODE_INPUT){
 s8 def(BYTECODE_INPUT){
     u32 x = 2;
     //@incomplete: SIMD?
-    while(page[x] != Bytecode::PROC_END){x += 1;};
+    while(page[x] != Bytecode::PROC_END){
+	x += 1;
+	if(page[x] == Bytecode::NEXT_BUCKET){
+	    vm.buc = vm.buc->next;
+	    vm.cursor = vm.buc->bytecodes;
+	    
+	    page = vm.cursor;
+	    x = 0;
+	};
+    };
     vm.procs.push(page+1);
     return x;
 };
@@ -338,6 +347,7 @@ bool execBytecode(VM &vm){
     BytecodeBucket *buc = vm.buc;
     while(true){
 	Bytecode bc = *vm.cursor;
+	ASSERT(bc < Bytecode::COUNT);
 	if(bc == Bytecode::NONE){return true;};
 	s8 x = byteProc[(u16)bc](vm.cursor, vm);
 	if(x == -1){return false;};
@@ -347,5 +357,5 @@ bool execBytecode(VM &vm){
 };
 
 #if(DBG)
-static_assert((u16)Bytecode::BYTECODE_COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
+static_assert((u16)Bytecode::COUNT == ARRAY_LENGTH(byteProc), "Bytecode and byteProc not one-to-one");
 #endif
