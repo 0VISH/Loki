@@ -29,6 +29,7 @@ enum class ForType{
     FOR_EVER,
     C_LES,
     C_EQU,
+    C_EXPR,
 };
 
 struct ASTBase {
@@ -91,12 +92,15 @@ struct AST_Type : ASTBase{
 };
 struct ASTFor : ASTBase{
     DynamicArray<ASTBase*> body;
-    ASTBase *end;
+    union{
+	ASTBase *end;
+	ASTBase *expr;
+    };
     ASTBase *increment;
     void    *ForSe;
     u32      endOff;
     u32      incrementOff;
-    ForType loopType;
+    ForType  loopType;
 };
 
 void freeNodeInternal(ASTBase *base);
@@ -514,7 +518,16 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	}break;
 	default:{
 	    PARSE_FOR_EXPR:
-	    printf("TODO:");
+	    For->loopType = ForType::C_EXPR;
+	    x += 1;
+	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
+	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
+	    if(bend == -1 && nend == -1){
+		lexer.emitErr(tokOffs[x-1].off, "Line has to be finished with '{' or a newline");
+		return nullptr;
+	    };
+	    u32 end = (bend != -1)? bend : nend;
+	    For->expr = genASTExprTree(lexer, file, x, end);
 	}break;
 	};
     }break;
@@ -527,6 +540,10 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	s32 end;
 	s32 bend = getTokenOffInLine((Token_Type)'{', lexer, x);
 	s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
+	if(bend == -1 && nend == -1){
+	    lexer.emitErr(tokOffs[x-1].off, "Line has to be finished with '{' or a newline");
+	    return nullptr;
+	};
 	if(bend == -1){
 	    end = nend;
 	}else{

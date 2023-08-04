@@ -19,6 +19,7 @@
 	    printf("int overflow");		\
 	    break;				\
 	};					\
+	return EXIT_FAILURE;			\
       };					\
 
 #endif

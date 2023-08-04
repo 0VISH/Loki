@@ -1,4 +1,4 @@
-from termcolor import colored
+import colorama
 from sys import argv
 import subprocess
 import os
@@ -14,6 +14,8 @@ if exe == None:
     print("which compiler?")
     quit()
 
+colorama.init(autoreset = True)
+    
 if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
 
 def getFilesInFolder(folderPath):
@@ -36,8 +38,8 @@ for i in getFilesInFolder("test\\"):
     process = subprocess.Popen(exe + " " + i, shell=True, stdout=outputFile)
     process.wait()
     if process.returncode != 0:
-        print(colored("FAIL", "red"))
+        print(colorama.Fore.RED + "FAIL")
     else:
-        print(colored("OK", "green"))
+        print(colorama.Fore.GREEN + "OK")
 
 outputFile.close()

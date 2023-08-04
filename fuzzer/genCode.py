@@ -1,4 +1,4 @@
-from termcolor import colored
+import colorama
 from random import randint, sample, uniform
 from sys import argv
 import string
@@ -21,6 +21,8 @@ if command == None:
     quit()
 
 if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
+
+colorama.init(autoreset=True)
 
 class Type():
     u8  = 0
@@ -250,7 +252,7 @@ for j in range(0, GARBAGE_COUNT):
     process = subprocess.Popen(command, shell=True, stdout=outputFile)
     process.wait()
     if process.returncode != 0:
-        print(dots + colored("FAIL", "red"))
+        print(dots + colorama.Fore.RED  + "FAIL")
         fName = "bin\\fuzz\\fuzz"+str(j)+".loki"
         f = open(fName, "w")
         f.write(loCode)
@@ -259,7 +261,7 @@ for j in range(0, GARBAGE_COUNT):
         fail += 1
         failed.append(fName)
     else:
-        print(dots + colored("OK", "green"))
+        print(dots + colorama.Fore.GREEN + "OK")
 outputFile.close()
 
 print("\n[STATUS]")

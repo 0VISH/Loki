@@ -1,3 +1,3 @@
 # Loki
 
-``pip install termcolor`` before running scripts under the ``fuzzer/`` directory
+``pip install colorama`` before running scripts under the ``fuzzer/`` directory
