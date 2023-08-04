@@ -217,9 +217,9 @@ struct BytecodeContext{
     Map procToID;
     u32 *varToReg;
     Type *types;
-    u16 registerID;
+    u32 registerID;
 
-    void init(u32 varCount, u32 procCount, u16 rgsID = 0){
+    void init(u32 varCount, u32 procCount, u16 rgsID){
 	varToReg = nullptr;
 	registerID = rgsID;
 	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
@@ -646,7 +646,6 @@ ASTUniVar *var = (ASTUniVar*)node;
 	for(u32 x=0; x<inCount;){
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
-		//TODO: compile input body?
 	    case ASTType::UNI_DECLERATION:{
 		ASTUniVar *var = (ASTUniVar*)node;
 		u32 id = procSE->varMap.getValue(var->name);

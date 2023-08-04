@@ -108,7 +108,63 @@ bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle)
     };
     return true;
 };
-
+VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
+    for(u32 x=see.count; x>0; x-=1){
+	x -= 1;
+	ScopeEntities *se = see[x];
+	s32 k = se->varMap.getValue(name);
+	if(k != -1){return se->varEntities+k;};
+	if(se->scope == Scope::PROC){return nullptr;};
+    };
+    return nullptr;
+};
+bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+    BRING_TOKENS_TO_SCOPE;
+    ScopeEntities *se = see[see.count-1];
+    switch(node->type){
+    case ASTType::BIN_GRT:
+    case ASTType::BIN_GRTE:
+    case ASTType::BIN_LSR:
+    case ASTType::BIN_LSRE:
+    case ASTType::BIN_EQU:
+    case ASTType::BIN_MUL:
+    case ASTType::BIN_DIV:
+    case ASTType::BIN_ADD:{
+	ASTBinOp *op = (ASTBinOp*)node;
+	Flag flag;
+	Type lhsType = getTreeType(op->lhs, flag, see, lexer);
+	if(lhsType == Type::UNKOWN){return false;};
+	if(isTypeNum(lhsType) == false){return false;};
+	Type rhsType = getTreeType(op->rhs, flag, see, lexer);
+	if(rhsType == Type::UNKOWN){return false;};
+	if(isTypeNum(rhsType) == false){return false;};
+	op->lhsType = lhsType;
+	op->rhsType = rhsType;
+    }break;
+    case ASTType::NUM_INTEGER:
+    case ASTType::NUM_DECIMAL: break;
+    case ASTType::VARIABLE:{
+	ASTVariable *var = (ASTVariable*)node;
+	if(getVarEntity(var->name, see) == nullptr){return false;};
+    }break;
+    case ASTType::UNI_NEG:{
+	ASTUniOp *op = (ASTUniOp*)node;
+        switch(op->node->type){
+	case ASTType::NUM_INTEGER:
+	case ASTType::NUM_DECIMAL: break;
+	case ASTType::VARIABLE:{
+	    ASTVariable *var = (ASTVariable*)op->node;
+	    Type type = getVarEntity(var->name, see)->type;
+	    if(isTypeNum(type) == false){return false;};
+	}break;
+	};
+    }break;
+    default:
+	UNREACHABLE;
+	return false;
+    };
+    return true;
+};
 
 #define CHECK_TYPE_AND_TREE_IF_INITIALIZED				\
     flag = var->flag;							\
@@ -120,16 +176,17 @@ bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle)
 	};								\
     };									\
     if(!IS_BIT(flag, Flags::UNINITIALIZED)){				\
-    Flag treeFlag;							\
-    Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
-    if(treeType == Type::UNKOWN){return false;};			\
-    if(tKnown){								\
-    if((u32)treeType < (u32)type){					\
-	lexer.emitErr(tokOffs[var->tokenOff].off, "Explicit cast required as type of expression is greater than declared type"); \
-	return false;							\
-    };									\
-    };									\
-    flag |= treeFlag;							\
+	if(checkExpression(var->rhs, lexer, see) == false){return false;}; \
+	Flag treeFlag;							\
+	Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
+	if(treeType == Type::UNKOWN){return false;};			\
+	if(tKnown){							\
+	    if((u32)treeType < (u32)type){				\
+		lexer.emitErr(tokOffs[var->tokenOff].off, "Explicit cast required as type of expression is greater than declared type"); \
+		return false;						\
+	    };								\
+	};								\
+	flag |= treeFlag;						\
     };       								\
 
 
@@ -177,16 +234,6 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     typeNode->type = type;
     return true;
 };
-VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
-    for(u32 x=see.count; x>0; x-=1){
-	x -= 1;
-	ScopeEntities *se = see[x];
-	s32 k = se->varMap.getValue(name);
-	if(k != -1){return se->varEntities+k;};
-	if(se->scope == Scope::PROC){return nullptr;};
-    };
-    return nullptr;
-};
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     BRING_TOKENS_TO_SCOPE;
@@ -203,6 +250,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	}break;
 	case ForType::C_LES:
 	case ForType::C_EQU:{
+	    if(checkExpression(For->end, lexer, see) == false){return false;};
 	    Flag endTreeFlag = 0;
 	    Type endTreeType = getTreeType(For->end, endTreeFlag, see, lexer);
 	    if(isTypeNum(endTreeType) == false){
@@ -211,6 +259,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    };
 	    Type incrementTreeType = Type::UNKOWN;
 	    if(For->increment != nullptr){
+		if(checkExpression(For->increment, lexer, see) == false){return false;};
 		Flag incrementTreeFlag = 0;
 		incrementTreeType = getTreeType(For->increment, endTreeFlag, see, lexer);
 		if(isTypeNum(incrementTreeType) == false){
@@ -245,6 +294,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::IF:{
 	BRING_TOKENS_TO_SCOPE;
 	ASTIf *If = (ASTIf*)node;
+	if(checkExpression(If->expr, lexer, see) == false){return false;};
 	Flag treeFlag;
 	Type treeType = getTreeType(If->expr, treeFlag, see, lexer);
 	if(treeType == Type::UNKOWN){return false;};
@@ -296,18 +346,16 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	if(checkVarDef(node, lexer, see, true, false) == false){return false;};
-	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	if(checkVarDef(node, lexer, see, false, false) == false){return false;};
-	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, see, true, true) == false){return false;};
 	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
-	    if(checkEntity(var->rhs, lexer, see) == false){return false;};
+	    if(checkExpression(var->rhs, lexer, see) == false){return false;};
 	};
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
@@ -317,45 +365,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Type unkown. Cannot uninitialize");
 	    return false;
 	};
-	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
-    case ASTType::BIN_GRT:
-    case ASTType::BIN_GRTE:
-    case ASTType::BIN_LSR:
-    case ASTType::BIN_LSRE:
-    case ASTType::BIN_EQU:
-    case ASTType::BIN_MUL:
-    case ASTType::BIN_DIV:
-    case ASTType::BIN_ADD:{
-	ASTBinOp *op = (ASTBinOp*)node;
-	Flag flag;
-	Type lhsType = getTreeType(op->lhs, flag, see, lexer);
-	if(lhsType == Type::UNKOWN){return false;};
-	if(isTypeNum(lhsType) == false){return false;};
-	Type rhsType = getTreeType(op->rhs, flag, see, lexer);
-	if(rhsType == Type::UNKOWN){return false;};
-	if(isTypeNum(rhsType) == false){return false;};
-	op->lhsType = lhsType;
-	op->rhsType = rhsType;
-    }break;
-    case ASTType::NUM_INTEGER:
-    case ASTType::NUM_DECIMAL: break;
-    case ASTType::VARIABLE:{
-	ASTVariable *var = (ASTVariable*)node;
-	if(getVarEntity(var->name, see) == nullptr){return false;};
-    }break;
-    case ASTType::UNI_NEG:{
-	ASTUniOp *op = (ASTUniOp*)node;
-        switch(op->node->type){
-	case ASTType::NUM_INTEGER:
-	case ASTType::NUM_DECIMAL: break;
-	case ASTType::VARIABLE:{
-	    ASTVariable *var = (ASTVariable*)op->node;
-	    Type type = getVarEntity(var->name, see)->type;
-	    if(isTypeNum(type) == false){return false;};
-	}break;
-	};
-    }break;
     default:
 	UNREACHABLE;
 	return false;

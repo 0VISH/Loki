@@ -636,21 +636,19 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x) {
 		    lexer.emitErr(tokOffs[x].off, "Expected '('");
 		    return nullptr;
 		};
-		x += 1;
 		ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, file);
 		proc->tokenOff = start;
 		proc->flag = flag;
 		proc->name = makeStringFromTokOff(start, lexer);
 		proc->body.init();
 		proc->out.zero();
-		if (tokTypes[x] == (Token_Type)')') {
-		    goto PARSE_AFTER_ARGS;
-		};
 		u32 uniInCount = 0;
 		u32 multiInCount = 0;
 		u32 multiInInputCount = 0;
 		//parse input
-		while (true) {
+		x += 1;
+		if(tokTypes[x] == (Token_Type)')'){goto END_PROC_INPUT_PARSING_LOOP;};
+		while(true){
 		    eatNewlines(tokTypes, x);
 		    ASTBase *base = parseBlock(lexer, file, x);
 		    if(base == nullptr){return nullptr;};
@@ -665,12 +663,19 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x) {
 		    }break;
 		    };
 		    proc->body.push(base);
-		    if(tokTypes[x] == (Token_Type)','){
+		    switch(tokTypes[x]){
+		    case (Token_Type)')':{
+			goto END_PROC_INPUT_PARSING_LOOP;
+		    }break;
+		    case (Token_Type)',':{
 			x += 1;
-			continue;
+		    }break;
+		    default:
+			lexer.emitErr(tokOffs[x].off, "Expected ','");
+			return nullptr;
 		    };
-		    break;
 		};
+		END_PROC_INPUT_PARSING_LOOP:
 		proc->uniInCount = uniInCount;
 		proc->multiInCount = multiInCount;
 		proc->multiInInputCount = multiInInputCount;
@@ -1063,7 +1068,6 @@ namespace dbg {
 	    PAD;
 	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
-	    printf("IN");
 	    u32 inCount = proc->uniInCount + proc->multiInCount;
 	    for(u32 x=0; x<inCount; x+=1){
 		ASTBase *node = proc->body[x];

@@ -82,7 +82,7 @@ bool compile(char *fileName){
 	    bca.uninit();
 	});
     BytecodeContext &bc = bca.newElem();
-    bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count);
+    bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count, 0);
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
