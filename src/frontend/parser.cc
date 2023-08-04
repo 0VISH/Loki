@@ -408,9 +408,9 @@ s32 getTokenOffInLine(Token_Type tok, Lexer &lexer, u32 cur){
     };
     return x;
 };
-ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &flagStart) {
+ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
-    flagStart = x;
+    Flag flag;
     while(tokTypes[x] == Token_Type::K_CONSTANT || tokTypes[x] == Token_Type::K_COMPTIME){
 	if(tokTypes[x] == Token_Type::K_CONSTANT){
 	    SET_BIT(flag, Flags::CONSTANT);
@@ -614,10 +614,14 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 		assign->name = makeStringFromTokOff(start, lexer);
 		x += 1;
 		u32 end = getEndNewlineEOF(tokTypes, x);
-		assign->rhs = genASTExprTree(lexer, file, x, end);
-		if(assign->rhs == nullptr){return nullptr;};
+		if(tokTypes[x] == Token_Type::TDOT){
+		    SET_BIT(flag, Flags::UNINITIALIZED);
+		    x += 1;
+		}else{
+		    assign->rhs = genASTExprTree(lexer, file, x, end);
+		    if(assign->rhs == nullptr){return nullptr;};
+		};
 		assign->flag = flag;
-		flag = 0;
 		return (ASTBase*)assign;
 	    } break;
 	    case (Token_Type)':': {
@@ -741,14 +745,15 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    } break;
 	    default: {
 		if (isType(tokTypes[x])) {
-		    uniVarType = ASTType::UNI_ASSIGNMENT_T_KNOWN;
 		    x += 1;
-		    if (tokTypes[x] == (Token_Type)'=') { goto SINGLE_VARIABLE_ASSIGNMENT; };
+		    if (tokTypes[x] == (Token_Type)'=') {
+			uniVarType = ASTType::UNI_ASSIGNMENT_T_KNOWN;
+			goto SINGLE_VARIABLE_ASSIGNMENT;
+		    };
 		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION, file);
 		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    assign->flag = flag;
-		    flag = 0;
 		    return (ASTBase*)assign;
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected a type");
@@ -790,7 +795,6 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
 	    u32 end = getEndNewlineEOF(tokTypes, x);
 	    multiAss->rhs = genASTExprTree(lexer, file, x, end);
 	    multiAss->flag = flag;
-	    flag = 0;
 	    return (ASTBase*)multiAss;
 	} break;
 	} break;
@@ -803,15 +807,7 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x, Flag &flag, u32 &f
     return nullptr;
 };
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x){
-    Flag flag = 0;
-    u32 flagStart = 0;
-    ASTBase *base = parseBlockInner(lexer, file, x, flag, flagStart);
-    if(flag != 0){
-	BRING_TOKENS_TO_SCOPE;
-	lexer.emitErr(tokOffs[flagStart].off, "Unexpected flags");
-	return nullptr;
-    };
-    return base;
+    return parseBlockInner(lexer, file, x);
 };
 
 u32 pow(u32 base, u32 exp){
@@ -995,7 +991,13 @@ namespace dbg {
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
 	    PAD;
 	    printf("RHS");
-	    if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
+	    if(IS_BIT(decl->flag, Flags::UNINITIALIZED)){
+		padding += 1;
+		PAD;
+		printf("uninitialized");
+	    }else{
+		if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
+	    };
 	} break;
 	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
 	    ASTMultiVar *decl = (ASTMultiVar*)node;

@@ -22,5 +22,6 @@ enum class Flags {
     CONSTANT = 1,
     COMPTIME,
     GLOBAL,
+    UNINITIALIZED,
 };
 typedef u8 Flag;

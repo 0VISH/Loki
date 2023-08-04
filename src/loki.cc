@@ -86,6 +86,7 @@ bool compile(char *fileName){
     compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
     dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
+    /*
     os::startTimer(TimeSlot::EXEC_BC);
     VM vm;
     vm.init(bf.firstBucket, &bf.labels, 0);
@@ -94,5 +95,6 @@ bool compile(char *fileName){
 	printf("TODO: VM ERRORs");
     };
     os::endTimer(TimeSlot::EXEC_BC);
+    */
     return true;
 };

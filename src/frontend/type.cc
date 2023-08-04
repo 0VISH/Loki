@@ -106,6 +106,9 @@ Type tokenKeywordToType(Lexer &lexer, u32 off){
     case Token_Type::K_S8:  return Type::S_8;
     case Token_Type::K_S16: return Type::S_16;
     case Token_Type::K_S32: return Type::S_32;
+    case Token_Type::K_F16: return Type::F_16;
+    case Token_Type::K_F32: return Type::F_32;
+    case Token_Type::K_F64: return Type::F_64;
     default:
 	UNREACHABLE;
         return Type::UNKOWN;

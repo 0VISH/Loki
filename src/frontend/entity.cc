@@ -117,7 +117,7 @@ bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	Flag &flag = var->flag;
 	Flag treeFlag;
 	Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);
-        if(treeType == Type::UNKOWN){return false;};
+	if(treeType == Type::UNKOWN){return false;};
 	if(tKown){
 	    type = tokenKeywordToType(lexer, var->tokenOff+2);
 	    if(type == Type::UNKOWN){
@@ -315,11 +315,19 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, see, true, true) == false){return false;};
-	if(checkEntity(var->rhs, lexer, see) == false){return false;};
+	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
+	    if(checkEntity(var->rhs, lexer, see) == false){return false;};
+	}else{
+	    //TODO: 
+	};
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, see, false, true) == false){return false;};
+	if(IS_BIT(var->flag, Flags::UNINITIALIZED)){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Type unkown. Cannot uninitialized");
+	    return false;
+	};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};
     } break;
     case ASTType::BIN_GRT:

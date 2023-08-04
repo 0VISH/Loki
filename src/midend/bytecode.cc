@@ -43,6 +43,7 @@ enum class Bytecode : u16{
     NEG,
     NEXT_BUCKET,
     LABEL,
+    DECL_REG,
     COUNT,
 };
 enum class BytecodeType : u16{
@@ -113,6 +114,11 @@ struct BytecodeFile{
     void emit(Type type){
 	curBucket->bytecodes[cursor] = (Bytecode)type;
 	cursor += 1;
+    };
+    void declReg(Type regType, u16 regID){
+	emit(Bytecode::DECL_REG);
+	emit(regType);
+	emit(regID);
     };
     Bytecode *getCurBytecodeAdd(){
 	return curBucket->bytecodes + cursor;
@@ -437,17 +443,23 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
-	u32 regID = compileExprToBytecode(var->rhs, lexer, see, bca, bf);
-	Type regType = bc.types[regID];
-	if(regType != Type::COMP_DECIMAL && regType != Type::COMP_INTEGER){
-	    if(regType != entity.type){
+	Flag flag = entity.flag;
+	u32 regID;
+	if(IS_BIT(flag, Flags::UNINITIALIZED)){
+	    regID = bc.newReg(entity.type);
+	    bf.declReg(entity.type, regID);
+	    bc.varToReg[id] = regID;
+	}else{
+	    regID = compileExprToBytecode(var->rhs, lexer, see, bca, bf);
+	    Type regType = bc.types[regID];
+	    if(isSameTypeRange(regType, entity.type) == false){
 		u32 newReg = bc.newReg(entity.type);
 		bf.cast(entity.type, newReg, regType, regID);
 		bc.varToReg[id] = newReg;
 	    }else{
 		bc.varToReg[id] = regID;
 	    };
-        };
+	};
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
@@ -672,7 +684,7 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, Dyna
 
 #define DUMP_REG dumpReg(getBytecode(buc, x));
 
-#define DUMP_TYPE dumpType(getBytecode(buc, x));
+#define DUMP_TYPE dumpType((Type)getBytecode(buc, x));
 
 namespace dbg{
     char *spaces = "    ";
@@ -680,20 +692,26 @@ namespace dbg{
     void dumpReg(Bytecode id){
 	printf(" %%%d ", id);
     };
-    void dumpType(Bytecode bc){
+    void dumpType(Type type){
 	printf(" ");
-	switch(bc){
-	case (Bytecode)Type::XE_VOID: printf("void");break;
-	case (Bytecode)Type::S_64: printf("s64");break;
-	case (Bytecode)Type::U_64: printf("u64");break;
-	case (Bytecode)Type::S_32: printf("s32");break;
-	case (Bytecode)Type::U_32: printf("u32");break;
-	case (Bytecode)Type::S_16: printf("s16");break;
-	case (Bytecode)Type::U_16: printf("u16");break;
-	case (Bytecode)Type::S_8: printf("s8");break;
-	case (Bytecode)Type::U_8: printf("u8");break;
-	case (Bytecode)Type::COMP_INTEGER: printf("comp_int");break;
-	case (Bytecode)Type::COMP_DECIMAL: printf("comp_dec");break;
+	switch(type){
+	case Type::XE_VOID: printf("void");break;
+	case Type::S_64: printf("s64");break;
+	case Type::U_64: printf("u64");break;
+	case Type::F_64: printf("f64");break;
+	case Type::S_32: printf("s32");break;
+	case Type::U_32: printf("u32");break;
+	case Type::F_32: printf("f32");break;
+	case Type::S_16: printf("s16");break;
+	case Type::U_16: printf("u16");break;
+	case Type::F_16: printf("f16");break;
+	case Type::S_8: printf("s8");break;
+	case Type::U_8: printf("u8");break;
+	case Type::COMP_INTEGER: printf("comp_int");break;
+	case Type::COMP_DECIMAL: printf("comp_dec");break;
+	default:
+	    UNREACHABLE;
+	    return;
 	};
     };
     inline Bytecode getBytecode(BytecodeBucket *buc, u32 &x){
@@ -813,7 +831,7 @@ namespace dbg{
 	    printf("%d(", (u32)bc);
 	    bc = getBytecode(buc, x);
 	    while(bc != Bytecode::PROC_GIVES){
-		dumpType(bc);
+		dumpType((Type)bc);
 		DUMP_REG;
 		printf(",");
 		bc = getBytecode(buc, x);
@@ -823,7 +841,7 @@ namespace dbg{
 	    if(bc != Bytecode::PROC_START){
 		printf(" -> (");
 		while(bc != Bytecode::PROC_START){
-		    dumpType(bc);
+		    dumpType((Type)bc);
 		    bc = getBytecode(buc, x);
 		};
 		printf(")");
@@ -844,6 +862,11 @@ namespace dbg{
 	}break;
 	case Bytecode::NEG:{
 	    printf("neg");
+	    DUMP_TYPE;
+	    DUMP_REG;
+	}break;
+	case Bytecode::DECL_REG:{
+	    printf("decl_reg");
 	    DUMP_TYPE;
 	    DUMP_REG;
 	}break;

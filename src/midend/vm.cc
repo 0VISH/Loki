@@ -296,6 +296,9 @@ s8 next_bucket(BYTECODE_INPUT){
     vm.cursor = vm.buc->bytecodes - 1; //execBytecodes increments it by 1
     return 0;
 };
+s8 decl_reg(BYTECODE_INPUT){
+    return 2;
+};
 
 /*
   NEG TYPE 1 REG 1
@@ -341,6 +344,7 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     neg,
     next_bucket,
     label,
+    decl_reg,
 };
 
 bool execBytecode(VM &vm){

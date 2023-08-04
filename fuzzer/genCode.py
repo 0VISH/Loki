@@ -237,22 +237,25 @@ outputFile = open(outputFileName, "w")
 fail = 0
 failed = []
 for j in range(0, GARBAGE_COUNT):
-    loCode = None
+    loCode = ""
     print("["+str(j)+"] Generating garbage...")
     x = {}
     fuzzFile = open(fuzzFileName, "w")
-    fuzzFile.write("main :: proc(){\n")
+    loCode += "main :: proc(){\n"
     for i in range(0, ENTITY_COUNT):
-        loCode = genEntity(x, 1, 0) + "\n"
-    fuzzFile.write(loCode + "}")
+        loCode += genEntity(x, 1, 0) + "\n"
+    loCode += "}"
+    fuzzFile.write(loCode)
     fuzzFile.close()
     
-    print(tab + "calling " + command, end="")
+    print(tab + "calling: " + command, end="")
     
     process = subprocess.Popen(command, shell=True, stdout=outputFile)
     process.wait()
     if process.returncode != 0:
         print(dots + colorama.Fore.RED  + "FAIL")
+        print(tab + "return code:", process.returncode)
+        print(loCode)
         fName = "bin\\fuzz\\fuzz"+str(j)+".loki"
         f = open(fName, "w")
         f.write(loCode)
