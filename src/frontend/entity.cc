@@ -108,56 +108,47 @@ bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle)
     };
     return true;
 };
-bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see, bool tKown, bool isSingle){
+
+
+#define CHECK_TYPE_AND_TREE_IF_INITIALIZED				\
+    flag = var->flag;							\
+    if(tKnown){								\
+	type = tokenKeywordToType(lexer, var->tokenOff+2);		\
+	if(type == Type::UNKOWN){					\
+	    lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");	\
+	    return false;						\
+	};								\
+    };									\
+    if(!IS_BIT(flag, Flags::UNINITIALIZED)){				\
+    Flag treeFlag;							\
+    Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
+    if(treeType == Type::UNKOWN){return false;};			\
+    if(tKnown){								\
+    if((u32)treeType < (u32)type){					\
+	lexer.emitErr(tokOffs[var->tokenOff].off, "Explicit cast required as type of expression is greater than declared type"); \
+	return false;							\
+    };									\
+    };									\
+    flag |= treeFlag;							\
+    };       								\
+
+
+bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see, bool tKnown, bool isSingle){
     BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1];
+    Flag flag;
+    Type type;
     if(isSingle){
 	ASTUniVar *var = (ASTUniVar*)base;
-	Type type;
-	Flag &flag = var->flag;
-	Flag treeFlag;
-	Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);
-	if(treeType == Type::UNKOWN){return false;};
-	if(tKown){
-	    type = tokenKeywordToType(lexer, var->tokenOff+2);
-	    if(type == Type::UNKOWN){
-		lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
-		return false;
-	    };
-	    if((u32)treeType < (u32)type){
-		lexer.emitErr(tokOffs[var->tokenOff].off, "Type of expression tree does not match declared type");
-		return false;
-	    };
-	}else{
-	    type = treeType;
-	};
-	flag |= treeFlag;
+	CHECK_TYPE_AND_TREE_IF_INITIALIZED;
 	if(checkVarEntityPresentInScopeElseReg(lexer, var->name, flag, type, se) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefenition");
 	    return false;
 	};
 	return true;
-    };
+    }
     ASTMultiVar *var = (ASTMultiVar*)base;
-    Type type;
-    Flag &flag = var->flag;
-    Flag treeFlag = 0;
-    Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);
-    if(treeType == Type::UNKOWN){return false;};
-    if(tKown){
-	type = tokenKeywordToType(lexer, var->tokenOff+2);
-	if(type == Type::UNKOWN){
-	    lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
-	    return false;
-	};
-	if((u32)treeType < (u32)type){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Size of expression is greater than declared size");
-	    return false;
-	};
-    }else{
-	type = treeType;
-    };
-    flag |= treeFlag;
+    CHECK_TYPE_AND_TREE_IF_INITIALIZED;
     DynamicArray<String> &names = var->names;
     for(u32 x=0; x<names.count; x+=1){
 	if(checkVarEntityPresentInScopeElseReg(lexer, names[x], flag, type, se) == false){
@@ -317,15 +308,13 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(checkVarDef(node, lexer, see, true, true) == false){return false;};
 	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
 	    if(checkEntity(var->rhs, lexer, see) == false){return false;};
-	}else{
-	    //TODO: 
 	};
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
 	ASTUniVar *var = (ASTUniVar*)node;
 	if(checkVarDef(node, lexer, see, false, true) == false){return false;};
 	if(IS_BIT(var->flag, Flags::UNINITIALIZED)){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Type unkown. Cannot uninitialized");
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Type unkown. Cannot uninitialize");
 	    return false;
 	};
 	if(checkEntity(var->rhs, lexer, see) == false){return false;};

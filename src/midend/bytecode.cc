@@ -437,14 +437,39 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
-	//TODO: compile decleration
+    case ASTType::UNI_DECLERATION:{
+	ASTUniVar *var = (ASTUniVar*)node;
+	u32 id = se->varMap.getValue(var->name);
+	const VariableEntity &entity = se->varEntities[id];
+	u16 reg = bc.newReg(entity.type);
+	if(isFloat(entity.type)){
+	    bf.movConstS(reg, 0);
+	}else{
+	    bf.movConstF(reg, 0);
+	};
+    }break;
+    case ASTType::MULTI_DECLERATION:{
+	ASTMultiVar *var = (ASTMultiVar*)node;
+	DynamicArray<String> &names = var->names;
+	u32 firstID = se->varMap.getValue(names[0]);
+	const VariableEntity &firstEntityID = se->varEntities[firstID];
+	Type firstEntityType = firstEntityID.type;
+	for(u32 x=0; x<names.count; x+=1){
+	    u32 reg = bc.newReg(firstEntityType);
+	    if(isFloat(firstEntityType)){
+		bf.movConstF(reg, 0);
+	    }else{
+		bf.movConstS(reg, 0);
+	    };
+	};
+    }break;
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN:{
 ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
 	Flag flag = entity.flag;
-	u32 regID;
+	u16 regID;
 	if(IS_BIT(flag, Flags::UNINITIALIZED)){
 	    regID = bc.newReg(entity.type);
 	    bf.declReg(entity.type, regID);
