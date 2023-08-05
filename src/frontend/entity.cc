@@ -76,45 +76,18 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
     };
     se->init(varCount, procCount);
 };
-bool checkVarDecl(ASTBase *base, Lexer &lexer, ScopeEntities *se, bool isSingle){
-    BRING_TOKENS_TO_SCOPE;
-    if(isSingle){
-	ASTUniVar *var = (ASTUniVar*)base;
-	Type type = tokenKeywordToType(lexer, var->tokenOff+2);
-	if(type == Type::UNKOWN){
-	    lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
-	    return false;
-	};
-	if(checkVarEntityPresentInScopeElseReg(lexer, var->name, var->flag, type, se) == false){
-	    BRING_TOKENS_TO_SCOPE;
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
-	    return false;
-	};
-	return true;
-    };
-    ASTMultiVar *var = (ASTMultiVar*)base;
-    Type type = tokenKeywordToType(lexer, var->tokenOff+2);
-    if(type == Type::UNKOWN){
-	lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");
-	return false;
-    };
-    for(u32 x=0; x!=var->names.count; x+=1){
-	String &name = var->names[x];
-	if(checkVarEntityPresentInScopeElseReg(lexer, name, var->flag, type, se) == false){
-	    BRING_TOKENS_TO_SCOPE;
-	    lexer.emitErr(tokOffs[var->tokenOff - var->names.count - var->names.count + x*2 + 2].off, "Variable redecleration");
-	    return false;
-	};
-    };
-    return true;
-};
 VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
     for(u32 x=see.count; x>0; x-=1){
 	x -= 1;
 	ScopeEntities *se = see[x];
 	s32 k = se->varMap.getValue(name);
 	if(k != -1){return se->varEntities+k;};
-	if(se->scope == Scope::PROC){return nullptr;};
+	if(se->scope == Scope::PROC){
+	    ScopeEntities *globalScope = see[0];
+	    k = globalScope->varMap.getValue(name);
+	    if(k != -1){return globalScope->varEntities+k;};
+	    return nullptr;
+	};
     };
     return nullptr;
 };
@@ -166,55 +139,6 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
     return true;
 };
 
-#define CHECK_TYPE_AND_TREE_IF_INITIALIZED				\
-    flag = var->flag;							\
-    if(tKnown){								\
-	type = tokenKeywordToType(lexer, var->tokenOff+2);		\
-	if(type == Type::UNKOWN){					\
-	    lexer.emitErr(tokOffs[var->tokenOff+2].off, "Unkown type");	\
-	    return false;						\
-	};								\
-    };									\
-    if(!IS_BIT(flag, Flags::UNINITIALIZED)){				\
-	if(checkExpression(var->rhs, lexer, see) == false){return false;}; \
-	Flag treeFlag;							\
-	Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
-	if(treeType == Type::UNKOWN){return false;};			\
-	if(tKnown){							\
-	    if((u32)treeType < (u32)type){				\
-		lexer.emitErr(tokOffs[var->tokenOff].off, "Explicit cast required as type of expression is greater than declared type"); \
-		return false;						\
-	    };								\
-	};								\
-	flag |= treeFlag;						\
-    };       								\
-
-
-bool checkVarDef(ASTBase *base, Lexer &lexer, DynamicArray<ScopeEntities*> &see, bool tKnown, bool isSingle){
-    BRING_TOKENS_TO_SCOPE;
-    ScopeEntities *se = see[see.count-1];
-    Flag flag;
-    Type type;
-    if(isSingle){
-	ASTUniVar *var = (ASTUniVar*)base;
-	CHECK_TYPE_AND_TREE_IF_INITIALIZED;
-	if(checkVarEntityPresentInScopeElseReg(lexer, var->name, flag, type, se) == false){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefenition");
-	    return false;
-	};
-	return true;
-    }
-    ASTMultiVar *var = (ASTMultiVar*)base;
-    CHECK_TYPE_AND_TREE_IF_INITIALIZED;
-    DynamicArray<String> &names = var->names;
-    for(u32 x=0; x<names.count; x+=1){
-	if(checkVarEntityPresentInScopeElseReg(lexer, names[x], flag, type, se) == false){
-	    lexer.emitErr(tokOffs[var->tokenOff - var->names.count - var->names.count + x*2 + 2].off, "Variable redefenition");
-	    return false;
-	};
-    };
-    return true;
-};
 bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     BRING_TOKENS_TO_SCOPE;
     AST_Type *typeNode = (AST_Type*)node;
@@ -336,35 +260,6 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	//NOTE: checking body checks the input also
 	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
-    } break;
-    case ASTType::UNI_DECLERATION:{
-	if(checkVarDecl(node, lexer, se, true) == false){ return false;};
-    }break;
-    case ASTType::MULTI_DECLERATION:{
-	if(checkVarDecl(node, lexer, se, false) == false){ return false;};
-    }break;
-    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	if(checkVarDef(node, lexer, see, true, false) == false){return false;};
-    }break;
-    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	if(checkVarDef(node, lexer, see, false, false) == false){return false;};
-    } break;
-    case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
-	ASTUniVar *var = (ASTUniVar*)node;
-	if(checkVarDef(node, lexer, see, true, true) == false){return false;};
-	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
-	    if(checkExpression(var->rhs, lexer, see) == false){return false;};
-	};
-    }break;
-    case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
-	ASTUniVar *var = (ASTUniVar*)node;
-	if(checkVarDef(node, lexer, see, false, true) == false){return false;};
-	if(IS_BIT(var->flag, Flags::UNINITIALIZED)){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Type unkown. Cannot uninitialize");
-	    return false;
-	};
     } break;
     default:
 	UNREACHABLE;
