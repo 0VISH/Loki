@@ -388,7 +388,7 @@ s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<S
     };
     return varCount;
 };
-ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x);
+
 ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
     BRING_TOKENS_TO_SCOPE;
     AST_Type *type = (AST_Type*)allocAST(sizeof(AST_Type), ASTType::TYPE, file);
@@ -408,7 +408,7 @@ s32 getTokenOffInLine(Token_Type tok, Lexer &lexer, u32 cur){
     };
     return x;
 };
-ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x) {
+ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
     Flag flag;
     while(tokTypes[x] == Token_Type::K_CONSTANT || tokTypes[x] == Token_Type::K_COMPTIME){
@@ -810,9 +810,6 @@ ASTBase *parseBlockInner(Lexer &lexer, ASTFile &file, u32 &x) {
     } break;
     };
     return nullptr;
-};
-ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x){
-    return parseBlockInner(lexer, file, x);
 };
 
 u32 pow(u32 base, u32 exp){

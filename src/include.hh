@@ -14,7 +14,12 @@
 #include "mem.cc"
 #include "ds.cc"
 #include "threadpool.hh"
-#include "os.cc"
+#include "time.cc"
+#if(PLAT_WIN)
+#include "windowsOS.cc"
+#elif(PLAT_LIN)
+#include "linuxOS.cc"
+#endif
 
 #include "debug/include.hh"
 

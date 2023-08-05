@@ -96,6 +96,6 @@ namespace report{
 	    };
 	    printf("^\n");
 	};
-	printf("\n\nflushed %d error%c\n", errorOff, (errorOff == 1)?' ':'s');
+	printf("\nflushed %d error%c\n", errorOff, (errorOff == 1)?' ':'s');
     };
 }

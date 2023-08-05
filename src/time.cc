@@ -21,6 +21,7 @@ char *timeSlotNames[] = {
 };
 
 void dumpTimers(Timer *t){
+    printf("\n");
     const u32 dots = 30;
     for(u32 x=0; x<(u16)TimeSlot::COUNT; x+=1){
 	char * slotName = timeSlotNames[x];
@@ -33,9 +34,3 @@ void dumpTimers(Timer *t){
 	printf("%f\n", t[x].time);
     };
 };
-
-#if(PLAT_WIN)
-#include "windowsOS.cc"
-#elif(PLAT_LIN)
-#include "linuxOS.cc"
-#endif
