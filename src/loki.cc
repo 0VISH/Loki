@@ -35,8 +35,10 @@ bool compile(char *fileName){
     DynamicArray<ScopeEntities*> see;
     see.init(3);
     DEFER({
-	    see[0]->uninit();
-	    mem::free(see[0]);
+	    for(u32 x=0; x<see.count; x+=1){
+		see[x]->uninit();
+		mem::free(see[x]);
+	    };
 	    see.uninit();
 	});
     ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
