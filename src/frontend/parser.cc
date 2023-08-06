@@ -410,7 +410,7 @@ s32 getTokenOffInLine(Token_Type tok, Lexer &lexer, u32 cur){
 };
 ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
-    Flag flag;
+    Flag flag = 0;
     while(tokTypes[x] == Token_Type::K_CONSTANT || tokTypes[x] == Token_Type::K_COMPTIME){
 	if(tokTypes[x] == Token_Type::K_CONSTANT){
 	    SET_BIT(flag, Flags::CONSTANT);

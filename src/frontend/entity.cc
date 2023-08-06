@@ -66,6 +66,27 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
     };								\
     return nullptr;						\
 
+
+s32 getVarEntityScopeOff(String name, DynamicArray<ScopeEntities*> &see){
+    u32 x = see.count;
+    while(x>0){
+	x -= 1;
+	ScopeEntities *se = see[x];
+	if(se->varMap.len != 0){
+	    s32 k = se->varMap.getValue(name);
+	    if(k != -1){return k;};
+	};
+	if(se->scope == Scope::PROC){
+	    ScopeEntities *globalScope = see[0];
+	    if(globalScope->varMap.len != 0){
+		s32 k = globalScope->varMap.getValue(name);
+		if(k != -1){return k;};
+	    };
+	    return -1;
+	};
+    };
+    return -1;
+};
 ProcEntity *getProcEntity(String name, DynamicArray<ScopeEntities*> &see){
     GET_ENTITY_TEMPLATE(procMap, procEntities);
 };
@@ -174,7 +195,6 @@ bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, Dyna
 
 #define CHECK_TREE_AND_MERGE_FLAGS					\
     if(checkExpression(var->rhs, lexer, see) == false){return false;};	\
-    Flag flag = var->flag;						\
     Flag treeFlag;							\
     Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
     if(treeType == Type::UNKOWN){return false;};			\
@@ -208,7 +228,10 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::UNI_ASSIGNMENT_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);
-	CHECK_TREE_AND_MERGE_FLAGS;
+	Flag flag = var->flag;
+	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
+	    CHECK_TREE_AND_MERGE_FLAGS;
+	};
 	if(checkVarEntityPresentInScopeElseReg(var->name, flag, type, see) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
 	    return false;
@@ -217,7 +240,10 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);
-	CHECK_TREE_AND_MERGE_FLAGS;
+	Flag flag = var->flag;
+	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
+	    CHECK_TREE_AND_MERGE_FLAGS;
+	};
 	DynamicArray<String> &names = var->names;
 	for(u32 x=0; x<names.count; x+=1){
 	    String &name = names[x];
@@ -229,6 +255,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::UNI_ASSIGNMENT_T_UNKNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
+	Flag flag = var->flag;
+	if(IS_BIT(flag, Flags::UNINITIALIZED)){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Cannot keep the variable uninitialized since the type is unkown.");
+	    return false;
+	};
 	CHECK_TREE_AND_MERGE_FLAGS;
 	if(checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
@@ -237,6 +268,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
+	Flag flag = var->flag;
+	if(IS_BIT(flag, Flags::UNINITIALIZED)){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Cannot keep the variable uninitialized since the type is unkown.");
+	    return false;
+	};
 	CHECK_TREE_AND_MERGE_FLAGS;
 	DynamicArray<String> &names = var->names;
 	for(u32 x=0; x<names.count; x+=1){

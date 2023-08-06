@@ -294,28 +294,13 @@ u16 emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, Lexer &lexer,
     return outputReg;
 };
 
-s64 getConstIntAndUpdate(Bytecode *page, u32 &x){
-    s64 *mem = (s64*)(page + x);
-    x += const_in_stream;
-    return *mem;
-};
 s64 getConstInt(Bytecode *page){
     s64 *mem = (s64*)page;
-    return *mem;
-};
-f64 getConstDecAndUpdate(Bytecode *page, u32 &x){
-    f64 *mem = (f64*)(page + x);
-    x += const_in_stream;
     return *mem;
 };
 f64 getConstDec(Bytecode *page){
     f64 *mem = (f64*)page;
     return *mem;
-};
-Bytecode *getPointerAndUpdate(Bytecode *page, u32 &x){
-    Bytecode *mem = (Bytecode*)(page + x);
-    x += pointer_in_stream;
-    return mem;
 };
 Bytecode *getPointer(Bytecode *page){
     Bytecode *mem = (Bytecode*)page;
@@ -344,14 +329,9 @@ u16 compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntitie
     }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
-	u32 off = see.count-1;
+	s32 off = getVarEntityScopeOff(var->name, see); //NOTE: we do not need to check if off == -1 as the checker would have raised a problem
 	ScopeEntities *se = see[off];
-	s32 id = se->varMap.getValue(var->name);
-	if(id == -1){
-	    off = 0;
-	    se = see[0];
-	    id = se->varMap.getValue(var->name);
-	};
+	u32 id = se->varMap.getValue(var->name);
 	BytecodeContext &correctBC = bca[off];
 	return correctBC.varToReg[id];	
     }break;
@@ -737,6 +717,21 @@ namespace dbg{
 	    UNREACHABLE;
 	    return;
 	};
+    };
+    s64 getConstIntAndUpdate(Bytecode *page, u32 &x){
+	s64 *mem = (s64*)(page + x);
+	x += const_in_stream;
+	return *mem;
+    };
+    f64 getConstDecAndUpdate(Bytecode *page, u32 &x){
+	f64 *mem = (f64*)(page + x);
+	x += const_in_stream;
+	return *mem;
+    };
+    Bytecode *getPointerAndUpdate(Bytecode *page, u32 &x){
+	Bytecode *mem = (Bytecode*)(page + x);
+	x += pointer_in_stream;
+	return mem;
     };
     inline Bytecode getBytecode(BytecodeBucket *buc, u32 &x){
 	return buc->bytecodes[x++];
