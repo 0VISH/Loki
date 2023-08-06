@@ -270,7 +270,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	Flag flag = var->flag;
 	if(IS_BIT(flag, Flags::UNINITIALIZED)){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Cannot keep the variable uninitialized since the type is unkown.");
+	    lexer.emitErr(tokOffs[var->tokenOff - (var->names.count-1)*2].off, "Cannot keep the variable uninitialized since the type is unkown.");
 	    return false;
 	};
 	CHECK_TREE_AND_MERGE_FLAGS;

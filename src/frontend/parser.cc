@@ -797,8 +797,13 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		return nullptr;
 	    };
 	    x += 1;
-	    u32 end = getEndNewlineEOF(tokTypes, x);
-	    multiAss->rhs = genASTExprTree(lexer, file, x, end);
+	    if(tokTypes[x] == Token_Type::TDOT){
+		SET_BIT(flag, Flags::UNINITIALIZED);
+		x += 1;
+	    }else{
+		u32 end = getEndNewlineEOF(tokTypes, x);
+		multiAss->rhs = genASTExprTree(lexer, file, x, end);
+	    };
 	    multiAss->flag = flag;
 	    return (ASTBase*)multiAss;
 	} break;
@@ -1023,7 +1028,13 @@ namespace dbg {
 	    };
 	    PAD;
 	    printf("RHS");
-	    if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
+	    if(IS_BIT(multiAss->flag, Flags::UNINITIALIZED)){
+		padding += 1;
+		PAD;
+		printf("uninitialized");
+	    }else{
+		if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
+	    };
 	} break;
 	case ASTType::FOR:{
 	    bool printed = false;
