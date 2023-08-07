@@ -55,6 +55,8 @@ s8 none(BYTECODE_INPUT){return -1;};
 s8 proc_gives(BYTECODE_INPUT){return -1;};
 s8 proc_start(BYTECODE_INPUT){return -1;};
 s8 proc_end(BYTECODE_INPUT){return -1;};
+s8 block_start(BYTECODE_INPUT){return -1;};
+s8 block_end(BYTECODE_INPUT){return -1;};
 //TODO: 
 s8 ret(BYTECODE_INPUT){return 0;};
 
@@ -279,16 +281,21 @@ s8 def(BYTECODE_INPUT){
     return x;
 };
 s8 neg(BYTECODE_INPUT){
-    BytecodeType bt = typeToBytecodeType((Type)page[1]);
-    u16 reg = (u32)page[2];
+    u16 destReg = (u16)page[1];
+    BytecodeType bt = typeToBytecodeType((Type)page[2]);
+    u16 srcReg = (u16)page[3];
     switch(bt){
-    case BytecodeType::INTEGER_S: vm.registers[reg].sint *= -1; break;
-    case BytecodeType::INTEGER_U:
-	vm.registers[reg].sint = vm.registers[reg].uint * -1;
+    case BytecodeType::INTEGER_S:
+	vm.registers[destReg].sint = vm.registers[srcReg].sint * -1;
 	break;
-    case BytecodeType::DECIMAL_S: vm.registers[reg].dec  *= -1; break;
+    case BytecodeType::INTEGER_U:
+	vm.registers[destReg].sint = vm.registers[srcReg].uint * -1;
+	break;
+    case BytecodeType::DECIMAL_S:
+	vm.registers[destReg].dec  = vm.registers[srcReg].dec * -1;
+	break;
     };
-    return 2;
+    return 3;
 };
 s8 next_bucket(BYTECODE_INPUT){
     vm.buc = vm.buc->next;
@@ -345,6 +352,8 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     next_bucket,
     label,
     decl_reg,
+    block_start,
+    block_end,
 };
 
 bool execBytecode(VM &vm){
