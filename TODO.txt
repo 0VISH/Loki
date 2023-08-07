@@ -1,5 +1,4 @@
 1) Complete for loops
-2) Remove zero() method and just init body arrays
-3) Factor out/ Simplify
-   3.1) blockBC.init
-   3.2) Se->uninit();free(Se);
+2) SSA bytecode
+3) Add string type
+4) fix casting system
