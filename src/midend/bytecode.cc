@@ -311,6 +311,9 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
     BytecodeContext &bc = bca[bca.count - 1];
     u16 outputReg;
     switch(type){
+    case ASTType::STRING:{
+	
+    }break;
     case ASTType::NUM_INTEGER:{
 	const Type type = Type::COMP_INTEGER;
 	outputReg = bc.newReg(type);

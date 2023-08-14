@@ -4,6 +4,7 @@
 enum class ASTType {
     NUM_INTEGER,
     NUM_DECIMAL,
+    STRING,
     BIN_ADD,
     BIN_MUL,
     BIN_DIV,
@@ -40,6 +41,10 @@ struct ASTNumInt : ASTBase{
 };
 struct ASTNumDec : ASTBase{
     u32 tokenOff;
+};
+struct ASTString : ASTBase{
+    u32 tokenOff;
+    String str;
 };
 struct ASTUniVar : ASTBase{
     String name;
@@ -219,6 +224,13 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
  CHECK_TYPE_AST_OPERAND:
     Token_Type type = tokTypes[x];
     switch (type) {
+    case Token_Type::DOUBLE_QUOTES:{
+	ASTString *string = (ASTString*)allocAST(sizeof(ASTString), ASTType::STRING, file);
+	string->tokenOff = x;
+	string->str = makeStringFromTokOff(x, lexer);
+	x += 1;
+	return (ASTBase*)string;
+    }break;
     case (Token_Type)'-':{
 	ASTUniOp *uniOp = (ASTUniOp*)allocAST(sizeof(ASTUniOp), ASTType::UNI_NEG, file);
 	x += 1;
@@ -1096,6 +1108,12 @@ namespace dbg {
 	    AST_Type *type = (AST_Type*)node;
 	    printf("%d", type->type);
 	    PAD;
+	}break;
+	case ASTType::STRING:{
+	    printf("string");
+	    PAD;
+	    ASTString *string = (ASTString*)node;
+	    printf("\"%.*s\"", string->str.len, string->str.mem+1);
 	}break;
 	default: UNREACHABLE;
 	};

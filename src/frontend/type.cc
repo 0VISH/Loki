@@ -43,6 +43,11 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	SET_BIT(id, Type::COMP_DECIMAL);
 	return id;
     }break;
+    case ASTType::STRING:{
+	SET_BIT(flag, Flags::CONSTANT);
+	SET_BIT(id, Type::STRING);
+	return id;
+    }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *uniOp = (ASTUniOp*)base;
 	return getTreeTypeID(uniOp->node, flag, see, lexer);
@@ -120,6 +125,7 @@ Type tokenKeywordToType(Lexer &lexer, u32 off){
 char *Type2CString[] =  {
     "unkown",
     "xe_void",
+    "string",
     "f_64",
     "s_64",
     "u_64",

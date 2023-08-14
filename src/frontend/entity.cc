@@ -117,6 +117,7 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
 	op->lhsType = lhsType;
 	op->rhsType = rhsType;
     }break;
+    case ASTType::STRING:
     case ASTType::NUM_INTEGER:
     case ASTType::NUM_DECIMAL: break;
     case ASTType::VARIABLE:{
