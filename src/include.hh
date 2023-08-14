@@ -26,11 +26,6 @@
 
 #include "report.cc"
 #include "threadpool.cc"
-#include "frontend/lexer.cc"
-#include "frontend/type.hh"
-#include "frontend/parser.cc"
-#include "frontend/type.cc"
-#include "frontend/entity.cc"
-#include "midend/bytecode.cc"
-#include "midend/vm.cc"
+#include "frontend/include.hh"
+#include "midend/include.hh"
 #include "loki.cc"
