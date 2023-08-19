@@ -14,11 +14,11 @@ enum class ASTType {
     BIN_LSRE,
     BIN_EQU,
     UNI_DECLERATION,
-    UNI_ASSIGNMENT_T_UNKNOWN,
-    UNI_ASSIGNMENT_T_KNOWN,
+    UNI_INITIALIZATION_T_UNKNOWN,
+    UNI_INITIALIZATION_T_KNOWN,
     MULTI_DECLERATION,
-    MULTI_ASSIGNMENT_T_UNKNOWN,
-    MULTI_ASSIGNMENT_T_KNOWN,
+    MULTI_INITIALIZATION_T_UNKNOWN,
+    MULTI_INITIALIZATION_T_KNOWN,
     PROC_DEFENITION,
     VARIABLE,
     TYPE,
@@ -55,6 +55,7 @@ struct ASTUniVar : ASTBase{
 struct ASTBinOp : ASTBase{
     ASTBase *lhs;
     ASTBase *rhs;
+    u32 tokenOff;
     Type lhsType;
     Type rhsType;
 };
@@ -120,8 +121,8 @@ void freeBody(DynamicArray<ASTBase*> &body){
 void freeNodeInternal(ASTBase *base){
     switch(base->type){
     case ASTType::MULTI_DECLERATION:
-    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:
-    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:{
+    case ASTType::MULTI_INITIALIZATION_T_UNKNOWN:
+    case ASTType::MULTI_INITIALIZATION_T_KNOWN:{
 	ASTMultiVar *mv = (ASTMultiVar*)base;
 	mv->names.uninit();
     }break;
@@ -188,8 +189,9 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
 };
 
 ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
-    BRING_TOKENS_TO_SCOPE;
+    BRING_TOKENS_TO_SCOPE;    
     ASTType type;
+    u32 start = x;
     switch (tokTypes[x]) {
     case (Token_Type)'-': x -= 1;//NOTE: sub is a uni operator
     case (Token_Type)'+': type = ASTType::BIN_ADD; x += 1; break;
@@ -198,6 +200,12 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
     case (Token_Type)'=':{
 	type = ASTType::BIN_EQU;
 	x += 1;
+	if(tokTypes[x] == (Token_Type)'='){
+	    x += 1;
+	}else{
+	    lexer.emitErr(tokOffs[start].off, "Expected '='");
+	    return nullptr;
+	};
     }break;
     case (Token_Type)'>':{
 	type = ASTType::BIN_GRT;
@@ -205,19 +213,27 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	if(tokTypes[x] == (Token_Type)'='){
 	    type = ASTType::BIN_GRTE;
 	    x += 1;
+	}else{
+	    lexer.emitErr(tokOffs[start].off, "Expected '='");
+	    return nullptr;
 	};
     }break;
     case (Token_Type)'<':{
 	type = ASTType::BIN_LSR;
 	x += 1;
-	if(tokTypes[x] == (Token_Type)'<'){
+	if(tokTypes[x] == (Token_Type)'='){
 	    type = ASTType::BIN_LSRE;
 	    x += 1;
+	}else{
+	    lexer.emitErr(tokOffs[start].off, "Expected '='");
+	    return nullptr;
 	};
     }break;
     default: UNREACHABLE;
     };
-    return (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
+    ASTBinOp *binOp = (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
+    binOp->tokenOff = start;
+    return binOp;
 };
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     BRING_TOKENS_TO_SCOPE;
@@ -453,7 +469,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    return (ASTBase*)For;
 	}break;
 	case Token_Type::IDENTIFIER:{
-	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_ASSIGNMENT_T_UNKNOWN, file);
+	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_INITIALIZATION_T_UNKNOWN, file);
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
 	    For->body.push(var);
@@ -464,7 +480,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    For->increment = nullptr;
 	    x += 1;
 	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
-		var->type = ASTType::UNI_ASSIGNMENT_T_KNOWN;
+		var->type = ASTType::UNI_INITIALIZATION_T_KNOWN;
 		x += 1;
 	    };
 	    s32 end = getTokenOffInLine(Token_Type::TDOT, lexer, x);
@@ -616,7 +632,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	switch (tokTypes[x]) {
 	case (Token_Type)':': {
 	    x += 1;
-	    ASTType uniVarType = ASTType::UNI_ASSIGNMENT_T_UNKNOWN; 
+	    ASTType uniVarType = ASTType::UNI_INITIALIZATION_T_UNKNOWN; 
 	    switch (tokTypes[x]) {
 	    case (Token_Type)'=': {
 		//single variable assignment
@@ -764,7 +780,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		if (isType(tokTypes[x])) {
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') {
-			uniVarType = ASTType::UNI_ASSIGNMENT_T_KNOWN;
+			uniVarType = ASTType::UNI_INITIALIZATION_T_KNOWN;
 			goto SINGLE_VARIABLE_ASSIGNMENT;
 		    };
 		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION, file);
@@ -800,9 +816,9 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		    multiAss->type = ASTType::MULTI_DECLERATION;
 		    return (ASTBase*)multiAss;
 		};
-		multiAss->type = ASTType::MULTI_ASSIGNMENT_T_KNOWN;
+		multiAss->type = ASTType::MULTI_INITIALIZATION_T_KNOWN;
 	    } else if (tokTypes[x] == (Token_Type)'=') {
-		multiAss->type = ASTType::MULTI_ASSIGNMENT_T_UNKNOWN;
+		multiAss->type = ASTType::MULTI_INITIALIZATION_T_UNKNOWN;
 	    } else {
 		lexer.emitErr(tokOffs[x].off, "Expected a type or '='");
 		names.uninit();
@@ -994,15 +1010,15 @@ namespace dbg {
 		printf("      %.*s", name.len, name.mem);
 	    };
 	}break;
-	case ASTType::UNI_ASSIGNMENT_T_KNOWN: {
+	case ASTType::UNI_INITIALIZATION_T_KNOWN: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    u32 x = decl->tokenOff + 2;
-	    printf("uni_assignment_t_known");
+	    printf("UNI_INITIALIZATION_T_KNOWN");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	};
 	    flag = true;
-	case ASTType::UNI_ASSIGNMENT_T_UNKNOWN: {
+	case ASTType::UNI_INITIALIZATION_T_UNKNOWN: {
 	    if (flag) { flag = false; }
 	    else { printf("uni_assignment_t_unkown"); };	
 	    PAD;
@@ -1018,15 +1034,15 @@ namespace dbg {
 		if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
 	    };
 	} break;
-	case ASTType::MULTI_ASSIGNMENT_T_KNOWN: {
+	case ASTType::MULTI_INITIALIZATION_T_KNOWN: {
 	    ASTMultiVar *decl = (ASTMultiVar*)node;
 	    u32 x = decl->tokenOff + 2;
-	    printf("multi_assignment_t_known");
+	    printf("MULTI_INITIALIZATION_T_KNOWN");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	};
 	    flag = true;
-	case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN: {
+	case ASTType::MULTI_INITIALIZATION_T_UNKNOWN: {
 	    if (flag) { flag = false; }
 	    else { printf("multi_assignment_t_unkown"); };
 	    PAD;

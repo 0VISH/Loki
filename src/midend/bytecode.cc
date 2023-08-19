@@ -312,7 +312,9 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
     u16 outputReg;
     switch(type){
     case ASTType::STRING:{
-	
+	ASTString *string = (ASTString*)node;
+	GlobalStrings::addEntryIfRequired(string->str);
+	//TODO: 
     }break;
     case ASTType::NUM_INTEGER:{
 	const Type type = Type::COMP_INTEGER;
@@ -440,8 +442,8 @@ void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*>
 	    };
 	};
     }break;
-    case ASTType::UNI_ASSIGNMENT_T_KNOWN:
-    case ASTType::UNI_ASSIGNMENT_T_UNKNOWN:{
+    case ASTType::UNI_INITIALIZATION_T_KNOWN:
+    case ASTType::UNI_INITIALIZATION_T_UNKNOWN:{
 ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
@@ -456,8 +458,8 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bc.varToReg[id] = rhs.reg;
 	};
     }break;
-    case ASTType::MULTI_ASSIGNMENT_T_KNOWN:
-    case ASTType::MULTI_ASSIGNMENT_T_UNKNOWN:{
+    case ASTType::MULTI_INITIALIZATION_T_KNOWN:
+    case ASTType::MULTI_INITIALIZATION_T_UNKNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	DynamicArray<String> &names = var->names;
 	u32 firstID = se->varMap.getValue(names[0]);

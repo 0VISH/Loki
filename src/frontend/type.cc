@@ -12,7 +12,30 @@ Type greaterType(Type t1, Type t2){
     if(t1 < t2){return t1;};
     return t2;
 };
+bool isTypeNum(Type type){return (type > Type::XE_VOID) && (type <= Type::COMP_INTEGER);};
+bool isFloat(Type type){
+    return (type == Type::F_64 || type == Type::F_32 || type == Type::F_16 || type == Type::COMP_DECIMAL);
+};
+bool isIntS(Type type){
+    return (type == Type::S_64 || type == Type::S_32 || type == Type::S_16 || type == Type::S_8 || type == Type::COMP_INTEGER);
+};
+bool isIntU(Type type){
+    return (type == Type::U_64 || type == Type::U_32 || type == Type::U_16 || type == Type::U_8);
+};
+bool isSameTypeRange(Type type1, Type type2){
+    if(isFloat(type1)){
+	return isFloat(type2);
+    };
+    if(isIntS(type1)){
+	return isIntS(type2);
+    };
+    if(isIntU(type1)){
+	return isIntU(type2);
+    };
+    return false;
+};
 TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer) {
+    BRING_TOKENS_TO_SCOPE;
     TypeID id = 0;
     switch (base->type) {
     case ASTType::BIN_GRT:
@@ -31,6 +54,11 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	TypeID rhsTypeID = getTreeTypeID(node->rhs, rhsFlag, see, lexer);
 	if(rhsTypeID == 0){return 0;};
 	flag = lhsFlag & rhsFlag;
+	Type lhsType = typeID2Type(lhsTypeID);
+	Type rhsType = typeID2Type(rhsTypeID);
+	if(isSameTypeRange(lhsType, rhsType) == false){
+	    lexer.emitErr(tokOffs[node->tokenOff].off, "LHS type and RHS type are not in the same type range");
+	};
 	return (TypeID)((u32)lhsTypeID | (u32)rhsTypeID);
     } break;
     case ASTType::NUM_INTEGER:{
@@ -53,7 +81,6 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 	return getTreeTypeID(uniOp->node, flag, see, lexer);
     }break;
     case ASTType::VARIABLE:{
-	BRING_TOKENS_TO_SCOPE;
 	ASTVariable *var = (ASTVariable*)base;
 	Type type = Type::UNKOWN;
 	for(u32 x=see.count; x>0; x-=1){
@@ -79,28 +106,6 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 };
 Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer){
     return typeID2Type(getTreeTypeID(base, flag, see, lexer));
-};
-bool isTypeNum(Type type){return (type > Type::XE_VOID) && (type <= Type::COMP_INTEGER);};
-bool isFloat(Type type){
-    return (type == Type::F_64 || type == Type::F_32 || type == Type::F_16 || type == Type::COMP_DECIMAL);
-};
-bool isIntS(Type type){
-    return (type == Type::S_64 || type == Type::S_32 || type == Type::S_16 || type == Type::S_8 || type == Type::COMP_INTEGER);
-};
-bool isIntU(Type type){
-    return (type == Type::U_64 || type == Type::U_32 || type == Type::U_16 || type == Type::U_8);
-};
-bool isSameTypeRange(Type type1, Type type2){
-    if(isFloat(type1)){
-	return isFloat(type2);
-    };
-    if(isIntS(type1)){
-	return isIntS(type2);
-    };
-    if(isIntU(type1)){
-	return isIntU(type2);
-    };
-    return false;
 };
 Type tokenKeywordToType(Lexer &lexer, u32 off){
     BRING_TOKENS_TO_SCOPE;

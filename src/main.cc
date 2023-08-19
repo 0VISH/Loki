@@ -21,7 +21,9 @@ s32 main(s32 argc, char **argv) {
     };
     
     initKeywords();
+    GlobalStrings::initGlobalStrings();
     compile(argv[1]);
+    GlobalStrings::uninitGlobalStrings();
     uninitKeywords();
 
     os::endTimer(TimeSlot::TOTAL);

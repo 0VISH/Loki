@@ -54,13 +54,13 @@ bool compile(char *fileName){
 		for (u32 varCount = 0; nodeOff < astFile.nodes.count; nodeOff += 1) {
 		    if (varCount == x+1) { break; };
 		    ASTBase *base = astFile.nodes[nodeOff];
-		    if (base->type >= ASTType::UNI_ASSIGNMENT_T_UNKNOWN && base->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN) {
+		    if (base->type >= ASTType::UNI_INITIALIZATION_T_UNKNOWN && base->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN) {
 			varCount += 1;
 		    };
 		};
 		ASTBase *node = astFile.nodes[nodeOff-1];
 		u32 off;
-		if(node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_ASSIGNMENT_T_KNOWN){
+		if(node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN){
 		    ASTMultiVar *multiAss = (ASTMultiVar*)node;
 		    off = multiAss->tokenOff;
 		}else{
