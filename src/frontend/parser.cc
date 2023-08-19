@@ -30,7 +30,7 @@ enum class ForType{
     FOR_EVER,
     C_LES,
     C_EQU,
-    C_EXPR,
+    EXPR,
 };
 
 struct ASTBase {
@@ -473,10 +473,10 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
 	    For->body.push(var);
-	    x += 1;
-	    if(tokTypes[x] != (Token_Type)':'){
+	    if(tokTypes[x+1] != (Token_Type)':'){
 		goto PARSE_FOR_EXPR;
 	    };
+	    x += 1;
 	    For->increment = nullptr;
 	    x += 1;
 	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
@@ -545,9 +545,9 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    return (ASTBase*)For;
 	}break;
 	default:{
-	    PARSE_FOR_EXPR:
-	    For->loopType = ForType::C_EXPR;
 	    x += 1;
+	    PARSE_FOR_EXPR:
+	    For->loopType = ForType::EXPR;
 	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
 	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
 	    if(bend == -1 && nend == -1){
@@ -556,6 +556,25 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    };
 	    u32 end = (bend != -1)? bend : nend;
 	    For->expr = genASTExprTree(lexer, file, x, end);
+	    if(For->expr == nullptr){return nullptr;};
+	    x = end;
+	    if(bend == -1){
+		eatNewlines(lexer.tokenTypes, x);
+	    };
+	    if(tokTypes[x] != (Token_Type)'{'){
+		lexer.emitErr(tokOffs[x].off, "Expected '{' here");
+		return nullptr;
+	    };
+	    x += 1;
+	    eatNewlines(lexer.tokenTypes, x);
+	    while(tokTypes[x] != (Token_Type)'}'){
+		ASTBase *base = parseBlock(lexer, file, x);
+		if(base == nullptr){return nullptr;};
+		For->body.push(base);
+		eatNewlines(lexer.tokenTypes, x);
+	    };
+	    x += 1;
+	    return (ASTBase*)For;
 	}break;
 	};
     }break;
@@ -1020,7 +1039,7 @@ namespace dbg {
 	    flag = true;
 	case ASTType::UNI_INITIALIZATION_T_UNKNOWN: {
 	    if (flag) { flag = false; }
-	    else { printf("uni_assignment_t_unkown"); };	
+	    else { printf("uni_initialization_t_unkown"); };	
 	    PAD;
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
@@ -1044,7 +1063,7 @@ namespace dbg {
 	    flag = true;
 	case ASTType::MULTI_INITIALIZATION_T_UNKNOWN: {
 	    if (flag) { flag = false; }
-	    else { printf("multi_assignment_t_unkown"); };
+	    else { printf("multi_initialization_t_unkown"); };
 	    PAD;
 	    printf("names:");
 	    ASTMultiVar *multiAss = (ASTMultiVar*)node;
@@ -1074,11 +1093,15 @@ namespace dbg {
 	    case ForType::FOR_EVER:{
 		printf("for_ever");
 	    }break;
+	    case ForType::EXPR:{
+		printf("expr");
+		PAD;
+		printf("EXPR");
+		__dumpNodesWithoutEndPadding(For->expr, lexer, padding+1);
+	    }break;
 	    case ForType::C_LES:
-		if(printed == false){
-		    printf("c_les");
-		    printed = true;
-		};
+		printf("c_les");
+		printed = true;
 	    case ForType::C_EQU:{
 		if(printed == false){printf("c_equ");};
 		PAD;
@@ -1091,10 +1114,10 @@ namespace dbg {
 		if(For->increment != nullptr){
 		    printf("INCREMENT");
 		    __dumpNodesWithoutEndPadding(For->increment, lexer, padding+1);
-		    PAD;
 		};
 	    }break;
 	    };
+	    PAD;
 	    printf("BODY");
 	    __dumpDynamicArrayNodes(For->body, lexer, padding);
 	}break;

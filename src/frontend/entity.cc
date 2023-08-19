@@ -302,6 +302,14 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    if(checkEntities(For->body, lexer, see) == false){return false;};
 	    see.pop();
 	}break;
+	case ForType::EXPR:{
+	    if(checkExpression(For->expr, lexer, see) == false){return false;};
+	    ScopeEntities *ForSe = allocScopeEntity(Scope::BLOCK);
+	    see.push(ForSe);
+	    For->ForSe = ForSe;
+	    if(checkEntities(For->body, lexer, see) == false){return false;};
+	    see.pop();
+	}break;
 	case ForType::C_LES:
 	case ForType::C_EQU:{
 	    if(checkExpression(For->end, lexer, see) == false){return false;};
