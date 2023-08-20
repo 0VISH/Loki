@@ -469,13 +469,13 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    return (ASTBase*)For;
 	}break;
 	case Token_Type::IDENTIFIER:{
+	    if(tokTypes[x+1] != (Token_Type)':'){
+		goto PARSE_FOR_EXPR;
+	    };
 	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_INITIALIZATION_T_UNKNOWN, file);
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
 	    For->body.push(var);
-	    if(tokTypes[x+1] != (Token_Type)':'){
-		goto PARSE_FOR_EXPR;
-	    };
 	    x += 1;
 	    For->increment = nullptr;
 	    x += 1;
@@ -567,6 +567,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    };
 	    x += 1;
 	    eatNewlines(lexer.tokenTypes, x);
+	    For->body.init();
 	    while(tokTypes[x] != (Token_Type)'}'){
 		ASTBase *base = parseBlock(lexer, file, x);
 		if(base == nullptr){return nullptr;};
@@ -970,7 +971,7 @@ namespace dbg {
 	case ASTType::BIN_GRTE: if(c == NULL) { c = '>'; printf("bin_grte"); printEqual=true;};
 	case ASTType::BIN_LSR:  if(c == NULL) { c = '<'; printf("bin_lsr");};
 	case ASTType::BIN_LSRE: if(c == NULL) { c = '<'; printf("bin_lsre"); printEqual=true;};
-	case ASTType::BIN_EQU:  if(c == NULL) { c = '='; printf("bin_equ");};
+	case ASTType::BIN_EQU:  if(c == NULL) { c = '='; printf("bin_equ");  printEqual=true;};
 	case ASTType::BIN_ADD:  if(c == NULL) { c = '+'; printf("bin_add"); };
 	case ASTType::BIN_MUL:  if(c == NULL) { c = '*'; printf("bin_mul"); };
 	case ASTType::BIN_DIV:{

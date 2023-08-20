@@ -507,6 +507,19 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.blockEnd();
 	    bf.jmp(loopStartLbl);
 	}break;
+	case ForType::EXPR:{
+	    u16 loopStartLbl = newLabel();
+	    u16 loopEndLbl = newLabel();
+	    bf.label(loopStartLbl);
+	    Expr expr = compileExprToBytecode(For->expr, lexer, see, bca, bf);
+	    bf.jmp(Bytecode::JMPNS, expr.reg, loopEndLbl);
+	    bf.blockStart();
+	    for(u32 x=0; x<For->body.count; x+=1){
+		compileToBytecode(For->body[x], lexer, see, bca, bf);
+	    };
+	    bf.blockEnd();
+	    bf.label(loopEndLbl);
+	}break;
 	case ForType::C_LES:
 	case ForType::C_EQU:{
 	    ASTUniVar *var = (ASTUniVar*)For->body[0];

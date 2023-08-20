@@ -1,3 +1,2 @@
-1) Complete for loops
-2) Add string type
-3) Add casting system
+:: Add struct
+:: Dependency system and include files
