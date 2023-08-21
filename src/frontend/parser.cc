@@ -449,6 +449,13 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
     };
     u32 start = x;
     switch (tokTypes[x]) {
+    case Token_Type::P_IMPORT:{
+	x += 1;
+	if(tokTypes[x] != Token_Type::DOUBLE_QUOTES){
+	    lexer.emitErr(tokOffs[x].off, "Expected file path as a string");
+	    return nullptr;
+	};
+    }break;
     case Token_Type::K_FOR:{
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);
 	For->body.init();

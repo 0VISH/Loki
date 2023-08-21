@@ -25,7 +25,10 @@ enum class Token_Type {
     K_CONSTANT,
     K_COMPTIME,
     K_ELSE,
-    K_END,    //keywords end
+    K_END,       //keywords end
+    P_START,     //poundwords start
+    P_IMPORT,
+    P_END,       //poundwords end
     ARROW,
     DDOT,
     TDOT,
@@ -36,14 +39,12 @@ struct TokenOffset {
     u16 len;
 };
 
-Map keywords;
-void initKeywords() {
-    const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
-    struct KeywordData {
+namespace Word{
+    struct WordData {
 	const char *str;
 	const Token_Type type;
     };
-    KeywordData data[keywordCount] = {
+    WordData keywordsData[] = {
 	{"u8", Token_Type::K_U8},
 	{"f16", Token_Type::K_F16},
 	{"f32", Token_Type::K_F32},
@@ -63,21 +64,32 @@ void initKeywords() {
 	{"comptime", Token_Type::K_COMPTIME},
 	{"else", Token_Type::K_ELSE},
     };
-    keywords.init(keywordCount);
-    
-    for (u8 i = 0; i < keywordCount; i += 1) {
-	s32 k = keywords.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
-#if(DBG)
-	if (k == -1) {
-	    printf("\n[LEXER] Could not register keyword\n");
-	    return;
-	};
-#endif
+    WordData poundwordsData[] = {
+	{"import", Token_Type::P_IMPORT},
     };
+    Map keywords;
+    Map poundwords;
+    const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
+    const u8 poundwordCount = (u32)Token_Type::P_END - (u32)Token_Type::P_START - 1;
+
+    void initWords(Map &map, WordData *data, u8 count) {
+	map.init(count);
+    
+	for (u8 i = 0; i < count; i += 1) {
+	    s32 k = map.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
+#if(DBG)
+	    if (k == -1) {
+		printf("\n[LEXER] Could not register word\n");
+		return;
+	    };
+#endif
+	};
+    };
+    void uninitWords(Map &map) { map.uninit(); };
 };
-void uninitKeywords() { keywords.uninit(); };
 
 bool isKeyword(Token_Type type) { return type > Token_Type::K_START && type < Token_Type::K_END; };
+bool isPoundword(Token_Type type) {return type > Token_Type::P_START && type < Token_Type::P_END;};
 bool isType(Token_Type type) {
     return (type>Token_Type::K_START && type<Token_Type::K_PROC) || type == Token_Type::IDENTIFIER;
 };
@@ -153,6 +165,23 @@ struct Lexer {
 	eatUnwantedChars(src, x);
 	while (src[x] != '\0') {
 	    switch (src[x]) {
+	    case '#':{
+		x += 1;
+		u32 start = x;
+		while(isAlpha(src[x])){
+		    x += 1;
+		};
+		s32 type = Word::poundwords.getValue({src+start, (u32)(x-start)});
+		if(type == -1){
+		    emitErr(start, "Unkown poundword");
+		    return false;
+		};
+		tokenTypes.push((Token_Type)type);
+		TokenOffset offset;
+		offset.off = start;
+		offset.len = (u16)(x-start);
+		tokenOffsets.push(offset);
+	    }break;
 	    case '\'':
 		stringType = Token_Type::SINGLE_QUOTES;
 		c = '\'';
@@ -185,7 +214,7 @@ struct Lexer {
 		    u64 start = x;
 		    x += 1;
 		    while (isAlpha(src[x]) || src[x] == '_' || isNum(src[x])) { x += 1; };
-		    s32 type = keywords.getValue({src+start, (u32)(x-start)});
+		    s32 type = Word::keywords.getValue({src+start, (u32)(x-start)});
 		    if (type != -1) { tokenTypes.push((Token_Type)type); }
 		    else { tokenTypes.push(Token_Type::IDENTIFIER); };
 		    TokenOffset offset;
@@ -394,10 +423,13 @@ namespace dbg {
 	    case (Token_Type)'\n': printf("new_line"); break;
 	    case Token_Type::ARROW: printf("->"); break;
 	    default:
-		if (lexer.tokenTypes[x] >= Token_Type::K_START && lexer.tokenTypes[x] <= Token_Type::K_END) {
+		if(isKeyword(lexer.tokenTypes[x])){
 		    printf("keyword\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-		}
-		else { printf("%c", lexer.tokenTypes[x]); };
+		}else if(isPoundword(lexer.tokenTypes[x])){
+		    printf("poundword\n%.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
+		}else{
+		    printf("%c", lexer.tokenTypes[x]);
+		};
 		break;
 	    };
 	};
