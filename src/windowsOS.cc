@@ -14,6 +14,12 @@ namespace os{
 	return fullPath;
     };
 
+    bool isFile(char *filePath){
+	DWORD dwAttrib = GetFileAttributes(filePath);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES && 
+		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+    };
     void setPrintColorToWhite() {
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);

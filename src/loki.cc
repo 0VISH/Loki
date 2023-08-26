@@ -1,25 +1,16 @@
-bool compile(char *fileName){
-    os::startTimer(TimeSlot::FRONTEND);
+ScopeEntities *parseAndLoadEntities(char *fileName, ASTFile &astFile){
     Lexer lexer;
-    if(lexer.init(fileName) == false){
-	printf("invalid file path: %s", lexer.fileName);
-	return false;
-    };
+    lexer.init(fileName);
     DEFER(lexer.uninit());
     if(lexer.genTokens() == false) {
 	report::flushReports();
-	return false;
+	return nullptr;
     };
-    //check if file is empty
     u32 off = 0;
     eatNewlines(lexer.tokenTypes, off);
     if(lexer.tokenTypes[off] == Token_Type::END_OF_FILE) {
-	return true;
+	return nullptr;
     };
-    //dbg::dumpLexerStat(lexer);
-    //dbg::dumpLexerTokens(lexer);
-    ASTFile &astFile = Dep::getASTFile(0);
-    astFile.init(0);
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
 	if (base == nullptr) { break; };
@@ -28,23 +19,16 @@ bool compile(char *fileName){
     };
     if (report::errorOff != 0) {
 	report::flushReports();
-	return false;
+	return nullptr;
     };
-    dbg::dumpASTFile(astFile, lexer);
     DynamicArray<ScopeEntities*> see;
     see.init(3);
-    DEFER({
-	    for(u32 x=0; x<see.count; x+=1){
-		see[x]->uninit();
-		mem::free(see[x]);
-	    };
-	    see.uninit();
-	});
+    DEFER(see.uninit());
     ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
     see.push(fileScopeEntities);
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	report::flushReports();
-	return false;
+	return nullptr;
     } else {
 	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
 	    VariableEntity &entity = fileScopeEntities->varEntities[x];
@@ -71,6 +55,13 @@ bool compile(char *fileName){
 	    SET_BIT(entity.flag, Flags::GLOBAL);
 	};
     };
+    return fileScopeEntities;
+};
+bool compile(char *fileName){
+    os::startTimer(TimeSlot::FRONTEND);
+    ASTFile &astFile = Dep::getASTFile(0);
+    astFile.init(0);
+    ScopeEntities *fileScopeEntities = parseAndLoadEntities(fileName, astFile);
     os::endTimer(TimeSlot::FRONTEND);
     os::startTimer(TimeSlot::MIDEND);
     BytecodeFile bf;
@@ -84,7 +75,13 @@ bool compile(char *fileName){
 	});
     BytecodeContext &bc = bca.newElem();
     bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count, 0);
-    compileASTNodesToBytecode(astFile.nodes, lexer, see, bca, bf);
+    DynamicArray<ScopeEntities*> see;
+    see.init();
+    see.push(fileScopeEntities);
+    compileASTNodesToBytecode(astFile.nodes, see, bca, bf);
+    see.uninit();
+    fileScopeEntities->uninit();
+    mem::free(fileScopeEntities);
     dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
     /*

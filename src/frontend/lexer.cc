@@ -122,7 +122,6 @@ struct Lexer {
 	fileName = os::getFileFullName(fn);
 	
 	FILE *fp = fopen(fileName, "r");
-	if(fp == nullptr){return false;};
 	fseek(fp, 0, SEEK_END);
 	u64 size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);

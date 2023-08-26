@@ -36,10 +36,10 @@ struct ASTBase {
     ASTType type;
 };
 struct ASTNumInt : ASTBase{
-    u32 tokenOff;
+    s64 num;
 };
 struct ASTNumDec : ASTBase{
-    u32 tokenOff;
+    f64 dec;
 };
 struct ASTString : ASTBase{
     u32 tokenOff;
@@ -177,9 +177,6 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	x += 1;
 	if(tokTypes[x] == (Token_Type)'='){
 	    x += 1;
-	}else{
-	    lexer.emitErr(tokOffs[start].off, "Expected '='");
-	    return nullptr;
 	};
     }break;
     case (Token_Type)'>':{
@@ -188,9 +185,6 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	if(tokTypes[x] == (Token_Type)'='){
 	    type = ASTType::BIN_GRTE;
 	    x += 1;
-	}else{
-	    lexer.emitErr(tokOffs[start].off, "Expected '='");
-	    return nullptr;
 	};
     }break;
     case (Token_Type)'<':{
@@ -199,9 +193,6 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	if(tokTypes[x] == (Token_Type)'='){
 	    type = ASTType::BIN_LSRE;
 	    x += 1;
-	}else{
-	    lexer.emitErr(tokOffs[start].off, "Expected '='");
-	    return nullptr;
 	};
     }break;
     default: UNREACHABLE;
@@ -210,6 +201,44 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
     binOp->tokenOff = start;
     return binOp;
 };
+
+//TODO: Hacked together af. REWRITE(return u64)
+s64 string2int(String &str){
+    s64 num = 0;
+    u32 len = str.len;
+    for(u32 x=0; x<str.len; x+=1){
+	char c = str[x];
+	switch(c){
+	case '.':
+	case '_':
+	    len -= 1;
+	    continue;
+	};
+    };
+    u32 y = 0;
+    for(u32 x=0; x<str.len; x+=1){
+	char c = str[x];
+	switch(c){
+	case '.':
+	case '_':
+	    continue;
+	};
+	num += (c - '0') * pow(10, len-y-1);
+	y += 1;
+    };
+    return num;
+}
+f64 string2float(String &str){
+    u32 decimal = 0;
+    while(str[decimal] != '.'){decimal += 1;};
+    u32 postDecimalBadChar = 0;
+    for(u32 x=decimal+1; x<str.len; x+=1){
+	if(str[x] == '_'){postDecimalBadChar += 1;};
+    };
+    s64 num = string2int(str);
+    return (f64)num/pow(10, str.len-decimal-1-postDecimalBadChar);
+};
+
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     BRING_TOKENS_TO_SCOPE;
  CHECK_TYPE_AST_OPERAND:
@@ -231,13 +260,15 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     }break;
     case Token_Type::INTEGER: {
 	ASTNumInt *numNode = (ASTNumInt*)allocAST(sizeof(ASTNumInt), ASTType::NUM_INTEGER, file);
-	numNode->tokenOff = x;
+	String str = makeStringFromTokOff(x, lexer);
+	numNode->num = string2int(str);
 	x += 1;
 	return (ASTBase*)numNode;
     } break;
     case Token_Type::DECIMAL:{
 	ASTNumDec *numNode = (ASTNumDec*)allocAST(sizeof(ASTNumDec), ASTType::NUM_DECIMAL, file);
-	numNode->tokenOff = x;
+	String str = makeStringFromTokOff(x, lexer);
+	numNode->dec = string2float(str);	
 	x += 1;
 	return (ASTBase*)numNode;
     }break;
@@ -436,6 +467,10 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	fileName.mem[fileName.len] = '\0';
 	char *fullFileName = os::getFileFullName(fileName.mem);
 	fileName.mem[fileName.len] = c;
+	if(os::isFile(fullFileName) == false){
+	    lexer.emitErr(tokOffs[x].off, "Invalid file path");
+	    return nullptr;
+	};
 	FileID fid = Dep::getFileID(fullFileName);
 	ASTFile &iFile = Dep::getASTFile(fid);
 	iFile.dependsOnMe.push(file.id);
@@ -782,7 +817,6 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 			return nullptr;
 		    };
 		    proc->body.push(node);
-		    x += 1;
 		    eatNewlines(tokTypes, x);
 		};
 		x += 1;
@@ -865,43 +899,6 @@ u32 pow(u32 base, u32 exp){
     };
     return num;
 };
-//TODO: Hacked together af. REWRITE(return u64)
-s64 string2int(String &str){
-    s64 num = 0;
-    u32 len = str.len;
-    for(u32 x=0; x<str.len; x+=1){
-	char c = str[x];
-	switch(c){
-	case '.':
-	case '_':
-	    len -= 1;
-	    continue;
-	};
-    };
-    u32 y = 0;
-    for(u32 x=0; x<str.len; x+=1){
-	char c = str[x];
-	switch(c){
-	case '.':
-	case '_':
-	    continue;
-	};
-	num += (c - '0') * pow(10, len-y-1);
-	y += 1;
-    };
-    return num;
-}
-f64 string2float(String &str){
-    u32 decimal = 0;
-    while(str[decimal] != '.'){decimal += 1;};
-    u32 postDecimalBadChar = 0;
-    for(u32 x=decimal+1; x<str.len; x+=1){
-	if(str[x] == '_'){postDecimalBadChar += 1;};
-    };
-    s64 num = string2int(str);
-    return (f64)num/pow(10, str.len-decimal-1-postDecimalBadChar);
-};
-
 #if(DBG)
 
 #define PAD printf("\n"); for (u8 i = 0; i < padding; i++) { printf("    "); };
@@ -946,18 +943,14 @@ namespace dbg {
 	case ASTType::NUM_INTEGER: {
 	    ASTNumInt *numInt = (ASTNumInt*)node;
 	    printf("num_integer");
-	    String str = makeStringFromTokOff(numInt->tokenOff, lexer);
-	    s64 num = string2int(str);
 	    PAD;
-	    printf("num: %lld", num);
+	    printf("num: %lld", numInt->num);
 	} break;
 	case ASTType::NUM_DECIMAL: {
 	    printf("num_decimal");
 	    ASTNumDec *numDec = (ASTNumDec*)node;
-	    String str = makeStringFromTokOff(numDec->tokenOff, lexer);
-	    f64 num = string2float(str);
 	    PAD;
-	    printf("num: %f", num);
+	    printf("num: %f", numDec->dec);
 	} break;
 	case ASTType::BIN_GRT: c = '>'; printf("bin_grt");
 	case ASTType::BIN_GRTE: if(c == NULL) { c = '>'; printf("bin_grte"); printEqual=true;};

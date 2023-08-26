@@ -146,9 +146,8 @@ struct BytecodeFile{
 	reserve(1 + 1);
 	emit(Bytecode::LABEL);
 	emit(label);
-	//@maybe remove this?
-	if(label > labels.len){
-	    labels.realloc(label);
+	if(label >= labels.len){
+	    labels.realloc(label + 5);
 	};
 	Bytecode *mem = getCurBytecodeAdd();
 	labels[label] = mem;
@@ -271,13 +270,13 @@ BytecodeType typeToBytecodeType(Type type){
     default: return BytecodeType::INTEGER_U;
     }
 };
-Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf);
-Expr emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, Lexer &lexer, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, DynamicArray<ScopeEntities*> &see){
+Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf);
+Expr emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, DynamicArray<ScopeEntities*> &see){
     Expr out;
     ASTBinOp *op = (ASTBinOp*)node;
     BytecodeContext &bc = bca[bca.count-1];
-    auto lhs = compileExprToBytecode(op->lhs, lexer, see, bca, bf);
-    auto rhs = compileExprToBytecode(op->rhs, lexer, see, bca, bf);
+    auto lhs = compileExprToBytecode(op->lhs, see, bca, bf);
+    auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);
     Type ansType = greaterType(lhs.type, rhs.type);
     u16 outputReg = bc.newReg(ansType);
     BytecodeType abt = typeToBytecodeType(ansType);
@@ -305,7 +304,7 @@ Bytecode *getPointer(Bytecode *page){
     Bytecode *mem = (Bytecode*)page;
     return mem;
 };
-Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     Expr out = {};
     ASTType type = node->type;
     BytecodeContext &bc = bca[bca.count - 1];
@@ -320,8 +319,7 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
 	const Type type = Type::COMP_INTEGER;
 	outputReg = bc.newReg(type);
 	ASTNumInt *numInt = (ASTNumInt*)node;
-	String str = makeStringFromTokOff(numInt->tokenOff, lexer);
-	s64 num = string2int(str);
+	s64 num = numInt->num;
 	bf.movConstS(outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
@@ -331,8 +329,7 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
 	const Type type = Type::COMP_DECIMAL;
 	outputReg = bc.newReg(type);
 	ASTNumDec *numDec = (ASTNumDec*)node;
-	String str = makeStringFromTokOff(numDec->tokenOff, lexer);
-	f64 num = string2float(str);
+	f64 num = numDec->dec;
 	bf.movConstF(outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
@@ -349,13 +346,13 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
 	return out;
     }break;
     case ASTType::BIN_ADD:{									
-	return emitBinOpBc(Bytecode::ADDS, Bytecode::ADDU, Bytecode::ADDF, node, lexer, bca, bf, see);
+	return emitBinOpBc(Bytecode::ADDS, Bytecode::ADDU, Bytecode::ADDF, node, bca, bf, see);
     }break;
     case ASTType::BIN_MUL:{
-	return emitBinOpBc(Bytecode::MULS, Bytecode::MULU, Bytecode::MULF, node, lexer, bca, bf, see);
+	return emitBinOpBc(Bytecode::MULS, Bytecode::MULU, Bytecode::MULF, node, bca, bf, see);
     }break;
     case ASTType::BIN_DIV:{
-	return emitBinOpBc(Bytecode::DIVS, Bytecode::DIVU, Bytecode::DIVF, node, lexer, bca, bf, see);
+	return emitBinOpBc(Bytecode::DIVS, Bytecode::DIVU, Bytecode::DIVF, node, bca, bf, see);
     }break;
     case ASTType::BIN_GRT:
     case ASTType::BIN_GRTE:
@@ -363,8 +360,8 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
     case ASTType::BIN_LSRE:
     case ASTType::BIN_EQU:{
         ASTBinOp *op = (ASTBinOp*)node;					
-	auto lhs = compileExprToBytecode(op->lhs, lexer, see, bca, bf);	
-	auto rhs = compileExprToBytecode(op->rhs, lexer, see, bca, bf);	
+	auto lhs = compileExprToBytecode(op->lhs, see, bca, bf);	
+	auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);	
 	Type ansType = greaterType(lhs.type, rhs.type);
 	u16 cmpOutReg = bc.newReg(ansType);					
 	BytecodeType abt = typeToBytecodeType(ansType);			
@@ -394,7 +391,7 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *uniOp = (ASTUniOp*)node;
-	auto operand = compileExprToBytecode(uniOp->node, lexer, see, bca, bf);
+	auto operand = compileExprToBytecode(uniOp->node, see, bca, bf);
 	u16 newReg;
 	if(isIntU(operand.type)){
 	    newReg = bc.newReg((Type)((u32)operand.type-1));
@@ -411,7 +408,7 @@ Expr compileExprToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntiti
     };
     return out;
 };
-void compileToBytecode(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     BytecodeContext &bc = bca[bca.count-1];
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
@@ -454,7 +451,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.declReg(entity.type, rhsReg);
 	    bc.varToReg[id] = rhsReg;
 	}else{
-	    auto rhs = compileExprToBytecode(var->rhs, lexer, see, bca, bf);
+	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
 	    bc.varToReg[id] = rhs.reg;
 	};
     }break;
@@ -474,7 +471,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 		bc.varToReg[x] = rhsReg;
 	    };
 	}else{
-	    auto rhs = compileExprToBytecode(var->rhs, lexer, see, bca, bf);
+	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
 	    Bytecode byte;
 	    BytecodeType bType = typeToBytecodeType(type);
 	    if(bType == BytecodeType::DECIMAL_S){byte = Bytecode::MOVF;}
@@ -502,7 +499,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.label(loopStartLbl);
 	    bf.blockStart();
 	    for(u32 x=0; x<For->body.count; x+=1){
-		compileToBytecode(For->body[x], lexer, see, bca, bf);
+		compileToBytecode(For->body[x], see, bca, bf);
 	    };
 	    bf.blockEnd();
 	    bf.jmp(loopStartLbl);
@@ -511,11 +508,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    u16 loopStartLbl = newLabel();
 	    u16 loopEndLbl = newLabel();
 	    bf.label(loopStartLbl);
-	    Expr expr = compileExprToBytecode(For->expr, lexer, see, bca, bf);
+	    Expr expr = compileExprToBytecode(For->expr, see, bca, bf);
 	    bf.jmp(Bytecode::JMPNS, expr.reg, loopEndLbl);
 	    bf.blockStart();
 	    for(u32 x=0; x<For->body.count; x+=1){
-		compileToBytecode(For->body[x], lexer, see, bca, bf);
+		compileToBytecode(For->body[x], see, bca, bf);
 	    };
 	    bf.blockEnd();
 	    bf.label(loopEndLbl);
@@ -551,11 +548,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 		incrementReg = blockBC.newReg(ent.type);
 		bf.movConstS(incrementReg, 1);
 	    };
-	    compileToBytecode(For->body[0], lexer, see, bca, bf);
+	    compileToBytecode(For->body[0], see, bca, bf);
 	    u16 varReg = blockBC.registerID-1;    //FIXME: 
 	    bf.label(loopStartLbl);
 	    
-	    auto cond = compileExprToBytecode(For->end, lexer, see, bca, bf);
+	    auto cond = compileExprToBytecode(For->end, see, bca, bf);
 	    u16 cmpOutReg = blockBC.newReg(ent.type);
 	    bf.binOp(cmp, cmpOutReg, varReg, cond.reg);
 
@@ -572,12 +569,12 @@ ASTUniVar *var = (ASTUniVar*)node;
 
 	    bf.blockStart();
 	    for(u32 x=1; x<For->body.count; x+=1){
-		compileToBytecode(For->body[x], lexer, see, bca, bf);
+		compileToBytecode(For->body[x], see, bca, bf);
 	    };
 	    bf.blockEnd();
 
 	    if(For->increment != nullptr){
-		incrementReg = compileExprToBytecode(For->increment, lexer, see, bca, bf).reg;
+		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
 	    };
 	    bf.binOp(add, varReg, varReg, incrementReg);
 
@@ -593,7 +590,7 @@ ASTUniVar *var = (ASTUniVar*)node;
     }break;
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)node;
-	u32 exprID = compileExprToBytecode(If->expr, lexer, see, bca, bf).reg;
+	u32 exprID = compileExprToBytecode(If->expr, see, bca, bf).reg;
 	BytecodeContext &blockBC = bca.newElem();
 	ScopeEntities *IfSe = (ScopeEntities*)If->IfSe;
 	blockBC.init(IfSe->varMap.count, IfSe->procMap.count, bc.registerID);
@@ -606,7 +603,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	bf.jmp(Bytecode::JMPNS, exprID, inElseLbl);
 	bf.blockStart();
 	for(u32 x=0; x<If->body.count; x+=1){
-	    compileToBytecode(If->body[x], lexer, see, bca, bf);
+	    compileToBytecode(If->body[x], see, bca, bf);
 	};
 	bf.blockEnd();
 	see.pop();
@@ -622,7 +619,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    elseBC.init(ElseSe->varMap.count, ElseSe->procMap.count, bc.registerID);
 	    bf.blockStart();
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
-		compileToBytecode(If->elseBody[x], lexer, see, bca, bf);
+		compileToBytecode(If->elseBody[x], see, bca, bf);
 	    };
 	    bf.blockEnd();
 	    see.pop();
@@ -684,7 +681,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	see.push(procSE);
 	bf.blockStart();
 	for(u32 x=inCount; x<proc->body.count; x+=1){
-	    compileToBytecode(proc->body[x], lexer, see, bca, bf);
+	    compileToBytecode(proc->body[x], see, bca, bf);
 	};
 	bf.blockEnd();
 	see.pop()->uninit();
@@ -699,10 +696,10 @@ ASTUniVar *var = (ASTUniVar*)node;
 	break;
     };
 };
-void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, Lexer &lexer, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     for(u32 x=0; x<nodes.count; x+=1){
 	ASTBase *node = nodes[x];
-	compileToBytecode(node, lexer, see, bca, bf);
+	compileToBytecode(node, see, bca, bf);
     };
     bf.emit(Bytecode::NONE);
 };

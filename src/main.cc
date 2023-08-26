@@ -19,7 +19,11 @@ s32 main(s32 argc, char **argv) {
 	printf("main file path not provided\n");
 	return EXIT_SUCCESS;
     };
-    
+
+    if(os::isFile(argv[1]) == false){
+	printf("invalid file path: %s", argv[1]);
+	return EXIT_SUCCESS;
+    };
     Word::init(Word::keywords, Word::keywordsData, Word::keywordCount);
     Word::init(Word::poundwords, Word::poundwordsData, Word::poundwordCount);
     GlobalStrings::init();
@@ -35,7 +39,7 @@ s32 main(s32 argc, char **argv) {
     dumpTimers(os::times);
 #if(DBG)
     dbg::dumpBlockTimes();
-    printf("\nNOT FREED: %lld\nCALLS NOT FREED: %d\n", mem::notFreed, mem::calls);
+    printf("\nCALLS NOT FREED: %d\n", mem::calls);
 #endif
 
     return EXIT_SUCCESS;
