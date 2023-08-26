@@ -1,4 +1,3 @@
-#define AST_PAGE_SIZE 1024
 #define BRING_TOKENS_TO_SCOPE DynamicArray<Token_Type> &tokTypes = lexer.tokenTypes;DynamicArray<TokenOffset> &tokOffs = lexer.tokenOffsets;
 
 enum class ASTType {
@@ -140,30 +139,6 @@ void freeNodeInternal(ASTBase *base){
 	ASTFor *For = (ASTFor*)base;
 	freeBody(For->body);
     }break;
-    };
-};
-
-struct ASTFile {
-    DynamicArray<char*> memPages;
-    DynamicArray<ASTBase*> nodes;
-    u16 pageBrim;
-
-    void init(){
-	memPages.init(2);
-	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
-	memPages.push(page);
-	pageBrim = 0;
-	nodes.init(10);
-    };
-    void uninit(){
-	for(u32 x=0; x<nodes.count; x += 1){
-	    freeNodeInternal(nodes[x]);
-	};
-	for(u16 i=0; i<memPages.count; i++) {
-	    mem::free(memPages[i]);
-	};
-	memPages.uninit();
-	nodes.uninit();
     };
 };
 
@@ -461,6 +436,10 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	fileName.mem[fileName.len] = '\0';
 	char *fullFileName = os::getFileFullName(fileName.mem);
 	fileName.mem[fileName.len] = c;
+	FileID fid = Dep::getFileID(fullFileName);
+	ASTFile &iFile = Dep::getASTFile(fid);
+	iFile.dependsOnMe.push(file.id);
+	file.IDependOn += 1;
     }break;
     case Token_Type::K_FOR:{
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);

@@ -72,7 +72,7 @@ namespace Word{
     const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
     const u8 poundwordCount = (u32)Token_Type::P_END - (u32)Token_Type::P_START - 1;
 
-    void initWords(Map &map, WordData *data, u8 count) {
+    void init(Map &map, WordData *data, u8 count) {
 	map.init(count);
     
 	for (u8 i = 0; i < count; i += 1) {
@@ -85,7 +85,7 @@ namespace Word{
 #endif
 	};
     };
-    void uninitWords(Map &map) { map.uninit(); };
+    void uninit(Map &map) { map.uninit(); };
 };
 
 bool isKeyword(Token_Type type) { return type > Token_Type::K_START && type < Token_Type::K_END; };

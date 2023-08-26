@@ -17,10 +17,9 @@ bool compile(char *fileName){
 	return true;
     };
     //dbg::dumpLexerStat(lexer);
-    dbg::dumpLexerTokens(lexer);
-    ASTFile astFile;
-    astFile.init();
-    DEFER(astFile.uninit());
+    //dbg::dumpLexerTokens(lexer);
+    ASTFile &astFile = Dep::getASTFile(0);
+    astFile.init(0);
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
 	if (base == nullptr) { break; };

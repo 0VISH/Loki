@@ -2,11 +2,11 @@ namespace GlobalStrings{
     hashmap *globalStrings;
     u16 stringID;
 
-    void initGlobalStrings(){
+    void init(){
 	globalStrings = hashmap_create();
 	stringID = 0;
     };
-    void uninitGlobalStrings(){
+    void uninit(){
 	hashmap_free(globalStrings);
     };
     u32 addEntryIfRequired(String str){

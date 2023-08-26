@@ -20,13 +20,15 @@ s32 main(s32 argc, char **argv) {
 	return EXIT_SUCCESS;
     };
     
-    Word::initWords(Word::keywords, Word::keywordsData, Word::keywordCount);
-    Word::initWords(Word::poundwords, Word::poundwordsData, Word::poundwordCount);
-    GlobalStrings::initGlobalStrings();
+    Word::init(Word::keywords, Word::keywordsData, Word::keywordCount);
+    Word::init(Word::poundwords, Word::poundwordsData, Word::poundwordCount);
+    GlobalStrings::init();
+    Dep::init();
     compile(argv[1]);
-    GlobalStrings::uninitGlobalStrings();
-    Word::uninitWords(Word::poundwords);
-    Word::uninitWords(Word::keywords);
+    Dep::uninit();
+    GlobalStrings::uninit();
+    Word::uninit(Word::poundwords);
+    Word::uninit(Word::keywords);
 
     os::endTimer(TimeSlot::TOTAL);
     if(report::errorOff == 0){printf("\n");};
