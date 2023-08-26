@@ -455,6 +455,12 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    lexer.emitErr(tokOffs[x].off, "Expected file path as a string");
 	    return nullptr;
 	};
+	String fileName = makeStringFromTokOff(x, lexer);
+	fileName.mem += 1;
+	char c = fileName.mem[fileName.len-1];
+	fileName.mem[fileName.len] = '\0';
+	char *fullFileName = os::getFileFullName(fileName.mem);
+	fileName.mem[fileName.len] = c;
     }break;
     case Token_Type::K_FOR:{
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);
