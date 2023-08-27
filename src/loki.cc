@@ -62,7 +62,10 @@ bool compile(char *fileName){
     while(Dep::parseAndCheckQueue.count != 0){
 	Dep::IDAndName idf = Dep::parseAndCheckQueue.pop();
 	ASTFile &file = Dep::getASTFile(idf.id);
-	parseCheckAndLoadEntities(idf.name, file);
+	ScopeEntities *se = parseCheckAndLoadEntities(idf.name, file);
+	if(se){
+	    Dep::pushToCompileQueue(&file.nodes, se);
+	};
     };
     os::endTimer(TimeSlot::FRONTEND);
     if (report::errorOff != 0) {

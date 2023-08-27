@@ -37,6 +37,10 @@ namespace Dep{
 	FileID id;
 	char *name;
     };
+    struct NodeAndScope{
+	DynamicArray<ASTBase*> *nodes;
+	ScopeEntities *se;
+    };
     
     DynamicArray<ASTFile> files;
     DynamicArray<ScopeEntities*> fileIDToSE;
@@ -44,6 +48,7 @@ namespace Dep{
     FileID fileID;
 
     DynamicArray<IDAndName> parseAndCheckQueue;
+    DynamicArray<NodeAndScope> compileToBytecodeQueue;
 
     void init(){
 	fileNameToID = hashmap_create();
@@ -51,6 +56,7 @@ namespace Dep{
 	files.init(3);
 	files.count += 1;        //0 -> main file scope
 	parseAndCheckQueue.init();
+	compileToBytecodeQueue.init();
 	fileIDToSE.init();
     };
     void uninit(){
@@ -60,6 +66,7 @@ namespace Dep{
 	};
 	files.uninit();
 	parseAndCheckQueue.uninit();
+	compileToBytecodeQueue.uninit();
 	fileIDToSE.uninit();
     };
 
@@ -84,5 +91,8 @@ namespace Dep{
     void pushToParseAndCheckQueue(char *name){
 	FileID fid = getFileID(name);
 	parseAndCheckQueue.push({fid, name});
+    };
+    void pushToCompileQueue(DynamicArray<ASTBase*> *nodes, ScopeEntities *se){
+	compileToBytecodeQueue.push({nodes, se});
     };
 };
