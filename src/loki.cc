@@ -59,6 +59,7 @@ bool compile(char *fileName){
     ASTFile &astFile = Dep::getASTFile(0);
     astFile.init(0);
     ScopeEntities *fileScopeEntities = parseCheckAndLoadEntities(fileName, astFile);
+    Dep::pushToCompileQueue(&astFile.nodes, fileScopeEntities);
     while(Dep::parseAndCheckQueue.count != 0){
 	Dep::IDAndName idf = Dep::parseAndCheckQueue.pop();
 	ASTFile &file = Dep::getASTFile(idf.id);
@@ -72,25 +73,29 @@ bool compile(char *fileName){
 	return false;
     };
     os::startTimer(TimeSlot::MIDEND);
-    BytecodeFile bf;
-    bf.init();
-    DEFER(bf.uninit());
     DynamicArray<BytecodeContext> bca;
     bca.init(3);
     DEFER({
 	    bca[0].uninit();
 	    bca.uninit();
 	});
-    BytecodeContext &bc = bca.newElem();
-    bc.init(fileScopeEntities->varMap.count, fileScopeEntities->procMap.count, 0);
     DynamicArray<ScopeEntities*> see;
     see.init();
-    see.push(fileScopeEntities);
-    compileASTNodesToBytecode(astFile.nodes, see, bca, bf);
+    for(u32 x=0; x<Dep::compileToBytecodeQueue.count; x+=1){
+	auto nodeAndScope = Dep::compileToBytecodeQueue[x];
+	ScopeEntities *se = nodeAndScope.se;
+	BytecodeFile bf;
+	bf.init();
+	BytecodeContext &bc = bca.newElem();
+	bc.init(se->varMap.count, se->procMap.count, 0);
+	see.push(se);
+	compileASTNodesToBytecode(*nodeAndScope.nodes, see, bca, bf);
+	see.pop();
+	bca.pop();
+	dbg::dumpBytecodeFile(bf);
+	bf.uninit();
+    };
     see.uninit();
-    fileScopeEntities->uninit();
-    mem::free(fileScopeEntities);
-    dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
     /*
     os::startTimer(TimeSlot::EXEC_BC);

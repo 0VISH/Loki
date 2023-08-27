@@ -26,4 +26,5 @@ struct ScopeEntities{
     void init(u32 varCount, u32 procCount);
     void uninit();
 };
+struct ASTBase;
 void freeNodeInternal(ASTBase *base);

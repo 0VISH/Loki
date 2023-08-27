@@ -1,9 +1,10 @@
+#include "entity.hh"
+
 #define AST_PAGE_SIZE 1024
 
 typedef s16 FileID;
 
 struct ASTBase;
-void freeNodeInternal(ASTBase *base);
 
 struct ASTFile{
     DynamicArray<char*> memPages;
@@ -31,7 +32,6 @@ struct ASTFile{
     };
 };
 
-struct ScopeEntities;
 namespace Dep{
     struct IDAndName{
 	FileID id;
@@ -67,6 +67,11 @@ namespace Dep{
 	files.uninit();
 	parseAndCheckQueue.uninit();
 	compileToBytecodeQueue.uninit();
+	for(u32 x=0; x<fileIDToSE.count; x+=1){
+	    ScopeEntities *se = fileIDToSE[x];
+	    se->uninit();
+	    mem::free(se);
+	};
 	fileIDToSE.uninit();
     };
 
@@ -74,6 +79,7 @@ namespace Dep{
 	if(id >= fileIDToSE.len){
 	    fileIDToSE.realloc(id + 5);
 	};
+	fileIDToSE.count = (u32)id;
 	fileIDToSE[(u32)id] = se;
     };
     FileID getFileID(char *fileName){
