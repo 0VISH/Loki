@@ -24,6 +24,7 @@ enum class ASTType {
     UNI_NEG,
     IF,
     FOR,
+    IMPORT,
 };
 enum class ForType{
     FOR_EVER,
@@ -34,6 +35,9 @@ enum class ForType{
 
 struct ASTBase {
     ASTType type;
+};
+struct ASTImport : ASTBase{
+    char *fileName;
 };
 struct ASTNumInt : ASTBase{
     s64 num;
@@ -463,7 +467,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	};
 	String fileName = makeStringFromTokOff(x, lexer);
 	fileName.mem += 1;
-	char c = fileName.mem[fileName.len-1];
+	char c = fileName.mem[fileName.len];
 	fileName.mem[fileName.len] = '\0';
 	char *fullFileName = os::getFileFullName(fileName.mem);
 	fileName.mem[fileName.len] = c;
@@ -471,10 +475,11 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    lexer.emitErr(tokOffs[x].off, "Invalid file path");
 	    return nullptr;
 	};
-	FileID fid = Dep::getFileID(fullFileName);
-	ASTFile &iFile = Dep::getASTFile(fid);
-	iFile.dependsOnMe.push(file.id);
-	file.IDependOn += 1;
+	Dep::pushToParseAndCheckQueue(fullFileName);
+	x += 1;
+	ASTImport *Import = (ASTImport*)allocAST(sizeof(ASTImport), ASTType::IMPORT, file);
+	Import->fileName = fullFileName;
+	return (ASTBase*)Import;
     }break;
     case Token_Type::K_FOR:{
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);

@@ -404,6 +404,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
     } break;
+    case ASTType::IMPORT: break;
     default:
 	UNREACHABLE;
 	return false;

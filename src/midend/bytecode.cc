@@ -691,6 +691,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	bf.reserve(1);
 	bf.emit(Bytecode::PROC_END);
     }break;
+    case ASTType::IMPORT: break;
     default:
 	UNREACHABLE;
 	break;

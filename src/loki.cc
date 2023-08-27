@@ -1,4 +1,4 @@
-ScopeEntities *parseAndLoadEntities(char *fileName, ASTFile &astFile){
+ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     Lexer lexer;
     lexer.init(fileName);
     DEFER(lexer.uninit());
@@ -13,13 +13,9 @@ ScopeEntities *parseAndLoadEntities(char *fileName, ASTFile &astFile){
     };
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
-	if (base == nullptr) { break; };
+	if (base == nullptr) { return nullptr; };
 	astFile.nodes.push(base);
 	eatNewlines(lexer.tokenTypes, off);
-    };
-    if (report::errorOff != 0) {
-	report::flushReports();
-	return nullptr;
     };
     DynamicArray<ScopeEntities*> see;
     see.init(3);
@@ -55,14 +51,23 @@ ScopeEntities *parseAndLoadEntities(char *fileName, ASTFile &astFile){
 	    SET_BIT(entity.flag, Flags::GLOBAL);
 	};
     };
+    Dep::registerScopedEntities(astFile.id, fileScopeEntities);
     return fileScopeEntities;
 };
 bool compile(char *fileName){
     os::startTimer(TimeSlot::FRONTEND);
     ASTFile &astFile = Dep::getASTFile(0);
     astFile.init(0);
-    ScopeEntities *fileScopeEntities = parseAndLoadEntities(fileName, astFile);
+    ScopeEntities *fileScopeEntities = parseCheckAndLoadEntities(fileName, astFile);
+    while(Dep::parseAndCheckQueue.count != 0){
+	Dep::IDAndName idf = Dep::parseAndCheckQueue.pop();
+	ASTFile &file = Dep::getASTFile(idf.id);
+	parseCheckAndLoadEntities(idf.name, file);
+    };
     os::endTimer(TimeSlot::FRONTEND);
+    if (report::errorOff != 0) {
+	return false;
+    };
     os::startTimer(TimeSlot::MIDEND);
     BytecodeFile bf;
     bf.init();

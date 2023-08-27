@@ -8,20 +8,16 @@ void freeNodeInternal(ASTBase *base);
 struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
-    DynamicArray<FileID> dependsOnMe;
     FileID id;
     u16 pageBrim;
-    u16 IDependOn;
 
     void init(FileID fileID){
 	id = fileID;
 	pageBrim = 0;
-	IDependOn = 0;
 	memPages.init(2);
 	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
 	memPages.push(page);
 	nodes.init(10);
-	dependsOnMe.init();
     };
     void uninit(){
 	for(u32 x=0; x<nodes.count; x += 1){
@@ -32,19 +28,30 @@ struct ASTFile{
 	};
 	memPages.uninit();
 	nodes.uninit();
-	dependsOnMe.uninit();
     };
 };
 
+struct ScopeEntities;
 namespace Dep{
+    struct IDAndName{
+	FileID id;
+	char *name;
+    };
+    
     DynamicArray<ASTFile> files;
+    DynamicArray<ScopeEntities*> fileIDToSE;
     hashmap *fileNameToID;
     FileID fileID;
+
+    DynamicArray<IDAndName> parseAndCheckQueue;
 
     void init(){
 	fileNameToID = hashmap_create();
 	fileID = 1;
-	files.init();
+	files.init(3);
+	files.count += 1;        //0 -> main file scope
+	parseAndCheckQueue.init();
+	fileIDToSE.init();
     };
     void uninit(){
 	hashmap_free(fileNameToID);
@@ -52,11 +59,19 @@ namespace Dep{
 	    files[x].uninit();
 	};
 	files.uninit();
+	parseAndCheckQueue.uninit();
+	fileIDToSE.uninit();
     };
 
+    void registerScopedEntities(FileID id, ScopeEntities *se){
+	if(id >= fileIDToSE.len){
+	    fileIDToSE.realloc(id + 5);
+	};
+	fileIDToSE[(u32)id] = se;
+    };
     FileID getFileID(char *fileName){
 	uintptr_t temp = fileID;
-	if(hashmap_get_set(fileNameToID, fileName, strlen(fileName), &temp)){
+	if(hashmap_get_set(fileNameToID, fileName, strlen(fileName), &temp) == false){
 	    ASTFile &file = files.newElem();
 	    file.init((FileID)temp);
 	    fileID += 1;
@@ -65,5 +80,9 @@ namespace Dep{
     };
     ASTFile &getASTFile(FileID id){
 	return files[(u32)id];
+    };
+    void pushToParseAndCheckQueue(char *name){
+	FileID fid = getFileID(name);
+	parseAndCheckQueue.push({fid, name});
     };
 };
