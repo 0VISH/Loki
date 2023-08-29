@@ -143,6 +143,7 @@ struct Lexer {
 	tokenOffsets.uninit();
     };
     void emitErr(u64 off, char *fmt, ...) {
+	printf("EMITING ERR");
 	if (report::errorOff == MAX_REPORTS) { return; };
 	report::Error &rep = report::errors[report::errorOff];
 	report::errorOff += 1;

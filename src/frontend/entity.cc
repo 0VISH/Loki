@@ -240,6 +240,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	StructEntity entity;
 	entity.varToOff.init(Struct->memberCount);
 	u64 size = 0;
+	//TODO: add scope
 	if(checkEntities(Struct->body, lexer, see) == false){return false;};
 	for(u32 x=0; x<Struct->body.count; x+=1){
 	    if(Struct->body[x]->type == ASTType::UNI_DECLERATION){
@@ -251,7 +252,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 		entity.varToOff.insertValue(var->name, size);
 		size += var->size;
 	    }else{
-		
+		//TODO: 
 	    };
 	};
 	entity.size = size;
@@ -260,6 +261,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::UNI_DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
+	if(type == Type::UNKOWN){return false;};
 	if(checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
 	    return false;
