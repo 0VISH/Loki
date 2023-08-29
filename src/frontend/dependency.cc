@@ -52,9 +52,8 @@ namespace Dep{
 
     void init(){
 	fileNameToID = hashmap_create();
-	fileID = 1;
+	fileID = 0;
 	files.init(3);
-	files.count += 1;        //0 -> main file scope
 	parseAndCheckQueue.init();
 	compileToBytecodeQueue.init();
 	fileIDToSE.init();

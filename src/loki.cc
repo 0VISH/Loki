@@ -17,6 +17,7 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
 	astFile.nodes.push(base);
 	eatNewlines(lexer.tokenTypes, off);
     };
+    dbg::dumpASTFile(astFile, lexer);
     DynamicArray<ScopeEntities*> see;
     see.init(3);
     DEFER(see.uninit());
@@ -56,10 +57,7 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
 };
 bool compile(char *fileName){
     os::startTimer(TimeSlot::FRONTEND);
-    ASTFile &astFile = Dep::getASTFile(0);
-    astFile.init(0);
-    ScopeEntities *fileScopeEntities = parseCheckAndLoadEntities(fileName, astFile);
-    Dep::pushToCompileQueue(&astFile.nodes, fileScopeEntities);
+    Dep::pushToParseAndCheckQueue(fileName);
     while(Dep::parseAndCheckQueue.count != 0){
 	Dep::IDAndName idf = Dep::parseAndCheckQueue.pop();
 	ASTFile &file = Dep::getASTFile(idf.id);

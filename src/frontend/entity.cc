@@ -1,6 +1,8 @@
-void ScopeEntities::init(u32 varCount, u32 procCount){
+void ScopeEntities::init(u32 varCount, u32 procCount, u32 structCount){
     varMap.len = 0;
     procMap.len = 0;
+    structMap.len = 0;
+    structMap.count = 0;
     varMap.count = 0;
     procMap.count = 0;
     if(varCount != 0){
@@ -11,6 +13,10 @@ void ScopeEntities::init(u32 varCount, u32 procCount){
 	procMap.init(procCount);
 	procEntities = (ProcEntity*)mem::alloc(sizeof(ProcEntity) * procCount);
     };
+    if(structCount != 0){
+	structMap.init(structCount);
+	structEntities = (StructEntity*)mem::alloc(sizeof(StructEntity) * structCount);
+    };
 };
 void ScopeEntities::uninit(){
     if(varMap.len != 0){
@@ -20,6 +26,10 @@ void ScopeEntities::uninit(){
     if(procMap.len != 0){
 	procMap.uninit();
         mem::free(procEntities);
+    };
+    if(structMap.len != 0){
+	structMap.uninit();
+	mem::free(structEntities);
     };
 };
 
@@ -32,6 +42,7 @@ ScopeEntities* allocScopeEntity(Scope scope){
 void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntities *se) {
     u32 procCount = 0;
     u32 varCount = 0;
+    u32 structCount = 0;
     for (u32 x = 0; x < entities.count; x += 1) {
 	ASTBase *node = entities[x];
 	if (node->type == ASTType::PROC_DEFENITION) {
@@ -41,9 +52,11 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
 	} else if (node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN){
 	    ASTMultiVar *multi = (ASTMultiVar*)node;
 	    varCount += multi->names.count;
+	} else if(node->type == ASTType::STRUCT_DEFENITION){
+	    structCount += 1;
 	};
     };
-    se->init(varCount, procCount);
+    se->init(varCount, procCount, structCount);
 };
 
 #define GET_ENTITY_TEMPLATE(MAP, ENTITIES)			\
@@ -92,6 +105,9 @@ ProcEntity *getProcEntity(String name, DynamicArray<ScopeEntities*> &see){
 };
 VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
     GET_ENTITY_TEMPLATE(varMap, varEntities);
+};
+StructEntity *getStructEntity(String name, DynamicArray<ScopeEntities*> &see){
+    GET_ENTITY_TEMPLATE(structMap, structEntities);
 };
 
 bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
@@ -207,11 +223,53 @@ bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, Dyna
 	return false;							\
     };									\
 
+u64 getSizeOfType(u32 x, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+    BRING_TOKENS_TO_SCOPE;
+    switch(tokTypes[x]){
+    case Token_Type::K_U8:   return sizeof(u8);
+    case Token_Type::K_U16:  return sizeof(u16);
+    case Token_Type::K_U32:  return sizeof(u32);
+    case Token_Type::K_U64:  return sizeof(u64);
+    case Token_Type::K_S8:   return sizeof(s8);
+    case Token_Type::K_S16:  return sizeof(s16);
+    case Token_Type::K_S32:  return sizeof(s32);
+    case Token_Type::K_S64:  return sizeof(s64);
+    };
+    return 0;
+};
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1]; //current scope
     switch (node->type) {
+    case ASTType::STRUCT_DEFENITION:{
+	ASTStructDef *Struct = (ASTStructDef*)node;
+	if(getStructEntity(Struct->name, see) != nullptr){
+	    lexer.emitErr(tokOffs[Struct->tokenOff].off, "Struct redefenition");
+	};
+	Map &map = se->structMap;
+	u32 id = map.count;
+	map.insertValue(Struct->name, id);
+
+	StructEntity entity;
+	entity.varToOff.init(Struct->memberCount);
+	u64 size = 0;
+	for(u32 x=0; x<Struct->body.count; x+=1){
+	    if(Struct->body[x]->type == ASTType::UNI_DECLERATION){
+		ASTUniVar *var = (ASTUniVar*)Struct->body[x];
+		if(entity.varToOff.getValue(var->name) != -1){
+		    lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
+		    return false;
+		};
+		entity.varToOff.insertValue(var->name, size);
+		size += getSizeOfType(var->tokenOff+2, lexer, see);
+	    }else{
+		
+	    };
+	};
+	entity.size = size;
+	se->structEntities[id] = entity;
+    }break;
     case ASTType::UNI_DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);

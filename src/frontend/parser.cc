@@ -25,6 +25,7 @@ enum class ASTType {
     IF,
     FOR,
     IMPORT,
+    STRUCT_DEFENITION,
 };
 enum class ForType{
     FOR_EVER,
@@ -63,7 +64,7 @@ struct ASTBinOp : ASTBase{
     Type rhsType;
 };
 struct ASTMultiVar : ASTBase{
-     DynamicArray<String> names;
+    DynamicArray<String> names;
     ASTBase *rhs;
     u32 tokenOff;
     u8 flag;
@@ -110,6 +111,12 @@ struct ASTFor : ASTBase{
     u32      endOff;
     u32      incrementOff;
     ForType  loopType;
+};
+struct ASTStructDef : ASTBase{
+    DynamicArray<ASTBase*> body;
+    String name;
+    u32 tokenOff;
+    u32 memberCount;
 };
 
 void freeNodeInternal(ASTBase *base);
@@ -705,127 +712,164 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 		return (ASTBase*)assign;
 	    } break;
 	    case (Token_Type)':': {
-		//procedure defenition
 		x += 1;
-		if (tokTypes[x] != Token_Type::K_PROC) {
-		    lexer.emitErr(tokOffs[x].off, "Expected 'proc' keyword");
-		    return nullptr;
-		};
-		x += 1;
-		if (tokTypes[x] != (Token_Type)'(') {
-		    lexer.emitErr(tokOffs[x].off, "Expected '('");
-		    return nullptr;
-		};
-		ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, file);
-		proc->tokenOff = start;
-		proc->flag = flag;
-		proc->name = makeStringFromTokOff(start, lexer);
-		proc->body.init();
-		proc->out.zero();
-		u32 uniInCount = 0;
-		u32 multiInCount = 0;
-		u32 multiInInputCount = 0;
-		//parse input
-		x += 1;
-		if(tokTypes[x] == (Token_Type)')'){goto END_PROC_INPUT_PARSING_LOOP;};
-		while(true){
-		    eatNewlines(tokTypes, x);
-		    ASTBase *base = parseBlock(lexer, file, x);
-		    if(base == nullptr){return nullptr;};
-		    switch(base->type){
-		    case ASTType::MULTI_DECLERATION:{
-			ASTMultiVar *multiVar = (ASTMultiVar*)base;
-			multiInCount += 1;
-			multiInInputCount = multiVar->names.count;
-		    }break;
-		    case ASTType::UNI_DECLERATION:{
-			uniInCount += 1;
-		    }break;
-		    };
-		    proc->body.push(base);
-		    switch(tokTypes[x]){
-		    case (Token_Type)')':{
-			goto END_PROC_INPUT_PARSING_LOOP;
-		    }break;
-		    case (Token_Type)',':{
-			x += 1;
-		    }break;
-		    default:
-			lexer.emitErr(tokOffs[x].off, "Expected ','");
-			return nullptr;
-		    };
-		};
-		END_PROC_INPUT_PARSING_LOOP:
-		proc->uniInCount = uniInCount;
-		proc->multiInCount = multiInCount;
-		proc->multiInInputCount = multiInInputCount;
-		if(tokTypes[x] != (Token_Type)')'){
-		    lexer.emitErr(tokOffs[x].off, "Expected ')'");
-		    return nullptr;
-		};
-		PARSE_AFTER_ARGS:
-		x += 1;
-		eatNewlines(tokTypes, x);
-		switch (tokTypes[x]) {
-		case Token_Type::ARROW: {
+		switch (tokTypes[x]){
+		case Token_Type::K_STRUCT:{
 		    x += 1;
-		    proc->out.init();
-		    bool bracket = false;
-		    if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
-		    //parse output
-		    while (true) {
-			eatNewlines(tokTypes, x);
-			ASTBase *typeNode = parseType(x, lexer, file);
-			if(typeNode == nullptr){return nullptr;};
-			x += 1;
-			proc->out.push(typeNode);
-			if(tokTypes[x] == (Token_Type)','){
-			    x += 1;
-			    continue;
-			};
-			break;
-		    };
-		    if (tokTypes[x] == (Token_Type)')') {
-			if (bracket == false) {
-			    lexer.emitErr(tokOffs[x].off, "Did not expect ')'");
-			    return nullptr;
-			};
-			x += 1;
-			eatNewlines(tokTypes, x);
-		    } else if(bracket == true) {
-			lexer.emitErr(tokOffs[x].off, "Expected ')'");
-			return nullptr;
-		    };
-		    if (tokTypes[x] != (Token_Type)'{') {
+		    eatNewlines(tokTypes, x);
+		    if(tokTypes[x] != (Token_Type)'{'){
 			lexer.emitErr(tokOffs[x].off, "Expected '{'");
 			return nullptr;
 		    };
 		    x += 1;
-		} break;
-		case (Token_Type)'{': {
+		    eatNewlines(tokTypes, x);
+		    ASTStructDef *Struct = (ASTStructDef*)allocAST(sizeof(ASTStructDef), ASTType::STRUCT_DEFENITION, file);
+		    Struct->name = makeStringFromTokOff(start, lexer);
+		    Struct->body.init();
+		    Struct->tokenOff = start;
+		    u32 count = 0;
+		    while (tokTypes[x] != (Token_Type)'}') {
+			//parse body
+			u32 start = x;
+			ASTBase *node = parseBlock(lexer, file, x);
+			if (node == nullptr) {return nullptr;};
+			switch(node->type){
+			case ASTType::UNI_DECLERATION: count += 1;break;
+			case ASTType::MULTI_DECLERATION:{
+			    ASTMultiVar *multiVar = (ASTMultiVar*)node;
+			    count += multiVar->names.count;
+			}break;
+			default:
+			    lexer.emitErr(tokOffs[x].off, "Invalid statement. Struct only takes uni/multi decleration");
+			    return nullptr;
+			};
+			Struct->body.push(node);
+			eatNewlines(tokTypes, x);
+		    };
+		    Struct->memberCount = count;
 		    x += 1;
-		} break;
-		default: {
-		    lexer.emitErr(tokOffs[x].off, "Expected '{' or '->'");
-		    return nullptr;
-		} break;
-		};
-		eatNewlines(tokTypes, x);
-		if (tokTypes[x] == (Token_Type)'}') {
+		    return (ASTBase*)Struct;
+		}break;
+		case Token_Type::K_PROC:{
+		    //procedure defenition
 		    x += 1;
-		    return (ASTBase*)proc;
-		};
-		while (tokTypes[x] != (Token_Type)'}') {
-		    //parse body
-		    ASTBase *node = parseBlock(lexer, file, x);
-		    if (node == nullptr) {
+		    if (tokTypes[x] != (Token_Type)'(') {
+			lexer.emitErr(tokOffs[x].off, "Expected '('");
 			return nullptr;
 		    };
-		    proc->body.push(node);
+		    ASTProcDef *proc = (ASTProcDef*)allocAST(sizeof(ASTProcDef), ASTType::PROC_DEFENITION, file);
+		    proc->tokenOff = start;
+		    proc->flag = flag;
+		    proc->name = makeStringFromTokOff(start, lexer);
+		    proc->body.init();
+		    proc->out.zero();
+		    u32 uniInCount = 0;
+		    u32 multiInCount = 0;
+		    u32 multiInInputCount = 0;
+		    //parse input
+		    x += 1;
+		    if(tokTypes[x] == (Token_Type)')'){goto END_PROC_INPUT_PARSING_LOOP;};
+		    while(true){
+			eatNewlines(tokTypes, x);
+			ASTBase *base = parseBlock(lexer, file, x);
+			if(base == nullptr){return nullptr;};
+			switch(base->type){
+			case ASTType::MULTI_DECLERATION:{
+			    ASTMultiVar *multiVar = (ASTMultiVar*)base;
+			    multiInCount += 1;
+			    multiInInputCount = multiVar->names.count;
+			}break;
+			case ASTType::UNI_DECLERATION:{
+			    uniInCount += 1;
+			}break;
+			};
+			proc->body.push(base);
+			switch(tokTypes[x]){
+			case (Token_Type)')':{
+			    goto END_PROC_INPUT_PARSING_LOOP;
+			}break;
+			case (Token_Type)',':{
+			    x += 1;
+			}break;
+			default:
+			    lexer.emitErr(tokOffs[x].off, "Expected ','");
+			    return nullptr;
+			};
+		    };
+		    END_PROC_INPUT_PARSING_LOOP:
+		    proc->uniInCount = uniInCount;
+		    proc->multiInCount = multiInCount;
+		    proc->multiInInputCount = multiInInputCount;
+		    if(tokTypes[x] != (Token_Type)')'){
+			lexer.emitErr(tokOffs[x].off, "Expected ')'");
+			return nullptr;
+		    };
+		    PARSE_AFTER_ARGS:
+		    x += 1;
 		    eatNewlines(tokTypes, x);
+		    switch (tokTypes[x]) {
+		    case Token_Type::ARROW: {
+			x += 1;
+			proc->out.init();
+			bool bracket = false;
+			if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
+			//parse output
+			while (true) {
+			    eatNewlines(tokTypes, x);
+			    ASTBase *typeNode = parseType(x, lexer, file);
+			    if(typeNode == nullptr){return nullptr;};
+			    x += 1;
+			    proc->out.push(typeNode);
+			    if(tokTypes[x] == (Token_Type)','){
+				x += 1;
+				continue;
+			    };
+			    break;
+			};
+			if (tokTypes[x] == (Token_Type)')') {
+			    if (bracket == false) {
+				lexer.emitErr(tokOffs[x].off, "Did not expect ')'");
+				return nullptr;
+			    };
+			    x += 1;
+			    eatNewlines(tokTypes, x);
+			} else if(bracket == true) {
+			    lexer.emitErr(tokOffs[x].off, "Expected ')'");
+			    return nullptr;
+			};
+			if (tokTypes[x] != (Token_Type)'{') {
+			    lexer.emitErr(tokOffs[x].off, "Expected '{'");
+			    return nullptr;
+			};
+			x += 1;
+		    } break;
+		    case (Token_Type)'{': {
+			x += 1;
+		    } break;
+		    default: {
+			lexer.emitErr(tokOffs[x].off, "Expected '{' or '->'");
+			return nullptr;
+		    } break;
+		    };
+		    eatNewlines(tokTypes, x);
+		    if (tokTypes[x] == (Token_Type)'}') {
+			x += 1;
+			return (ASTBase*)proc;
+		    };
+		    while (tokTypes[x] != (Token_Type)'}') {
+			//parse body
+			ASTBase *node = parseBlock(lexer, file, x);
+			if (node == nullptr) {
+			    return nullptr;
+			};
+			proc->body.push(node);
+			eatNewlines(tokTypes, x);
+		    };
+		    x += 1;
+		    return (ASTBase*)proc;
+		}break;
 		};
-		x += 1;
-		return (ASTBase*)proc;
+		
 	    } break;
 	    default: {
 		if (isType(tokTypes[x])) {
@@ -1132,7 +1176,6 @@ namespace dbg {
 	    for (u32 v=inCount; v < table.count; v += 1) {
 		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
-	    PAD;
 	} break;
 	case ASTType::TYPE:{
 	    AST_Type *type = (AST_Type*)node;
@@ -1144,6 +1187,19 @@ namespace dbg {
 	    PAD;
 	    ASTString *string = (ASTString*)node;
 	    printf("\"%.*s\"", string->str.len, string->str.mem+1);
+	}break;
+	case ASTType::STRUCT_DEFENITION:{
+	    printf("struct_defenition");
+	    PAD;
+	    ASTStructDef *Struct = (ASTStructDef*)node;
+	    printf("name: %.*s", Struct->name.len, Struct->name.mem);
+	    PAD;
+	    printf("member_count: %d", Struct->memberCount);
+	    PAD;
+	    printf("BODY");
+	    for (u32 v=0; v < Struct->body.count; v += 1) {
+		__dumpNodesWithoutEndPadding(Struct->body[v], lexer, padding + 1);
+	    };
 	}break;
 	default: UNREACHABLE;
 	};
