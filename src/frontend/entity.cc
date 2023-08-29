@@ -223,20 +223,6 @@ bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, Dyna
 	return false;							\
     };									\
 
-u64 getSizeOfType(u32 x, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
-    BRING_TOKENS_TO_SCOPE;
-    switch(tokTypes[x]){
-    case Token_Type::K_U8:   return sizeof(u8);
-    case Token_Type::K_U16:  return sizeof(u16);
-    case Token_Type::K_U32:  return sizeof(u32);
-    case Token_Type::K_U64:  return sizeof(u64);
-    case Token_Type::K_S8:   return sizeof(s8);
-    case Token_Type::K_S16:  return sizeof(s16);
-    case Token_Type::K_S32:  return sizeof(s32);
-    case Token_Type::K_S64:  return sizeof(s64);
-    };
-    return 0;
-};
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
 bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     BRING_TOKENS_TO_SCOPE;
@@ -254,6 +240,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	StructEntity entity;
 	entity.varToOff.init(Struct->memberCount);
 	u64 size = 0;
+	if(checkEntities(Struct->body, lexer, see) == false){return false;};
 	for(u32 x=0; x<Struct->body.count; x+=1){
 	    if(Struct->body[x]->type == ASTType::UNI_DECLERATION){
 		ASTUniVar *var = (ASTUniVar*)Struct->body[x];
@@ -262,7 +249,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 		    return false;
 		};
 		entity.varToOff.insertValue(var->name, size);
-		size += getSizeOfType(var->tokenOff+2, lexer, see);
+		size += var->size;
 	    }else{
 		
 	    };
@@ -272,7 +259,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::UNI_DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);
+	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
 	if(checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
 	    return false;
@@ -280,7 +267,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::MULTI_DECLERATION:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
-	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);
+	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
 	DynamicArray<String> &names = var->names;
 	for(u32 x=0; x<names.count; x+=1){
 	    String &name = names[x];
@@ -292,7 +279,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::UNI_INITIALIZATION_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);
+	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
 	Flag flag = var->flag;
 	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
 	    CHECK_TREE_AND_MERGE_FLAGS;
@@ -305,7 +292,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     }break;
     case ASTType::MULTI_INITIALIZATION_T_KNOWN:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
-	Type type = tokenKeywordToType(lexer, var->tokenOff + 2);
+	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
 	Flag flag = var->flag;
 	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
 	    CHECK_TREE_AND_MERGE_FLAGS;

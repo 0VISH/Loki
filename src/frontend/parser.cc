@@ -53,6 +53,7 @@ struct ASTString : ASTBase{
 struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
+    u64 size;
     u32 tokenOff;
     u8 flag;
 };
@@ -66,6 +67,7 @@ struct ASTBinOp : ASTBase{
 struct ASTMultiVar : ASTBase{
     DynamicArray<String> names;
     ASTBase *rhs;
+    u64 size;
     u32 tokenOff;
     u8 flag;
 };

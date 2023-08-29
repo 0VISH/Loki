@@ -107,21 +107,27 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
 Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer){
     return typeID2Type(getTreeTypeID(base, flag, see, lexer));
 };
-Type tokenKeywordToType(Lexer &lexer, u32 off){
+StructEntity *getStructEntity(String name, DynamicArray<ScopeEntities*> &see);
+Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see, u64 &size){
     BRING_TOKENS_TO_SCOPE;
     switch (tokTypes[off]) {
-    case Token_Type::K_U8:  return Type::U_8;
-    case Token_Type::K_U16: return Type::U_16;
-    case Token_Type::K_U32: return Type::U_32;
-    case Token_Type::K_S8:  return Type::S_8;
-    case Token_Type::K_S16: return Type::S_16;
-    case Token_Type::K_S32: return Type::S_32;
-    case Token_Type::K_F16: return Type::F_16;
-    case Token_Type::K_F32: return Type::F_32;
-    case Token_Type::K_F64: return Type::F_64;
+    case Token_Type::K_U8:  size=sizeof(u8);  return Type::U_8;
+    case Token_Type::K_U16: size=sizeof(u16); return Type::U_16;
+    case Token_Type::K_U32: size=sizeof(u32); return Type::U_32;
+    case Token_Type::K_S8:  size=sizeof(s8);  return Type::S_8;
+    case Token_Type::K_S16: size=sizeof(s16); return Type::S_16;
+    case Token_Type::K_S32: size=sizeof(s32); return Type::S_32;
+    case Token_Type::K_F32: size=sizeof(f32); return Type::F_32;
+    case Token_Type::K_F64: size=sizeof(f64); return Type::F_64;
     default:
-	UNREACHABLE;
-        return Type::UNKOWN;
+	String name = makeStringFromTokOff(off, lexer);
+	StructEntity *entity = getStructEntity(name, see);
+	if(entity == nullptr){
+	    lexer.emitErr(tokOffs[off].off, "Unkown type");
+	    return Type::UNKOWN;
+	};
+	size = entity->size;
+	return Type::STRUCT;
     };
     return Type::UNKOWN;
 };
@@ -130,6 +136,7 @@ Type tokenKeywordToType(Lexer &lexer, u32 off){
 char *Type2CString[] =  {
     "unkown",
     "xe_void",
+    "struct",
     "string",
     "f_64",
     "s_64",

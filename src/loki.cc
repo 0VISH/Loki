@@ -3,7 +3,6 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     lexer.init(fileName);
     DEFER(lexer.uninit());
     if(lexer.genTokens() == false) {
-	report::flushReports();
 	return nullptr;
     };
     u32 off = 0;
@@ -24,7 +23,6 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
     see.push(fileScopeEntities);
     if (checkEntities(astFile.nodes, lexer, see) == false) {
-	report::flushReports();
 	return nullptr;
     } else {
 	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
@@ -68,6 +66,7 @@ bool compile(char *fileName){
     };
     os::endTimer(TimeSlot::FRONTEND);
     if (report::errorOff != 0) {
+	report::flushReports();
 	return false;
     };
     os::startTimer(TimeSlot::MIDEND);
