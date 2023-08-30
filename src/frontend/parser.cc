@@ -26,6 +26,7 @@ enum class ASTType {
     FOR,
     IMPORT,
     STRUCT_DEFENITION,
+    MODIFIER,
 };
 enum class ForType{
     FOR_EVER,
@@ -96,6 +97,11 @@ struct ASTProcDef : ASTBase {
 };
 struct ASTVariable : ASTBase{
     String name;
+    u32 tokenOff;
+};
+struct ASTModifier : ASTBase{
+    String name;
+    ASTBase *child;
     u32 tokenOff;
 };
 struct AST_Type : ASTBase{
@@ -257,7 +263,36 @@ f64 string2float(String &str){
     s64 num = string2int(str);
     return (f64)num/pow(10, str.len-decimal-1-postDecimalBadChar);
 };
-
+ASTBase *genVariable(u32 &x, Lexer &lexer, ASTFile &file){
+    BRING_TOKENS_TO_SCOPE;
+    ASTBase *root = nullptr;
+    bool childReq = false;
+    ASTModifier *lastMod = nullptr;
+    while(tokTypes[x] == Token_Type::IDENTIFIER){
+	if(tokTypes[x+1] == (Token_Type)'.'){
+	    ASTModifier *mod = (ASTModifier*)allocAST(sizeof(ASTModifier), ASTType::MODIFIER, file);
+	    mod->name = makeStringFromTokOff(x, lexer);
+	    mod->tokenOff = x;
+	    childReq = true;
+	    if(root == nullptr){root = mod;};
+	    lastMod = mod;
+	    x += 2;
+	}else{
+	    ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
+	    var->name = makeStringFromTokOff(x, lexer);
+	    var->tokenOff = x;
+	    childReq = false;
+	    if(root == nullptr){root = var;};
+	    if(lastMod != nullptr){lastMod->child = var;};
+	    x += 1;
+	};
+    };
+    if(childReq){
+	lexer.emitErr(tokOffs[x].off, "Identifier required");
+	return nullptr;
+    };
+    return root;
+};
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     BRING_TOKENS_TO_SCOPE;
  CHECK_TYPE_AST_OPERAND:
@@ -979,6 +1014,14 @@ namespace dbg {
 	u8 flag = false;
 	u8 printEqual = false;
 	switch (type) {
+	case ASTType::MODIFIER:{
+	    ASTModifier *mod = (ASTModifier*)node;
+	    printf("modifier");
+	    PAD;
+	    printf("name: %.*s", mod->name.len, mod->name.mem);
+	    __dumpNodesWithoutEndPadding(mod->child, lexer, padding+1);
+	    PAD;
+	}break;
 	case ASTType::IF:{
 	    printf("if");
 	    PAD;
