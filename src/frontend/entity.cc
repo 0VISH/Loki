@@ -29,6 +29,10 @@ void ScopeEntities::uninit(){
     };
     if(structMap.len != 0){
 	structMap.uninit();
+	for(u32 x=0; x<structMap.count; x+=1){
+	    StructEntity *entity = structEntities + x;
+	    entity->varToOff.uninit();
+	};
 	mem::free(structEntities);
     };
 };
@@ -190,7 +194,6 @@ bool checkProcEntityPresentInScopeElseReg(String name, Flag flag, ScopeEntities 
     ProcEntity entity;
     entity.name = name;
     entity.flag = flag;
-    entity.se = procSe;
     se->procEntities[id] = entity;
     return true;
 };
@@ -240,7 +243,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	StructEntity entity;
 	entity.varToOff.init(Struct->memberCount);
 	u64 size = 0;
-	//TODO: add scope
+	ScopeEntities *StructSe = allocScopeEntity(Scope::BLOCK);
+	see.push(StructSe);
 	if(checkEntities(Struct->body, lexer, see) == false){return false;};
 	for(u32 x=0; x<Struct->body.count; x+=1){
 	    if(Struct->body[x]->type == ASTType::UNI_DECLERATION){
@@ -255,6 +259,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 		//TODO: 
 	    };
 	};
+	see.pop();
+	StructSe->uninit();
+	mem::free(StructSe);
 	entity.size = size;
 	se->structEntities[id] = entity;
     }break;
@@ -262,6 +269,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	ASTUniVar *var = (ASTUniVar*)node;
 	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
 	if(type == Type::UNKOWN){return false;};
+	SET_BIT(var->flag, Flags::CONSTANT);
 	if(checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
 	    return false;
@@ -270,6 +278,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     case ASTType::MULTI_DECLERATION:{
 	ASTMultiVar *var = (ASTMultiVar*)node;
 	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see, var->size);
+	SET_BIT(var->flag, Flags::CONSTANT);
 	DynamicArray<String> &names = var->names;
 	for(u32 x=0; x<names.count; x+=1){
 	    String &name = names[x];
@@ -431,6 +440,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	String name = proc->name;
 	
 	ScopeEntities *procSE = allocScopeEntity(Scope::PROC);
+	proc->se = procSE;
 	if(checkProcEntityPresentInScopeElseReg(name, proc->flag, procSE, see) == false){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;

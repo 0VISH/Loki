@@ -1,10 +1,12 @@
 #define BYTECODE_INPUT Bytecode *page, VM &vm
+#define STACK_SIZE 10000
 
 struct Register{
     union{
-	s64 sint;
-	u64 uint;
-	f64 dec;
+	s64   sint;
+	u64   uint;
+	f64   dec;
+	char *ptr;
     };
 };
 struct VM{
@@ -13,9 +15,12 @@ struct VM{
     Register *registers;
     BytecodeBucket *buc;
     Bytecode *cursor;
+    char stack[STACK_SIZE];
+    u32 stackOff;
     u32 procBlock;
 
     void init(BytecodeBucket *bucket, DynamicArray<Bytecode*> *lbls, u32 procBlockID, u32 offset = 0){
+	stackOff = 0;
 	labels = lbls;
 	procBlock = procBlockID;
 	buc = bucket;
@@ -306,6 +311,13 @@ s8 next_bucket(BYTECODE_INPUT){
 s8 decl_reg(BYTECODE_INPUT){
     return 2;
 };
+s8 alloc(BYTECODE_INPUT){
+    u16 reg = (u16)page[1];
+    s64 size = getConstInt(page + 2);
+    vm.registers[reg].ptr = &vm.stack[vm.stackOff];
+    vm.stackOff += size;
+    return 1+const_in_stream;
+};
 
 /*
   NEG TYPE 1 REG 1
@@ -354,6 +366,7 @@ s8 (*byteProc[])(BYTECODE_INPUT) = {
     decl_reg,
     block_start,
     block_end,
+    alloc,
 };
 
 bool execBytecode(VM &vm){

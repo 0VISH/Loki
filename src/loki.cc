@@ -72,10 +72,7 @@ bool compile(char *fileName){
     os::startTimer(TimeSlot::MIDEND);
     DynamicArray<BytecodeContext> bca;
     bca.init(3);
-    DEFER({
-	    bca[0].uninit();
-	    bca.uninit();
-	});
+    DEFER(bca.uninit());
     DynamicArray<ScopeEntities*> see;
     see.init();
     for(u32 x=0; x<Dep::compileToBytecodeQueue.count; x+=1){
@@ -88,7 +85,9 @@ bool compile(char *fileName){
 	see.push(se);
 	compileASTNodesToBytecode(*nodeAndScope.nodes, see, bca, bf);
 	see.pop();
-	bca.pop();
+	se->uninit();
+	mem::free(se);
+	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
 	bf.uninit();
     };

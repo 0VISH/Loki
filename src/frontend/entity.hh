@@ -8,13 +8,14 @@ enum class Scope{
 struct ScopeEntities;
 struct Entity{
     String name;
-    u8 flag;
+    Flag flag;
 };
 struct VariableEntity : Entity{
+    u64 size;
     Type type;
 };
 struct ProcEntity : Entity{
-    ScopeEntities *se;
+    Flag flag;
 };
 struct StructEntity : Entity{
     Map varToOff;

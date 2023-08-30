@@ -46,6 +46,7 @@ enum class Bytecode : u16{
     DECL_REG,
     BLOCK_START,
     BLOCK_END,
+    ALLOC,
     COUNT,
 };
 enum class BytecodeType : u16{
@@ -141,6 +142,12 @@ struct BytecodeFile{
 	f64 *memNum = (f64*)(mem);
 	*memNum = num;
 	cursor += const_in_stream;
+    };
+    void alloc(u16 reg, u64 size){
+	reserve(1 + 1 + const_in_stream);
+	emit(Bytecode::ALLOC);
+	emit(reg);
+	emitConstInt(size);
     };
     void label(u16 label){
 	reserve(1 + 1);
@@ -417,11 +424,17 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
-	u16 reg = bc.newReg(entity.type);
-	if(isFloat(entity.type)){
-	    bf.movConstS(reg, 0);
+	//TODO: check which architecture we are building for
+	if(entity.type == Type::STRUCT){
+	    u16 reg = bc.newReg(Type::STRUCT);
+	    bf.alloc(reg, var->size);
 	}else{
-	    bf.movConstF(reg, 0);
+	    u16 reg = bc.newReg(entity.type);
+	    if(isFloat(entity.type)){
+		bf.movConstS(reg, 0);
+	    }else{
+		bf.movConstF(reg, 0);
+	    };
 	};
     }break;
     case ASTType::MULTI_DECLERATION:{
@@ -489,7 +502,7 @@ ASTUniVar *var = (ASTUniVar*)node;
     }break;
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
-	ScopeEntities *ForSe = (ScopeEntities*)For->ForSe;
+	ScopeEntities *ForSe = For->ForSe;
 	BytecodeContext &blockBC = bca.newElem();
 	blockBC.init(ForSe->varMap.count, ForSe->procMap.count, bc.registerID);
 	see.push(ForSe);
@@ -592,7 +605,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	ASTIf *If = (ASTIf*)node;
 	u32 exprID = compileExprToBytecode(If->expr, see, bca, bf).reg;
 	BytecodeContext &blockBC = bca.newElem();
-	ScopeEntities *IfSe = (ScopeEntities*)If->IfSe;
+	ScopeEntities *IfSe = If->IfSe;
 	blockBC.init(IfSe->varMap.count, IfSe->procMap.count, bc.registerID);
 	see.push(IfSe);
 	u16 outIfLbl = newLabel();
@@ -613,7 +626,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	if(If->elseBody.count != 0){
 	    bf.jmp(outIfLbl);
 	    bf.label(inElseLbl);
-	    ScopeEntities *ElseSe = (ScopeEntities*)If->ElseSe;
+	    ScopeEntities *ElseSe = If->ElseSe;
 	    see.push(ElseSe);
 	    BytecodeContext &elseBC = bca.newElem();
 	    elseBC.init(ElseSe->varMap.count, ElseSe->procMap.count, bc.registerID);
@@ -634,8 +647,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	u32 procBytecodeID = procID;
 	bc.procToID.insertValue(proc->name, procBytecodeID);
 	procID += 1;
-	u32 procID = se->procMap.getValue(proc->name);
-	ScopeEntities *procSE = se->procEntities[procID].se;
+	ScopeEntities *procSE = proc->se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count, bc.registerID);
 	//        DEF   ID                   INPUT                          GIVES     OUTPUT       START
@@ -691,6 +703,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	bf.reserve(1);
 	bf.emit(Bytecode::PROC_END);
     }break;
+    case ASTType::STRUCT_DEFENITION:
     case ASTType::IMPORT: break;
     default:
 	UNREACHABLE;
@@ -918,6 +931,12 @@ namespace dbg{
 	    printf("decl_reg");
 	    DUMP_TYPE;
 	    DUMP_REG;
+	}break;
+	case Bytecode::ALLOC:{
+	    printf("alloc");
+	    DUMP_REG;
+	    s64 num = getConstIntAndUpdate(buc->bytecodes, x);
+	    printf("%lld", num);
 	}break;
 	default:
 	    UNREACHABLE;

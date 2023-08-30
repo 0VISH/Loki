@@ -34,6 +34,7 @@ enum class ForType{
     EXPR,
 };
 
+struct ScopeEntities;
 struct ASTBase {
     ASTType type;
 };
@@ -78,14 +79,15 @@ struct ASTIf : ASTBase{
     DynamicArray<ASTBase*> body;
     DynamicArray<ASTBase*> elseBody;
     ASTBase *expr;
-    void *IfSe;                  //scope of the body
-    void *ElseSe;                //scope of else body
+    ScopeEntities *IfSe;                  //scope of the body
+    ScopeEntities *ElseSe;                //scope of else body
     u32 tokenOff;
 };
 struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> body;    //NOTE: also includes input
     DynamicArray<ASTBase*> out;
     String name;
+    ScopeEntities *se;
     u32 tokenOff;
     u32 uniInCount;
     u32 multiInCount;
@@ -109,7 +111,7 @@ struct ASTFor : ASTBase{
 	ASTBase *expr;
     };
     ASTBase *increment;
-    void    *ForSe;
+    ScopeEntities    *ForSe;
     u32      endOff;
     u32      incrementOff;
     ForType  loopType;
@@ -142,6 +144,10 @@ void freeNodeInternal(ASTBase *base){
 	ASTProcDef *proc = (ASTProcDef*)base;
         freeBody(proc->body);
 	if(proc->out.len != 0){proc->out.uninit();};
+    }break;
+    case ASTType::STRUCT_DEFENITION:{
+	ASTStructDef *Struct = (ASTStructDef*)base;
+	freeBody(Struct->body);
     }break;
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)base;
