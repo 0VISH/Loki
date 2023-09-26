@@ -16,9 +16,9 @@
 #include "ds.cc"
 #include "threadpool.hh"
 #include "time.cc"
-#if(PLAT_WIN)
+#if(WIN)
 #include "windowsOS.cc"
-#elif(PLAT_LIN)
+#elif(LIN)
 #include "linuxOS.cc"
 #endif
 

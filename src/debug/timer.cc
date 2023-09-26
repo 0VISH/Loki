@@ -32,7 +32,7 @@ namespace dbg{
     }
 };
 
-#if(PLAT_WIN)
+#if(WIN)
 namespace dbg{
     struct Timer{
 	Timer(char *name) {

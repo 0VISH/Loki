@@ -57,5 +57,5 @@ privDefer<F> defer_func(F f) {
 //#define SIMD
 //#define MSVC_COMPILER
 //#define CLANG_COMPILER
-//#define PLAT_WIN
-//#define PLAT_LIN
+//#define WIN
+//#define LIN
