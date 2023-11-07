@@ -6,12 +6,16 @@ import os
 outputFileName = "bin/fuzz/fuzzOutput.txt"
 dotsCount = 40
 
-exe = None
+compilerPath = None
 for i in argv:
     if i.startswith("exe:"):
-        exe = i[len("exe:"):]
-if exe == None:
+        compilerPath = i[len("exe:"):]
+if compilerPath == None:
     print("which compiler? exe:path_to_exe")
+    quit()
+
+if os.path.isfile(compilerPath) == False:
+    print("path to compiler is incorrect")
     quit()
 
 colorama.init(autoreset = True)
@@ -35,7 +39,7 @@ for i in getFilesInFolder("test/"):
     print(i, end="")
     remainingDots = dotsCount - len(i)
     print("." * remainingDots, end="")
-    process = subprocess.Popen(exe + " " + i, shell=True, stdout=outputFile)
+    process = subprocess.Popen("call \""+compilerPath+"\" " + i, shell=True, stdout=outputFile)
     process.wait()
     if process.returncode != 0:
         print(colorama.Fore.RED + "FAIL")

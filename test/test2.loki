@@ -1,8 +1,8 @@
 //if
 
 main :: proc(){
-     //we only use 1 '=' for comparison
-     if 2 = 2{
+     //we don't need brackets after 'if'
+     if 2 == 2{
      
      } else {
        
@@ -11,7 +11,7 @@ main :: proc(){
      //if else-if else
      if(3 >= 5){
      
-     } else if 6 = 8 {
+     } else if 6 == 8 {
        //foo
      } else{
        //bar
@@ -22,7 +22,7 @@ main :: proc(){
 	if 3>= 5{
 	
 	} else{
-	  if 6 = 8{
+	  if 6 == 8{
 	     //foo
 	  } else{
 	     //bar

@@ -1,32 +1,20 @@
 #define REGISTER_COUNT      100
 
 /*
+  $d  global
   %d  register
   @d  proc
 */
 enum class Bytecode : u16{
     NONE = 0,
     CAST,
-    MOVS,
-    MOVU,
-    MOVF,
-    MOV_CONSTS,
-    MOV_CONSTF,
-    ADDS,
-    ADDU,
-    ADDF,
-    SUBS,
-    SUBU,
-    SUBF,
-    MULS,
-    MULU,
-    MULF,
-    DIVS,
-    DIVU,
-    DIVF,
-    CMPS,
-    CMPU,
-    CMPF,
+    MOV,
+    MOV_CONST,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    CMP,
     SETG,
     SETL,
     SETE,
@@ -41,18 +29,12 @@ enum class Bytecode : u16{
     PROC_END,
     RET,
     NEG,
-    NEXT_BUCKET,
     LABEL,
-    DECL_REG,
     BLOCK_START,
     BLOCK_END,
     ALLOC,
+    NEXT_BUCKET,
     COUNT,
-};
-enum class BytecodeType : u16{
-    INTEGER_S,
-    INTEGER_U,
-    DECIMAL_S,
 };
 
 const u16 const_in_stream = sizeof(s64) / sizeof(Bytecode);
@@ -122,11 +104,6 @@ struct BytecodeFile{
 	curBucket->bytecodes[cursor] = (Bytecode)type;
 	cursor += 1;
     };
-    void declReg(Type regType, u16 regID){
-	emit(Bytecode::DECL_REG);
-	emit(regType);
-	emit(regID);
-    };
     Bytecode *getCurBytecodeAdd(){
 	return curBucket->bytecodes + cursor;
     };
@@ -143,11 +120,11 @@ struct BytecodeFile{
 	*memNum = num;
 	cursor += const_in_stream;
     };
-    void alloc(u16 reg, u64 size){
-	reserve(1 + 1 + const_in_stream);
+    void alloc(Type type, u16 reg){
+	reserve(1 + 1 + 1);
 	emit(Bytecode::ALLOC);
+	emit(type);
 	emit(reg);
-	emitConstInt(size);
     };
     void label(u16 label){
 	reserve(1 + 1);
@@ -177,21 +154,31 @@ struct BytecodeFile{
 	emit(checkReg);
 	emit(label);
     };
-    void movConstS(u16 reg, s64 num){
-	reserve(1 + 1 + const_in_stream);
-	emit(Bytecode::MOV_CONSTS);
+    void mov(Type type, u16 dest, u16 src){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::MOV);
+	emit(type);
+	emit(dest);
+	emit(src);
+    };
+    void movConst(u16 reg, s64 num){
+	reserve(1 + 1 + 1 + const_in_stream);
+	emit(Bytecode::MOV_CONST);
+	emit(Type::COMP_INTEGER);
 	emit(reg);
 	emitConstInt(num);
     };
-    void movConstF(u16 outputReg, f64 num){
+    void movConst(u16 outputReg, f64 num){
 	reserve(1 + 1 + const_in_stream);
-	emit(Bytecode::MOV_CONSTF);
+	emit(Bytecode::MOV_CONST);
+	emit(Type::COMP_DECIMAL);
 	emit(outputReg);
 	emitConstDec(num);
     };
-    void binOp(Bytecode op, u16 outputReg, u16 lhsReg, u16 rhsReg){
-	reserve(1 + 1 + 1 + 1);
+    void binOp(Bytecode op, Type type, u16 outputReg, u16 lhsReg, u16 rhsReg){
+	reserve(1 + 1 + 1 + 1 + 1);
 	emit(op);
+	emit(type);
 	emit(outputReg);
 	emit(lhsReg);
 	emit(rhsReg);
@@ -216,12 +203,6 @@ struct BytecodeFile{
 	emit(newReg);
 	emit(type);
 	emit(reg);
-    };
-    void mov(Bytecode op, u16 outputReg, u16 inputReg){
-	reserve(1 + 1 + 1);
-	emit(op);
-	emit(outputReg);
-	emit(inputReg);
     };
 };
 
@@ -264,21 +245,8 @@ struct BytecodeContext{
 	return reg;
     };
 };
-BytecodeType typeToBytecodeType(Type type){
-    switch(type){
-    case Type::F_64:
-    case Type::F_32:
-    case Type::F_16:
-    case Type::COMP_DECIMAL: return BytecodeType::DECIMAL_S;
-    case Type::S_64:
-    case Type::S_32:
-    case Type::S_16:
-    case Type::COMP_INTEGER: return BytecodeType::INTEGER_S;
-    default: return BytecodeType::INTEGER_U;
-    }
-};
 Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf);
-Expr emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, DynamicArray<ScopeEntities*> &see){
+Expr emitBinOpBc(Bytecode binOp, ASTBase *node, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, DynamicArray<ScopeEntities*> &see){
     Expr out;
     ASTBinOp *op = (ASTBinOp*)node;
     BytecodeContext &bc = bca[bca.count-1];
@@ -286,14 +254,7 @@ Expr emitBinOpBc(Bytecode s, Bytecode u, Bytecode d, ASTBase *node, DynamicArray
     auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);
     Type ansType = greaterType(lhs.type, rhs.type);
     u16 outputReg = bc.newReg(ansType);
-    BytecodeType abt = typeToBytecodeType(ansType);
-    Bytecode binOp;
-    switch(abt){
-    case BytecodeType::INTEGER_S:   binOp = s;  break;
-    case BytecodeType::INTEGER_U:   binOp = u;  break;
-    case BytecodeType::DECIMAL_S:   binOp = d;  break;
-    };
-    bf.binOp(binOp, outputReg, lhs.reg, rhs.reg);
+    bf.binOp(binOp, ansType, outputReg, lhs.reg, rhs.reg);
     out.reg = outputReg;
     out.type = ansType;
     return out;
@@ -327,7 +288,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	outputReg = bc.newReg(type);
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	s64 num = numInt->num;
-	bf.movConstS(outputReg, num);
+	bf.movConst(outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
 	return out;
@@ -337,7 +298,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	outputReg = bc.newReg(type);
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	f64 num = numDec->dec;
-	bf.movConstF(outputReg, num);
+	bf.movConst(outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
 	return out;
@@ -353,13 +314,13 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	return out;
     }break;
     case ASTType::BIN_ADD:{									
-	return emitBinOpBc(Bytecode::ADDS, Bytecode::ADDU, Bytecode::ADDF, node, bca, bf, see);
+	return emitBinOpBc(Bytecode::ADD, node, bca, bf, see);
     }break;
     case ASTType::BIN_MUL:{
-	return emitBinOpBc(Bytecode::MULS, Bytecode::MULU, Bytecode::MULF, node, bca, bf, see);
+	return emitBinOpBc(Bytecode::MUL, node, bca, bf, see);
     }break;
     case ASTType::BIN_DIV:{
-	return emitBinOpBc(Bytecode::DIVS, Bytecode::DIVU, Bytecode::DIVF, node, bca, bf, see);
+	return emitBinOpBc(Bytecode::DIV, node, bca, bf, see);
     }break;
     case ASTType::BIN_GRT:
     case ASTType::BIN_GRTE:
@@ -371,9 +332,8 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);	
 	Type ansType = greaterType(lhs.type, rhs.type);
 	u16 cmpOutReg = bc.newReg(ansType);					
-	BytecodeType abt = typeToBytecodeType(ansType);			
+			
 	Bytecode set;
-	Bytecode cmp;
 	switch(op->type){
 	case ASTType::BIN_GRTE: set = Bytecode::SETGE; break;
 	case ASTType::BIN_GRT:  set = Bytecode::SETG;  break;
@@ -381,15 +341,10 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	case ASTType::BIN_LSRE: set = Bytecode::SETLE; break;
 	case ASTType::BIN_EQU:  set = Bytecode::SETE;  break;
 	};
-	switch(abt){							
-	case BytecodeType::INTEGER_S: cmp = Bytecode::CMPS; break;	
-	case BytecodeType::INTEGER_U: cmp = Bytecode::CMPU; break;
-	case BytecodeType::DECIMAL_S: cmp = Bytecode::CMPF; break;
-	};
 	
 	outputReg = bc.newReg(ansType);
 
-	bf.binOp(cmp, cmpOutReg, lhs.reg, rhs.reg);
+	bf.binOp(Bytecode::CMP, ansType, cmpOutReg, lhs.reg, rhs.reg);
 	bf.set(set, outputReg, cmpOutReg);
 
 	out.reg = outputReg;
@@ -426,14 +381,15 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
 	const VariableEntity &entity = se->varEntities[id];
 	//TODO: check which architecture we are building for
 	if(entity.type == Type::STRUCT){
+	    //TODO: allocate a new id for a new struct
 	    u16 reg = bc.newReg(Type::STRUCT);
-	    bf.alloc(reg, var->size);
+	    bf.alloc(Type::STRUCT, reg);
 	}else{
 	    u16 reg = bc.newReg(entity.type);
 	    if(isFloat(entity.type)){
-		bf.movConstS(reg, 0);
+		bf.movConst(reg, (f64)0.0);
 	    }else{
-		bf.movConstF(reg, 0);
+		bf.movConst(reg, (s64)0);
 	    };
 	};
     }break;
@@ -446,9 +402,9 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
 	for(u32 x=0; x<names.count; x+=1){
 	    u32 reg = bc.newReg(firstEntityType);
 	    if(isFloat(firstEntityType)){
-		bf.movConstF(reg, 0);
+		bf.movConst(reg, (f64)0.0);
 	    }else{
-		bf.movConstS(reg, 0);
+		bf.movConst(reg, (s64)0);
 	    };
 	};
     }break;
@@ -461,7 +417,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	if(IS_BIT(flag, Flags::UNINITIALIZED)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    u16 rhsReg = bc.newReg(entity.type);
-	    bf.declReg(entity.type, rhsReg);
+	    bf.alloc(entity.type, rhsReg);
 	    bc.varToReg[id] = rhsReg;
 	}else{
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
@@ -480,23 +436,19 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    //NOTE: MULTI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    for(u32 x=0; x<names.count; x+=1){
 		u16 rhsReg = bc.newReg(type);
-		bf.declReg(type, rhsReg);
+		bf.alloc(type, rhsReg);
 		bc.varToReg[x] = rhsReg;
 	    };
 	}else{
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
 	    Bytecode byte;
-	    BytecodeType bType = typeToBytecodeType(type);
-	    if(bType == BytecodeType::DECIMAL_S){byte = Bytecode::MOVF;}
-	    else if(bType == BytecodeType::INTEGER_S){byte = Bytecode::MOVS;}
-	    else{byte = Bytecode::MOVU;};
 	    for(u32 x=0; x<names.count; x+=1){
 		u32 id = se->varMap.getValue(names[x]);
 		const VariableEntity &entity = se->varEntities[id];
 		u16 regID = bc.newReg(rhs.type);
 		bc.varToReg[id] = regID;
 		bc.types[regID] = rhs.type;
-		bf.mov(byte, regID, rhs.reg);
+		bf.mov(type, regID, rhs.reg);
 	    };
 	};
     }break;
@@ -535,31 +487,13 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    ASTUniVar *var = (ASTUniVar*)For->body[0];
 	    u32 id = ForSe->varMap.getValue(var->name);
 	    VariableEntity &ent = ForSe->varEntities[id];
-	    BytecodeType varBcType = typeToBytecodeType(ent.type);
-	    Bytecode cmp;
-	    Bytecode add;
-	    switch(varBcType){
-	    case BytecodeType::INTEGER_S:
-		cmp = Bytecode::CMPS;
-		add = Bytecode::ADDS;
-		break;
-	    case BytecodeType::INTEGER_U:
-		cmp = Bytecode::CMPU;
-		add = Bytecode::ADDU;
-		break;
-	    case BytecodeType::DECIMAL_S:
-		cmp = Bytecode::CMPF;
-		add = Bytecode::ADDF;
-		break;
-	    };
-
 	    u16 loopStartLbl = newLabel();
 	    u16 loopEndLbl = newLabel();
 
 	    u16 incrementReg;
 	    if(For->increment == nullptr){
 		incrementReg = blockBC.newReg(ent.type);
-		bf.movConstS(incrementReg, 1);
+		bf.movConst(incrementReg, (s64)1);
 	    };
 	    compileToBytecode(For->body[0], see, bca, bf);
 	    u16 varReg = blockBC.registerID-1;    //FIXME: 
@@ -567,7 +501,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    
 	    auto cond = compileExprToBytecode(For->end, see, bca, bf);
 	    u16 cmpOutReg = blockBC.newReg(ent.type);
-	    bf.binOp(cmp, cmpOutReg, varReg, cond.reg);
+	    bf.binOp(Bytecode::CMP, ent.type, cmpOutReg, varReg, cond.reg);
 
 	    Bytecode setOp;
 	    if(For->loopType == ForType::C_EQU){
@@ -589,7 +523,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    if(For->increment != nullptr){
 		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
 	    };
-	    bf.binOp(add, varReg, varReg, incrementReg);
+	    bf.binOp(Bytecode::ADD, ent.type, varReg, varReg, incrementReg);
 
 	    bf.jmp(loopStartLbl);
 
@@ -797,61 +731,50 @@ namespace dbg{
 	case Bytecode::LABEL:{
 	    printf("%#010x:", getBytecode(buc, x));
 	}break;
-	case Bytecode::MOV_CONSTS:{
-	    printf("mov_consts");
+	case Bytecode::MOV_CONST:{
+	    printf("mov_const");
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    s64 num = getConstIntAndUpdate(buc->bytecodes, x);
 	    printf("%lld", num);
 	}break;
-	case Bytecode::MOV_CONSTF:{
-	    printf("mov_constf");
-	    DUMP_REG;
-	    f64 num = getConstDecAndUpdate(buc->bytecodes, x);
-	    printf("%f", num);
-	}break;
-	case Bytecode::MOVS: printf("movs");flag = false;
-	case Bytecode::MOVU: if(flag){printf("movu");flag = false;};
-	case Bytecode::MOVF:{
-	    if(flag){printf("movf");};
+	case Bytecode::MOV:{
+	    if(flag){printf("mov");};
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;	    
 	}break;
-	case Bytecode::ADDS: printf("adds");flag = false;
-	case Bytecode::ADDU: if(flag){printf("addu");flag = false;};
-	case Bytecode::ADDF:{
-	    if(flag){printf("addf");};
+	case Bytecode::ADD:{
+	    if(flag){printf("add");};
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;
-	case Bytecode::SUBS: printf("subs");flag = false;
-	case Bytecode::SUBU: if(flag){printf("subu");flag = false;};
-	case Bytecode::SUBF:{
-	    if(flag){printf("subf");};
+	case Bytecode::SUB:{
+	    if(flag){printf("sub");};
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;;
 	}break;
-	case Bytecode::MULS: printf("muls");flag = false;
-	case Bytecode::MULU: if(flag){printf("mulu");flag = false;};
-	case Bytecode::MULF:{
-	    if(flag){printf("mulf");};
+	case Bytecode::MUL:{
+	    if(flag){printf("mul");};
+	    DUMP_TYPE
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;
-	case Bytecode::DIVS: printf("divs");flag = false;
-	case Bytecode::DIVU: if(flag){printf("divu");flag = false;};
-	case Bytecode::DIVF:{
-	    if(flag){printf("divf");};
+	case Bytecode::DIV:{
+	    if(flag){printf("div");};
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;
-	case Bytecode::CMPS: printf("cmps");flag = false;
-	case Bytecode::CMPU: if(flag){printf("cmpu");flag = false;};
-	case Bytecode::CMPF:{
-	    if(flag){printf("cmpf");};
+	case Bytecode::CMP:{
+	    if(flag){printf("cmp");};
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
@@ -927,16 +850,10 @@ namespace dbg{
 	    DUMP_TYPE;
 	    DUMP_REG;
 	}break;
-	case Bytecode::DECL_REG:{
-	    printf("decl_reg");
-	    DUMP_TYPE;
-	    DUMP_REG;
-	}break;
 	case Bytecode::ALLOC:{
 	    printf("alloc");
+	    DUMP_TYPE
 	    DUMP_REG;
-	    s64 num = getConstIntAndUpdate(buc->bytecodes, x);
-	    printf("%lld", num);
 	}break;
 	default:
 	    UNREACHABLE;

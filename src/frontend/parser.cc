@@ -57,7 +57,7 @@ struct ASTString : ASTBase{
 struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
-    u64 size;
+    u64 size;  //TODO: remove
     u32 tokenOff;
     u8 flag;
 };
@@ -204,6 +204,8 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
 	x += 1;
 	if(tokTypes[x] == (Token_Type)'='){
 	    x += 1;
+	}else{
+	    lexer.emitErr(tokOffs[x].off, "Expected '='");
 	};
     }break;
     case (Token_Type)'>':{

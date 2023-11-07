@@ -10,14 +10,17 @@ ENTITY_COUNT  = 7
 fuzzFileName = "bin/fuzz/fuzz.xe"
 outputFileName = "bin/fuzz/fuzzOutput.txt"
 tab = "    "
-dots = ".................."
 
-command = None
+compilerPath = None
 for i in argv:
     if i.startswith("exe:"):
-        command = i[len("exe:"):] + " " + fuzzFileName
-if command == None:
-    print("which compiler?")
+        compilerPath = i[len("exe:"):]
+if compilerPath == None:
+    print("which compiler? exe:path_to_loki")
+    quit()
+
+if os.path.isfile(compilerPath) == False:
+    print("path to compiler is incorrect:", compilerPath)
     quit()
 
 if not os.path.isdir("bin/fuzz"): os.makedirs("bin/fuzz")
@@ -238,7 +241,7 @@ fail = 0
 failed = []
 for j in range(0, GARBAGE_COUNT):
     loCode = ""
-    print("["+str(j)+"] Generating garbage...")
+    print("["+str(j)+"] Generating garbage", end="."*35)
     x = {}
     fuzzFile = open(fuzzFileName, "w")
     loCode += "main :: proc(){\n"
@@ -248,15 +251,13 @@ for j in range(0, GARBAGE_COUNT):
     fuzzFile.write(loCode)
     fuzzFile.close()
     
-    print(tab + "calling: " + command, end="")
-    
-    process = subprocess.Popen(command, shell=True, stdout=outputFile)
+    process = subprocess.Popen("call \""+compilerPath+"\" " + fuzzFileName , shell=True, stdout=outputFile)
     process.wait()
     if process.returncode != 0:
-        print(dots + colorama.Fore.RED  + "FAIL")
+        print(colorama.Fore.RED  + "FAIL")
         print(tab + "return code:", process.returncode)
         print(loCode)
-        fName = "bin\\fuzz\\fuzz"+str(j)+".loki"
+        fName = "bin/fuzz/fuzz"+str(j)+".loki"
         f = open(fName, "w")
         f.write(loCode)
         f.close()
@@ -264,7 +265,7 @@ for j in range(0, GARBAGE_COUNT):
         fail += 1
         failed.append(fName)
     else:
-        print(dots + colorama.Fore.GREEN + "OK")
+        print(colorama.Fore.GREEN + "OK")
 outputFile.close()
 
 print("\n[STATUS]")
