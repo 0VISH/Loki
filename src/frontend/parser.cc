@@ -1,3 +1,5 @@
+#include <math.h>
+
 #define BRING_TOKENS_TO_SCOPE DynamicArray<Token_Type> &tokTypes = lexer.tokenTypes;DynamicArray<TokenOffset> &tokOffs = lexer.tokenOffsets;
 
 enum class ASTType {

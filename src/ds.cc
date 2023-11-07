@@ -158,7 +158,7 @@ public:
     void dumpMap(){
 	for(u32 x=0; x<len; x+=1){
 	    printf("%d: ", x);
-	    if(status[x] == false){printf("---\n", x);}
+	    if(status[x] == false){printf("---\n");}
 	    else{
 		printf("\n  KEY: %.*s", keys[x].len, keys[x].mem);
 		printf("\n  VAL: %d\n", values[x]);

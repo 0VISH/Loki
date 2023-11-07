@@ -1,4 +1,4 @@
-#include "frontend/entity.hh"
+#include "entity.hh"
 
 typedef u32 TypeID;
 

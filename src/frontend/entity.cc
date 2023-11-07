@@ -184,7 +184,7 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
 };
 
 bool checkProcEntityPresentInScopeElseReg(String name, Flag flag, ScopeEntities *procSe, DynamicArray<ScopeEntities*> &see) {
-    if(getProcEntity(name, see) != nullptr){return nullptr;};
+    if(getProcEntity(name, see) != nullptr){return false;};
 
     ScopeEntities *se = see[see.count-1];
     Map &map = se->procMap;
@@ -469,7 +469,6 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     return true;
 };
 bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
-    TIME_BLOCK;
     BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1];
     goThroughEntitiesAndInitScope(entities, se);

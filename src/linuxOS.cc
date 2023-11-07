@@ -1,4 +1,7 @@
 #include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace os{
     char *getFileFullName(char *filePath) {
@@ -10,16 +13,21 @@ namespace os{
 	memcpy(fullPath, fullFilePathBuff, len + 1);
 	return fullPath;
     };
+    bool isFile(char *filePath){
+	struct stat pathStat;
+	if(stat(filePath, &pathStat) != 0){return false;};
+	return S_ISREG(pathStat.st_mode);
+    };
 
     void setPrintColorToWhite() {printf("\033[97m");};
     void printErrorInRed() {printf("\033[31mERROR\033[97m");};
-
-    clock_t start;
-    void compilerStartTimer(){
-	start = clock();
+    
+    void initTimer(){};
+    void startTimer(TimeSlot slot){
+	times[(u16)slot] = (u64)clock();
     };
-    f64 compilerEndTimer(){
+    void endTimer(TimeSlot slot){
 	clock_t end = clock();
-	return (f64)(end - start)/CLOCKS_PER_SEC;
+	times[(u16)slot] = (f64)(end - times[(u16)slot])/CLOCKS_PER_SEC;
     };
 }

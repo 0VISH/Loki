@@ -1,10 +1,14 @@
 //@ignore
-#if(CLANG_COMPILER)
+#if(__clang__)
 #pragma clang diagnostic ignored "-Wwritable-strings"
 #pragma clang diagnostic ignored "-Wswitch"
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #pragma clang diagnostic ignored "-Wmicrosoft-include"
 #pragma clang diagnostic ignored "-Wmicrosoft-goto"
+#pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wnull-arithmetic"
+#pragma clang diagnostic ignored "-Wformat"
+#pragma clang diagnostic ignored "-Wnull-conversion"
 #endif
 
 #include "include.hh"
@@ -36,9 +40,8 @@ s32 main(s32 argc, char **argv) {
 
     os::endTimer(TimeSlot::TOTAL);
     if(report::errorOff == 0){printf("\n");};
-    dumpTimers(os::times);
+    dumpTimers(times);
 #if(DBG)
-    dbg::dumpBlockTimes();
     printf("\nCALLS NOT FREED: %d\n", mem::calls);
 #endif
 

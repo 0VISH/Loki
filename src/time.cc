@@ -7,11 +7,6 @@ enum class TimeSlot{
     COUNT,
 };
 
-struct Timer{
-    f64 start;
-    f64 time;
-};
-
 char *timeSlotNames[] = {
     "total",
     "frontend",
@@ -20,7 +15,9 @@ char *timeSlotNames[] = {
     "executing_bytecodes",
 };
 
-void dumpTimers(Timer *t){
+f64 times[(u16)TimeSlot::COUNT];
+
+void dumpTimers(f64 *t){
     printf("\n");
     const u32 dots = 30;
     for(u32 x=0; x<(u16)TimeSlot::COUNT; x+=1){
@@ -31,6 +28,6 @@ void dumpTimers(Timer *t){
 	    printf(".");
 	    j -= 1;
 	};
-	printf("%f\n", t[x].time);
+	printf("%f\n", t[x]);
     };
 };

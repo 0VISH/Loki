@@ -10,6 +10,6 @@ Omen.setBuildDir(plat, dbg)
 
 if dbg and plat=="win":
     extra = "/std:c++14 /arch:AVX /EHsc"
-    Omen.build("src/main.cc", "Loki", "cl", extraSwitches=extra)
+    Omen.build("src/main.cc", "loki", "cl", extraSwitches=extra)
 else:
-    Omen.build("src/main.cc", "Loki", "clang++")
+    Omen.build("src/main.cc", "loki", "clang++")

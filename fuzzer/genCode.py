@@ -7,8 +7,8 @@ import os
 
 GARBAGE_COUNT = 100
 ENTITY_COUNT  = 7
-fuzzFileName = "bin\\fuzz\\fuzz.xe"
-outputFileName = "bin\\fuzz\\fuzzOutput.txt"
+fuzzFileName = "bin/fuzz/fuzz.xe"
+outputFileName = "bin/fuzz/fuzzOutput.txt"
 tab = "    "
 dots = ".................."
 
@@ -20,7 +20,7 @@ if command == None:
     print("which compiler?")
     quit()
 
-if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
+if not os.path.isdir("bin/fuzz"): os.makedirs("bin/fuzz")
 
 colorama.init(autoreset=True)
 

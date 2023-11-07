@@ -156,7 +156,6 @@ struct Lexer {
 	va_end(args);
     };
     b32 genTokens() {
-	TIME_BLOCK;
 	u64 x = 0;
 	char *src = fileContent;
 	Token_Type stringType = Token_Type::EMPTY;

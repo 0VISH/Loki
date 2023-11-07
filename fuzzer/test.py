@@ -3,7 +3,7 @@ from sys import argv
 import subprocess
 import os
 
-outputFileName = "bin\\fuzz\\fuzzOutput.txt"
+outputFileName = "bin/fuzz/fuzzOutput.txt"
 dotsCount = 40
 
 exe = None
@@ -11,12 +11,12 @@ for i in argv:
     if i.startswith("exe:"):
         exe = i[len("exe:"):]
 if exe == None:
-    print("which compiler?")
+    print("which compiler? exe:path_to_exe")
     quit()
 
 colorama.init(autoreset = True)
     
-if not os.path.isdir("bin\\fuzz"): os.makedirs("bin\\fuzz")
+if not os.path.isdir("bin/fuzz"): os.makedirs("bin/fuzz")
 
 def getFilesInFolder(folderPath):
     files = []
@@ -31,7 +31,7 @@ def getFilesInFolder(folderPath):
 
 outputFile = open(outputFileName, "w")
 
-for i in getFilesInFolder("test\\"):
+for i in getFilesInFolder("test/"):
     print(i, end="")
     remainingDots = dotsCount - len(i)
     print("." * remainingDots, end="")
