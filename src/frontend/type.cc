@@ -108,17 +108,17 @@ Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, L
     return typeID2Type(getTreeTypeID(base, flag, see, lexer));
 };
 StructEntity *getStructEntity(String name, DynamicArray<ScopeEntities*> &see);
-Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see, u64 &size){
+Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     BRING_TOKENS_TO_SCOPE;
     switch (tokTypes[off]) {
-    case Token_Type::K_U8:  size=sizeof(u8);  return Type::U_8;
-    case Token_Type::K_U16: size=sizeof(u16); return Type::U_16;
-    case Token_Type::K_U32: size=sizeof(u32); return Type::U_32;
-    case Token_Type::K_S8:  size=sizeof(s8);  return Type::S_8;
-    case Token_Type::K_S16: size=sizeof(s16); return Type::S_16;
-    case Token_Type::K_S32: size=sizeof(s32); return Type::S_32;
-    case Token_Type::K_F32: size=sizeof(f32); return Type::F_32;
-    case Token_Type::K_F64: size=sizeof(f64); return Type::F_64;
+    case Token_Type::K_U8:  return Type::U_8;
+    case Token_Type::K_U16: return Type::U_16;
+    case Token_Type::K_U32: return Type::U_32;
+    case Token_Type::K_S8:  return Type::S_8;
+    case Token_Type::K_S16: return Type::S_16;
+    case Token_Type::K_S32: return Type::S_32;
+    case Token_Type::K_F32: return Type::F_32;
+    case Token_Type::K_F64: return Type::F_64;
     default:
 	String name = makeStringFromTokOff(off, lexer);
 	StructEntity *entity = getStructEntity(name, see);
@@ -126,7 +126,6 @@ Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see
 	    lexer.emitErr(tokOffs[off].off, "Unkown type");
 	    return Type::UNKOWN;
 	};
-	size = entity->size;
 	return Type::STRUCT;
     };
     return Type::UNKOWN;

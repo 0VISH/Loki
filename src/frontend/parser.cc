@@ -57,9 +57,8 @@ struct ASTString : ASTBase{
 struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
-    u64 size;  //TODO: remove
     u32 tokenOff;
-    u8 flag;
+    Flag flag;
 };
 struct ASTBinOp : ASTBase{
     ASTBase *lhs;
@@ -73,7 +72,7 @@ struct ASTMultiVar : ASTBase{
     ASTBase *rhs;
     u64 size;
     u32 tokenOff;
-    u8 flag;
+    Flag flag;
 };
 struct ASTUniOp : ASTBase{
     ASTBase *node;
@@ -92,10 +91,10 @@ struct ASTProcDef : ASTBase {
     String name;
     ScopeEntities *se;
     u32 tokenOff;
-    u32 uniInCount;
-    u32 multiInCount;
-    u32 multiInInputCount;
-    u8 flag;
+    u32 uniInCount;        //number of single input
+    u32 multiInCount;      //number of multiple input
+    u32 multiInInputCount; //total number of variables in multiple input
+    Flag flag;
 };
 struct ASTVariable : ASTBase{
     String name;

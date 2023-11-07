@@ -1,13 +1,15 @@
 #define REGISTER_COUNT      100
 
 /*
-  $d  global
+  $d  global   //TODO:
   %d  register
   @d  proc
 */
 enum class Bytecode : u16{
     NONE = 0,
     CAST,
+    REG,
+    GLOBAL,
     MOV,
     MOV_CONST,
     ADD,
@@ -40,6 +42,7 @@ enum class Bytecode : u16{
 const u16 const_in_stream = sizeof(s64) / sizeof(Bytecode);
 const u16 pointer_in_stream = sizeof(Bytecode*) / sizeof(Bytecode);
 const u16 bytecodes_in_bucket = 30;
+const u16 register_in_stream = 2;
 
 struct BytecodeBucket{
     BytecodeBucket *next;
@@ -217,16 +220,16 @@ u16 newLabel(){
 
 struct BytecodeContext{
     Map procToID;
-    u32 *varToReg;
-    Type *types;
+    u32  *varToReg;
+    Type *varTypes;
     u32 registerID;
 
     void init(u32 varCount, u32 procCount, u16 rgsID){
 	varToReg = nullptr;
 	registerID = rgsID;
-	types = (Type*)mem::alloc(sizeof(Type)*REGISTER_COUNT);
 	if(varCount != 0){
 	    varToReg = (u32*)mem::alloc(sizeof(u32)*varCount);
+	    varTypes = (Type*)mem::alloc(sizeof(Type)*varCount);
 	};
 	procToID.len = 0;
 	if(procCount != 0){
@@ -234,14 +237,16 @@ struct BytecodeContext{
 	};
     };
     void uninit(){
-	if(varToReg != nullptr){mem::free(varToReg);};
+	if(varToReg != nullptr){
+	    mem::free(varToReg);
+	    mem::free(varTypes);
+	};
 	if(procToID.len != 0){procToID.uninit();};
-	mem::free(types);
     };
     u16 newReg(Type type){
 	u16 reg = registerID;
 	registerID += 1;
-	types[reg] = type;
+	varTypes[reg] = type;
 	return reg;
     };
 };
@@ -310,7 +315,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	u32 id = se->varMap.getValue(var->name);
 	BytecodeContext &correctBC = bca[off];
 	out.reg = correctBC.varToReg[id];
-	out.type = correctBC.types[id];
+	out.type = correctBC.varTypes[id];
 	return out;
     }break;
     case ASTType::BIN_ADD:{									
@@ -447,7 +452,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 		const VariableEntity &entity = se->varEntities[id];
 		u16 regID = bc.newReg(rhs.type);
 		bc.varToReg[id] = regID;
-		bc.types[regID] = rhs.type;
+		bc.varTypes[regID] = rhs.type;
 		bf.mov(type, regID, rhs.reg);
 	    };
 	};
