@@ -89,6 +89,8 @@ bool compile(char *fileName){
 	mem::free(se);
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
+	Config cf;
+	BackendCompile(&bf, &cf, typeIDToName);
 	bf.uninit();
     };
     see.uninit();

@@ -1,5 +1,25 @@
 #include "entity.hh"
 
+char *typeIDToName[] = {
+    "unkown",
+    "void",
+    "struct",
+    "string",
+    "f64",
+    "s64",
+    "u64",
+    "f32",
+    "s32",
+    "u32",
+    "f16",
+    "s16",
+    "u16",
+    "s8",
+    "u8",
+    "f64",
+    "s64",
+};
+
 typedef u32 TypeID;
 
 Type typeID2Type(TypeID type) {
@@ -131,28 +151,4 @@ Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see
     return Type::UNKOWN;
 };
 
-#if(DBG)
-char *Type2CString[] =  {
-    "unkown",
-    "xe_void",
-    "struct",
-    "string",
-    "f_64",
-    "s_64",
-    "u_64",
-    "f_32",
-    "s_32",
-    "u_32",
-    "f_16",
-    "s_16",
-    "u_16",
-    "s_8",
-    "u_8",
-    "comp_decimal",
-    "comp_integer",
-};
-static_assert((u16)Type::TYPE_COUNT == ARRAY_LENGTH(Type2CString), "Type and Type2CString not one-to-one");
-namespace dbg {
-    char *getTypeName(Type type) { return Type2CString[(u16)(type)-1]; };
-};
-#endif
+static_assert((u16)Type::TYPE_COUNT == ARRAY_LENGTH(typeIDToName), "Type and typeIDToName not one-to-one");

@@ -26,4 +26,6 @@
 #include "report.cc"
 #include "frontend/include.hh"
 #include "midend/include.hh"
+#include "backend/backend.hh"
+#include "backend/llvmBackend.cc"  //TODO: remove this. Temp
 #include "loki.cc"

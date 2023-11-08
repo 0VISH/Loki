@@ -1,225 +1,164 @@
-#define REGISTER_COUNT      100
+#include "bytecode.hh"
 
-/*
-  $d  global   //TODO:
-  %d  register
-  @d  proc
-*/
-enum class Bytecode : u16{
-    NONE = 0,
-    CAST,
-    STORE,
-    LOAD,
-    MOV,
-    MOV_CONST,
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    CMP,
-    SETG,
-    SETL,
-    SETE,
-    SETGE,
-    SETLE,
-    JMPNS,        //jumps if given register is 0
-    JMPS,         //jumps if given register is not 0
-    JMP,
-    DEF,
-    PROC_GIVES,
-    PROC_START,
-    PROC_END,
-    RET,
-    NEG,
-    LABEL,
-    BLOCK_START,
-    BLOCK_END,
-    ALLOC,
-    NEXT_BUCKET,
-    COUNT,
+void BytecodeFile::init(){
+    labels.init();
+    cursor = 0;
+    firstBucket = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
+    firstBucket->next = nullptr;
+    firstBucket->prev = nullptr;
+    firstBucket->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
+    curBucket = firstBucket;
 };
-
-const u16 const_in_stream = sizeof(s64) / sizeof(Bytecode);
-const u16 pointer_in_stream = sizeof(Bytecode*) / sizeof(Bytecode);
-const u16 bytecodes_in_bucket = 30;
-const u16 register_in_stream = 2;
-
-struct BytecodeBucket{
-    BytecodeBucket *next;
-    BytecodeBucket *prev;
-    Bytecode bytecodes[bytecodes_in_bucket+1];     //padding with NEXT_BUCKET
+void BytecodeFile::uninit(){
+    BytecodeBucket *buc = firstBucket;
+    while(buc){
+	BytecodeBucket *temp = buc;
+	buc = buc->next;
+	mem::free(temp);
+    };
+    labels.uninit();
 };
-struct Expr{
-    Type type;
-    u16 reg;
+void BytecodeFile::newBucketAndUpdateCurBucket(){
+    ASSERT(curBucket);
+
+    cursor = 0;
+    BytecodeBucket *nb = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
+    nb->next = nullptr;
+    nb->prev = curBucket;
+    nb->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
+    curBucket->next = nb;
+    curBucket = nb;
 };
-
-struct BytecodeFile{
-    DynamicArray<Bytecode*>   labels;
-    BytecodeBucket           *firstBucket;
-    BytecodeBucket           *curBucket;
-    u16                       cursor;
-
-    void init(){
-	labels.init();
-	cursor = 0;
-	firstBucket = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
-	firstBucket->next = nullptr;
-	firstBucket->prev = nullptr;
-	firstBucket->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
-	curBucket = firstBucket;
+void BytecodeFile::reserve(u16 reserve){
+    if(cursor + reserve >= bytecodes_in_bucket){
+	emit(Bytecode::NEXT_BUCKET);
+	newBucketAndUpdateCurBucket();
     };
-    void uninit(){
-	BytecodeBucket *buc = firstBucket;
-	while(buc){
-	    BytecodeBucket *temp = buc;
-	    buc = buc->next;
-	    mem::free(temp);
-	};
-	labels.uninit();
+};
+void BytecodeFile::emit(Bytecode bc){
+    curBucket->bytecodes[cursor] = bc;
+    cursor += 1;
+};
+void BytecodeFile::emit(u16 bc){
+    curBucket->bytecodes[cursor] = (Bytecode)bc;
+    cursor += 1;
+};
+void BytecodeFile::emit(Type type){
+    curBucket->bytecodes[cursor] = (Bytecode)type;
+    cursor += 1;
+};
+Bytecode *BytecodeFile::getCurBytecodeAdd(){
+    return curBucket->bytecodes + cursor;
+};
+//encoding constant into bytecode page for cache
+void BytecodeFile::emitConstInt(s64 num){
+    Bytecode *mem = getCurBytecodeAdd();
+    u64 *memNum = (u64*)(mem);
+    *memNum = num;
+    cursor += const_in_stream;
+};
+void BytecodeFile::emitConstDec(f64 num){
+    Bytecode *mem = getCurBytecodeAdd();
+    f64 *memNum = (f64*)(mem);
+    *memNum = num;
+    cursor += const_in_stream;
+};
+void BytecodeFile::alloc(Type type, u16 reg){
+    reserve(1 + 1 + 1);
+    emit(Bytecode::ALLOC);
+    emit(type);
+    emit(reg);
+};
+void BytecodeFile::store(u16 dest, u16 src){
+    reserve(1 + 1 + 1);
+    emit(Bytecode::STORE);
+    emit(dest);
+    emit(src);
+};
+void BytecodeFile::load(Type type, u16 dest, u16 src){
+    reserve(1 + 1 + 1 + 1);
+    emit(Bytecode::LOAD);
+    emit(type);
+    emit(dest);
+    emit(src);
+};
+void BytecodeFile::label(u16 label){
+    reserve(1 + 1);
+    emit(Bytecode::LABEL);
+    emit(label);
+    if(label >= labels.len){
+	labels.realloc(label + 5);
     };
-    void newBucketAndUpdateCurBucket(){
-	ASSERT(curBucket);
-
-	cursor = 0;
-	BytecodeBucket *nb = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
-	nb->next = nullptr;
-	nb->prev = curBucket;
-	nb->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
-	curBucket->next = nb;
-	curBucket = nb;
-    };
-    void reserve(u16 reserve){
-	if(cursor + reserve >= bytecodes_in_bucket){
-	    emit(Bytecode::NEXT_BUCKET);
-	    newBucketAndUpdateCurBucket();
-	};
-    };
-    void emit(Bytecode bc){
-	curBucket->bytecodes[cursor] = bc;
-	cursor += 1;
-    };
-    void emit(u16 bc){
-	curBucket->bytecodes[cursor] = (Bytecode)bc;
-	cursor += 1;
-    };
-    void emit(Type type){
-	curBucket->bytecodes[cursor] = (Bytecode)type;
-	cursor += 1;
-    };
-    Bytecode *getCurBytecodeAdd(){
-	return curBucket->bytecodes + cursor;
-    };
-    //encoding constant into bytecode page for cache
-    void emitConstInt(s64 num){
-	Bytecode *mem = getCurBytecodeAdd();
-	u64 *memNum = (u64*)(mem);
-	*memNum = num;
-	cursor += const_in_stream;
-    };
-    void emitConstDec(f64 num){
-	Bytecode *mem = getCurBytecodeAdd();
-	f64 *memNum = (f64*)(mem);
-	*memNum = num;
-	cursor += const_in_stream;
-    };
-    void alloc(Type type, u16 reg){
-	reserve(1 + 1 + 1);
-	emit(Bytecode::ALLOC);
-	emit(type);
-	emit(reg);
-    };
-    void store(u16 dest, u16 src){
-	reserve(1 + 1 + 1);
-	emit(Bytecode::STORE);
-	emit(dest);
-	emit(src);
-    };
-    void load(Type type, u16 dest, u16 src){
-	reserve(1 + 1 + 1 + 1);
-	emit(Bytecode::LOAD);
-	emit(type);
-	emit(dest);
-	emit(src);
-    };
-    void label(u16 label){
-	reserve(1 + 1);
-	emit(Bytecode::LABEL);
-	emit(label);
-	if(label >= labels.len){
-	    labels.realloc(label + 5);
-	};
-	Bytecode *mem = getCurBytecodeAdd();
-	labels[label] = mem;
-    };
-    void blockStart(){
-	reserve(1);
-	emit(Bytecode::BLOCK_START);
-    };
-    void blockEnd(){
-	reserve(1);
-	emit(Bytecode::BLOCK_END);
-    };
-    void jmp(u16 label){
-	reserve(1 + 1);
-	emit(Bytecode::JMP);
-	emit(label);
-    };
-    void jmp(Bytecode op, u16 checkReg, u16 label){
-	emit(op);
-	emit(checkReg);
-	emit(label);
-    };
-    void mov(Type type, u16 dest, u16 src){
-	reserve(1 + 1 + 1 + 1);
-	emit(Bytecode::MOV);
-	emit(type);
-	emit(dest);
-	emit(src);
-    };
-    void movConst(u16 reg, s64 num){
-	reserve(1 + 1 + 1 + const_in_stream);
-	emit(Bytecode::MOV_CONST);
-	emit(Type::COMP_INTEGER);
-	emit(reg);
-	emitConstInt(num);
-    };
-    void movConst(u16 outputReg, f64 num){
-	reserve(1 + 1 + const_in_stream);
-	emit(Bytecode::MOV_CONST);
-	emit(Type::COMP_DECIMAL);
-	emit(outputReg);
-	emitConstDec(num);
-    };
-    void binOp(Bytecode op, Type type, u16 outputReg, u16 lhsReg, u16 rhsReg){
-	reserve(1 + 1 + 1 + 1 + 1);
-	emit(op);
-	emit(type);
-	emit(outputReg);
-	emit(lhsReg);
-	emit(rhsReg);
-    };
-    void cast(Type finalType, u16 finalReg, Type type, u16 reg){
-	reserve(1 + 1 + 1 + 1 + 1);
-	emit(Bytecode::CAST);
-	emit(finalType);
-	emit(finalReg);
-	emit(type);
-	emit(reg);
-    };
-    void set(Bytecode op, u16 outputReg, u16 inputReg){
-	reserve(1 + 1 + 1);
-	emit(op);
-	emit(outputReg);
-	emit(inputReg);
-    };
-    void neg(u16 newReg, Type type, u16 reg){
-	reserve(1 + 1 + 1);
-	emit(Bytecode::NEG);
-	emit(newReg);
-	emit(type);
-	emit(reg);
-    };
+    Bytecode *mem = getCurBytecodeAdd();
+    labels[label] = mem;
+};
+void BytecodeFile::blockStart(){
+    reserve(1);
+    emit(Bytecode::BLOCK_START);
+};
+void BytecodeFile::blockEnd(){
+    reserve(1);
+    emit(Bytecode::BLOCK_END);
+};
+void BytecodeFile::jmp(u16 label){
+    reserve(1 + 1);
+    emit(Bytecode::JMP);
+    emit(label);
+};
+void BytecodeFile::jmp(Bytecode op, u16 checkReg, u16 label){
+    emit(op);
+    emit(checkReg);
+    emit(label);
+};
+void BytecodeFile::mov(Type type, u16 dest, u16 src){
+    reserve(1 + 1 + 1 + 1);
+    emit(Bytecode::MOV);
+    emit(type);
+    emit(dest);
+    emit(src);
+};
+void BytecodeFile::movConst(u16 reg, s64 num){
+    reserve(1 + 1 + 1 + const_in_stream);
+    emit(Bytecode::MOV_CONST);
+    emit(Type::COMP_INTEGER);
+    emit(reg);
+    emitConstInt(num);
+};
+void BytecodeFile::movConst(u16 outputReg, f64 num){
+    reserve(1 + 1 + const_in_stream);
+    emit(Bytecode::MOV_CONST);
+    emit(Type::COMP_DECIMAL);
+    emit(outputReg);
+    emitConstDec(num);
+};
+void BytecodeFile::binOp(Bytecode op, Type type, u16 outputReg, u16 lhsReg, u16 rhsReg){
+    reserve(1 + 1 + 1 + 1 + 1);
+    emit(op);
+    emit(type);
+    emit(outputReg);
+    emit(lhsReg);
+    emit(rhsReg);
+};
+void BytecodeFile::cast(Type finalType, u16 finalReg, Type type, u16 reg){
+    reserve(1 + 1 + 1 + 1 + 1);
+    emit(Bytecode::CAST);
+    emit(finalType);
+    emit(finalReg);
+    emit(type);
+    emit(reg);
+};
+void BytecodeFile::set(Bytecode op, u16 outputReg, u16 inputReg){
+    reserve(1 + 1 + 1);
+    emit(op);
+    emit(outputReg);
+    emit(inputReg);
+};
+void BytecodeFile::neg(Type type, u16 newReg, u16 reg){
+    reserve(1 + 1 + 1);
+    emit(Bytecode::NEG);
+    emit(type);
+    emit(newReg);
+    emit(reg);
 };
 
 static u16 procID  = 0;
@@ -378,7 +317,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	}else{
 	    newReg = bc.newReg(operand.type);
 	};
-	bf.neg(newReg, operand.type, operand.reg);
+	bf.neg(operand.type, newReg, operand.reg);
 
 	return operand;
     }break;
@@ -606,11 +545,17 @@ ASTUniVar *var = (ASTUniVar*)node;
 	ScopeEntities *procSE = proc->se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count, bc.registerID);
-	//        DEF   ID                   INPUT                          GIVES     OUTPUT       START
-	bf.reserve(1  +  1 + (proc->uniInCount + proc->multiInInputCount)*2 + 1  + proc->out.count + 1);
+	//        DEF    OUTPUT_COUNT         OUTPUT       ID     INPUT_COUNT                  INPUT
+	bf.reserve(1  + const_in_stream + proc->out.count + 1 + const_in_stream + (proc->uniInCount + proc->multiInInputCount)*2);
 	bf.emit(Bytecode::DEF);
+	bf.emitConstInt(proc->out.count);
+	for(u32 x=0; x<proc->out.count; x+=1){
+	    AST_Type *type = (AST_Type*)proc->out[x];
+	    bf.emit(type->type);
+	};
 	bf.emit(procBytecodeID);
 	u32 inCount = proc->uniInCount + proc->multiInCount;
+	bf.emitConstInt(inCount);
 	for(u32 x=0; x<inCount;){
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
@@ -639,12 +584,6 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    }break;
 	    };
 	};
-	bf.emit(Bytecode::PROC_GIVES);
-	for(u32 x=0; x<proc->out.count; x+=1){
-	    AST_Type *type = (AST_Type*)proc->out[x];
-	    bf.emit(type->type);
-	};
-	bf.emit(Bytecode::PROC_START);
 	//RESERVE ENDS HERE
 	see.push(procSE);
 	bf.blockStart();
@@ -782,7 +721,7 @@ namespace dbg{
 	}break;
 	case Bytecode::MUL:{
 	    if(flag){printf("mul");};
-	    DUMP_TYPE
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
@@ -834,30 +773,28 @@ namespace dbg{
 	    DUMP_TYPE;
 	    DUMP_REG;
 	}break;
-	case Bytecode::PROC_GIVES:
 	case Bytecode::PROC_START:
 	case Bytecode::PROC_END:break;
 	case Bytecode::DEF:{
-	    printf("def _");
-	    Bytecode bc = getBytecode(buc, x);
-	    printf("%d(", (u32)bc);
+	    printf("def (");
+	    s64 outCount = getConstIntAndUpdate(buc->bytecodes, x);
+	    while(outCount != 0){
+		bc = getBytecode(buc, x);
+		dumpType((Type)bc);
+		printf(",");
+		outCount -= 1;
+	    };
 	    bc = getBytecode(buc, x);
-	    while(bc != Bytecode::PROC_GIVES){
+	    printf(") _%d(", (u32)bc);
+	    s64 inCount = getConstIntAndUpdate(buc->bytecodes, x);
+	    while(inCount != 0){
+		bc = getBytecode(buc, x);
 		dumpType((Type)bc);
 		DUMP_REG;
 		printf(",");
-		bc = getBytecode(buc, x);
+		inCount -= 1;
 	    };
 	    printf(")");
-	    bc = getBytecode(buc, x);
-	    if(bc != Bytecode::PROC_START){
-		printf(" -> (");
-		while(bc != Bytecode::PROC_START){
-		    dumpType((Type)bc);
-		    bc = getBytecode(buc, x);
-		};
-		printf(")");
-	    };
 
 	    bc = buc->bytecodes[x];
 	    while(bc != Bytecode::PROC_END){
@@ -868,8 +805,8 @@ namespace dbg{
 	}break;
 	case Bytecode::NEG:{
 	    printf("neg");
-	    DUMP_REG;
 	    DUMP_TYPE;
+	    DUMP_REG;
 	    DUMP_REG;
 	}break;
 	case Bytecode::ALLOC:{
