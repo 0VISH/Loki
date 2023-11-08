@@ -594,9 +594,6 @@ ASTUniVar *var = (ASTUniVar*)node;
 	see.pop()->uninit();
 	mem::free(procSE);
 	bca.pop().uninit();
-
-	bf.reserve(1);
-	bf.emit(Bytecode::PROC_END);
     }break;
     case ASTType::STRUCT_DEFENITION:
     case ASTType::IMPORT: break;
@@ -773,8 +770,6 @@ namespace dbg{
 	    DUMP_TYPE;
 	    DUMP_REG;
 	}break;
-	case Bytecode::PROC_START:
-	case Bytecode::PROC_END:break;
 	case Bytecode::DEF:{
 	    printf("def (");
 	    s64 outCount = getConstIntAndUpdate(buc->bytecodes, x);
@@ -797,11 +792,11 @@ namespace dbg{
 	    printf(")");
 
 	    bc = buc->bytecodes[x];
-	    while(bc != Bytecode::PROC_END){
+	    while(bc != Bytecode::BLOCK_END){
 		buc = dumpBytecode(buc, x, labels, block);
 		bc = buc->bytecodes[x];
 	    };
-	    x += 1;
+	    dumpBytecode(buc, x, labels, block);
 	}break;
 	case Bytecode::NEG:{
 	    printf("neg");

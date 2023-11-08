@@ -30,8 +30,6 @@ enum class Bytecode : u16{
     JMPS,         //jumps if given register is not 0
     JMP,
     DEF,
-    PROC_START,
-    PROC_END,
     RET,
     NEG,
     LABEL,

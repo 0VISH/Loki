@@ -37,7 +37,7 @@ namespace Dep{
 	FileID id;
 	char *name;
     };
-    struct NodeAndScope{
+    struct NodeScope{
 	DynamicArray<ASTBase*> *nodes;
 	ScopeEntities *se;
     };
@@ -48,7 +48,7 @@ namespace Dep{
     FileID fileID;
 
     DynamicArray<IDAndName> parseAndCheckQueue;
-    DynamicArray<NodeAndScope> compileToBytecodeQueue;
+    DynamicArray<NodeScope> compileToBytecodeQueue;
 
     void init(){
 	fileNameToID = hashmap_create();

@@ -6,7 +6,11 @@
 #define EXPORT extern "C" __declspec(dllexport)
 #endif
 
-#define PAGE_SIZE  1000
+#define PAGE_MEM_SIZE  1000
 
+struct Page{
+    char *mem;
+    u32   watermark;
+};
 struct Config{
 };

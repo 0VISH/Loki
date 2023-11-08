@@ -1,25 +1,5 @@
 #include "entity.hh"
 
-char *typeIDToName[] = {
-    "unkown",
-    "void",
-    "struct",
-    "string",
-    "f64",
-    "s64",
-    "u64",
-    "f32",
-    "s32",
-    "u32",
-    "f16",
-    "s16",
-    "u16",
-    "s8",
-    "u8",
-    "f64",
-    "s64",
-};
-
 typedef u32 TypeID;
 
 Type typeID2Type(TypeID type) {
@@ -150,5 +130,3 @@ Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see
     };
     return Type::UNKOWN;
 };
-
-static_assert((u16)Type::TYPE_COUNT == ARRAY_LENGTH(typeIDToName), "Type and typeIDToName not one-to-one");

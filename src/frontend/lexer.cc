@@ -8,7 +8,6 @@ enum class Token_Type {
     DOUBLE_QUOTES,
     K_START,  //keywords start
     K_U8,
-    K_F16,
     K_F32,
     K_F64,
     K_U16,
@@ -46,7 +45,6 @@ namespace Word{
     };
     WordData keywordsData[] = {
 	{"u8", Token_Type::K_U8},
-	{"f16", Token_Type::K_F16},
 	{"f32", Token_Type::K_F32},
 	{"f64", Token_Type::K_F64},
 	{"u16", Token_Type::K_U16},

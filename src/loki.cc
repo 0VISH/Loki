@@ -75,24 +75,27 @@ bool compile(char *fileName){
     DEFER(bca.uninit());
     DynamicArray<ScopeEntities*> see;
     see.init();
+    initLLVMBackend();
     for(u32 x=0; x<Dep::compileToBytecodeQueue.count; x+=1){
-	auto nodeAndScope = Dep::compileToBytecodeQueue[x];
-	ScopeEntities *se = nodeAndScope.se;
+	auto ns = Dep::compileToBytecodeQueue[x];
+	ScopeEntities *se = ns.se;
 	BytecodeFile bf;
 	bf.init();
 	BytecodeContext &bc = bca.newElem();
 	bc.init(se->varMap.count, se->procMap.count, 0);
 	see.push(se);
-	compileASTNodesToBytecode(*nodeAndScope.nodes, see, bca, bf);
+	compileASTNodesToBytecode(*ns.nodes, see, bca, bf);
 	see.pop();
 	se->uninit();
 	mem::free(se);
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
 	Config cf;
-	BackendCompile(&bf, &cf, typeIDToName);
+	BackendCompile(&bf, &cf);
 	bf.uninit();
     };
+    BackendDump("out.ll");
+    uninitLLVMBackend();
     see.uninit();
     os::endTimer(TimeSlot::MIDEND);
     /*

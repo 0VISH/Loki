@@ -173,7 +173,6 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     case Token_Type::K_S8: type = Type::S_8; break;
     case Token_Type::K_U16: type = Type::U_16; break;
     case Token_Type::K_S16: type = Type::S_16; break;
-    case Token_Type::K_F16: type = Type::F_16; break;
     case Token_Type::K_U32: type = Type::U_32; break;
     case Token_Type::K_S32: type = Type::S_32; break;
     case Token_Type::K_F32: type = Type::F_32; break;
@@ -215,7 +214,7 @@ bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, Dyna
 
 #define CHECK_TREE_AND_MERGE_FLAGS					\
     if(checkExpression(var->rhs, lexer, see) == false){return false;};	\
-    Flag treeFlag;							\
+    Flag treeFlag = 0;							\
     Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
     if(treeType == Type::UNKOWN){return false;};			\
     flag |= treeFlag;							\
