@@ -8,8 +8,8 @@
 enum class Bytecode : u16{
     NONE = 0,
     CAST,
-    REG,
-    GLOBAL,
+    STORE,
+    LOAD,
     MOV,
     MOV_CONST,
     ADD,
@@ -128,6 +128,19 @@ struct BytecodeFile{
 	emit(Bytecode::ALLOC);
 	emit(type);
 	emit(reg);
+    };
+    void store(u16 dest, u16 src){
+	reserve(1 + 1 + 1);
+	emit(Bytecode::STORE);
+	emit(dest);
+	emit(src);
+    };
+    void load(Type type, u16 dest, u16 src){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::LOAD);
+	emit(type);
+	emit(dest);
+	emit(src);
     };
     void label(u16 label){
 	reserve(1 + 1);
@@ -419,7 +432,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
 	Flag flag = entity.flag;
-	if(IS_BIT(flag, Flags::UNINITIALIZED)){
+	if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    u16 rhsReg = bc.newReg(entity.type);
 	    bf.alloc(entity.type, rhsReg);
@@ -437,7 +450,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	const VariableEntity &firstEntity = se->varEntities[firstID];
 	Flag flag = firstEntity.flag;
 	Type type = firstEntity.type;
-	if(IS_BIT(flag, Flags::UNINITIALIZED)){
+	if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: MULTI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    for(u32 x=0; x<names.count; x+=1){
 		u16 rhsReg = bc.newReg(type);
@@ -528,7 +541,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    if(For->increment != nullptr){
 		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
 	    };
-	    bf.binOp(Bytecode::ADD, ent.type, varReg, varReg, incrementReg);
+	    u16 tempRes = blockBC.newReg(ent.type);
+	    u16 varVal  = blockBC.newReg(ent.type);
+	    bf.load(ent.type, varVal, varReg);
+	    bf.binOp(Bytecode::ADD, ent.type, tempRes, varVal, incrementReg);
+	    bf.store(varReg, tempRes);
 
 	    bf.jmp(loopStartLbl);
 
@@ -858,6 +875,17 @@ namespace dbg{
 	case Bytecode::ALLOC:{
 	    printf("alloc");
 	    DUMP_TYPE
+	    DUMP_REG;
+	}break;
+	case Bytecode::STORE:{
+	    printf("store");
+	    DUMP_REG;
+	    DUMP_REG;
+	}break;
+	case Bytecode::LOAD:{
+	    printf("load");
+	    DUMP_TYPE;
+	    DUMP_REG;
 	    DUMP_REG;
 	}break;
 	default:

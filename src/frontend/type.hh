@@ -25,5 +25,6 @@ enum class Flags {
     COMPTIME,
     GLOBAL,
     UNINITIALIZED,
+    ALLOC,
 };
 typedef u8 Flag;

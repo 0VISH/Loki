@@ -560,10 +560,11 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_INITIALIZATION_T_UNKNOWN, file);
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
+	    var->flag = 0;
+	    SET_BIT(var->flag, Flags::ALLOC);
 	    For->body.push(var);
-	    x += 1;
 	    For->increment = nullptr;
-	    x += 1;
+	    x += 2;
 	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
 		var->type = ASTType::UNI_INITIALIZATION_T_KNOWN;
 		x += 1;

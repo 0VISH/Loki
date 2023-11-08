@@ -392,7 +392,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    ASTUniVar *var = (ASTUniVar*)For->body[0];
 	    u32 id = ForSe->varMap.getValue(var->name);
 	    VariableEntity &ent = ForSe->varEntities[id];
-	    if(isTypeNum(ent.type) == false){
+	    if(ent.type == Type::UNKOWN){
+		ent.type = endTreeType;
+	    }else if(isTypeNum(ent.type) == false){
 		lexer.emitErr(tokOffs[For->endOff].off, "Iterator should have a numeric type");
 		return false;
 	    };
