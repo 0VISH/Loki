@@ -29,6 +29,7 @@ enum class ASTType {
     IMPORT,
     STRUCT_DEFENITION,
     MODIFIER,
+    RETURN
 };
 enum class ForType{
     FOR_EVER,
@@ -128,6 +129,9 @@ struct ASTStructDef : ASTBase{
     String name;
     u32 tokenOff;
     u32 memberCount;
+};
+struct ASTReturn : ASTBase{
+    ASTBase *expr;
 };
 
 void freeNodeInternal(ASTBase *base);
@@ -512,6 +516,25 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
     };
     u32 start = x;
     switch (tokTypes[x]) {
+    case Token_Type::K_RETURN:{
+	ASTReturn *ret = (ASTReturn*)allocAST(sizeof(ASTReturn), ASTType::RETURN, file);
+	x += 1;
+	if(tokTypes[x] == (Token_Type)'}' || tokTypes[x] == (Token_Type)'\n'){
+	    ret->expr = nullptr;
+	}else{
+	    s32 end;
+	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
+	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
+	    if(bend != -1){
+		end = bend;
+	    }else{
+		end = nend;
+	    };
+	    ret->expr = genASTExprTree(lexer, file, x, end);
+	};
+	x += 1;
+	return (ASTBase*)ret;
+    }break;
     case Token_Type::P_IMPORT:{
 	x += 1;
 	if(tokTypes[x] != Token_Type::DOUBLE_QUOTES){
@@ -1025,6 +1048,13 @@ namespace dbg {
 	    printf("name: %.*s", mod->name.len, mod->name.mem);
 	    __dumpNodesWithoutEndPadding(mod->child, lexer, padding+1);
 	    PAD;
+	}break;
+	case ASTType::RETURN:{
+	    printf("return");
+	    PAD;
+	    ASTReturn *ret = (ASTReturn*)node;
+	    if(ret->expr == nullptr){printf("void");}
+	    else{__dumpNodesWithoutEndPadding(ret->expr, lexer, padding + 1);};
 	}break;
 	case ASTType::IF:{
 	    printf("if");

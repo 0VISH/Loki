@@ -160,6 +160,18 @@ void BytecodeFile::neg(Type type, u16 newReg, u16 reg){
     emit(newReg);
     emit(reg);
 };
+void BytecodeFile::ret(u16 reg, bool isVoid){
+    reserve(1 + 1 + 1);
+    emit(Bytecode::RET);
+    if(isVoid){
+	emit(Bytecode::TYPE);
+	emit(Type::XE_VOID);
+    }
+    else{
+	emit(Bytecode::REG);
+	emit(reg);
+    };
+};
 
 static u16 procID  = 0;
 static u16 labelID = 1;
@@ -332,6 +344,15 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
+    case ASTType::RETURN:{
+	ASTReturn *ret = (ASTReturn*)node;
+	if(ret->expr == nullptr){
+	    bf.ret(0, true);
+	}else{
+	    auto rhs = compileExprToBytecode(ret->expr, see, bca, bf);
+	    bf.ret(rhs.reg, false);
+	};
+    }break;
     case ASTType::UNI_DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
@@ -803,6 +824,15 @@ namespace dbg{
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
+	}break;
+	case Bytecode::RET:{
+	    printf("return");
+	    x += 1;
+	    if(buc->bytecodes[x] == Bytecode::TYPE){
+		DUMP_TYPE;
+	    }else{
+		DUMP_REG;
+	    };
 	}break;
 	case Bytecode::ALLOC:{
 	    printf("alloc");

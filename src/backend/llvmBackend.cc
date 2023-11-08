@@ -24,14 +24,24 @@ void translate(BytecodeBucket *buc, u32 &off){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
+    case Bytecode::RET:{
+	Bytecode bc = getBytecode(bytecodes, off);
+	write("ret ");
+	if(bc == Bytecode::TYPE){
+	    write("void");
+	}else{
+	    bc = getBytecode(bytecodes, off);
+	    write("%%_%d", bc);
+	};
+    }break;
     case Bytecode::MOV_CONST:{
 	Bytecode bc = getBytecode(bytecodes, off);
 	if(bc == (Bytecode)Type::COMP_INTEGER){
 	    bc = getBytecode(bytecodes, off);
-	    write("%%%d = add i64 0, %lld", bc, getConstIntAndUpdate(bytecodes, off));
+	    write("%%_%d = add i64 0, %lld", bc, getConstIntAndUpdate(bytecodes, off));
 	}else{
 	    bc = getBytecode(bytecodes, off);
-	    write("%%%d = add double 0, %lld", bc, getConstDecAndUpdate(bytecodes, off));
+	    write("%%_%d = add double 0, %lld", bc, getConstDecAndUpdate(bytecodes, off));
 	};
     }break;
     case Bytecode::DEF:{
@@ -48,15 +58,16 @@ void translate(BytecodeBucket *buc, u32 &off){
 	while(inCount != 1){
 	    Bytecode inputType = getBytecode(bytecodes, off);
 	    bc = getBytecode(bytecodes, off);
-	    write("%s %%%d,", typeIDToName[(u16)inputType], bc);
+	    write("%s %%_%d,", typeIDToName[(u16)inputType], bc);
 	    inCount -= 1;
 	};
 	Bytecode inputType = getBytecode(bytecodes, off);
 	bc = getBytecode(bytecodes, off);
-	write("%s %%%d){\n", typeIDToName[(u16)inputType], bc);
+	write("%s %%_%d){\n", typeIDToName[(u16)inputType], bc);
 	off += 1;
 	translateBlock(buc, off);
 	write("}");
+	off += 1;
     }break;
     };
     write("\n");
@@ -66,7 +77,6 @@ void translateBlock(BytecodeBucket *buc, u32 &x){
     while(buc){
 	while(buc->bytecodes[off] != Bytecode::NEXT_BUCKET && off != bytecodes_in_bucket && buc->bytecodes[off] != Bytecode::NONE && buc->bytecodes[off] != Bytecode::BLOCK_END){
 	    translate(buc, off);
-	    off += 1;
 	};
 	buc = buc->next;
 	off = 0;

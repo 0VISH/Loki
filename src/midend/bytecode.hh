@@ -11,6 +11,9 @@
 */
 enum class Bytecode : u16{
     NONE = 0,
+    TYPE,
+    REG,
+    GLOBAL,
     CAST,
     STORE,
     LOAD,
@@ -86,4 +89,5 @@ struct BytecodeFile{
     void cast(Type finalType, u16 finalReg, Type type, u16 reg);
     void set(Bytecode op, u16 outputReg, u16 inputReg);
     void neg(Type type, u16 newReg, u16 reg);
+    void ret(u16 reg, bool isVoid=false);
 };

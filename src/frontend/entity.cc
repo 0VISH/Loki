@@ -462,6 +462,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	see.pop();
     } break;
     case ASTType::IMPORT: break;
+    case ASTType::RETURN:{
+	//TODO: 
+    }break;
     default:
 	UNREACHABLE;
 	return false;

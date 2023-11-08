@@ -23,6 +23,7 @@ enum class Token_Type {
     K_FOR,
     K_CONSTANT,
     K_COMPTIME,
+    K_RETURN,
     K_ELSE,
     K_END,       //keywords end
     P_START,     //poundwords start
@@ -61,6 +62,7 @@ namespace Word{
 	{"const", Token_Type::K_CONSTANT},
 	{"comptime", Token_Type::K_COMPTIME},
 	{"else", Token_Type::K_ELSE},
+	{"return", Token_Type::K_RETURN},
     };
     WordData poundwordsData[] = {
 	{"import", Token_Type::P_IMPORT},
