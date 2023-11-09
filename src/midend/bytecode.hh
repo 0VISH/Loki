@@ -11,9 +11,6 @@
 */
 enum class Bytecode : u16{
     NONE = 0,
-    TYPE,
-    REG,
-    GLOBAL,
     CAST,
     STORE,
     LOAD,
@@ -42,11 +39,11 @@ enum class Bytecode : u16{
     NEXT_BUCKET,
     COUNT,
 };
+typedef s16 Reg;
 
 const u16 const_in_stream = sizeof(s64) / sizeof(Bytecode);
 const u16 pointer_in_stream = sizeof(Bytecode*) / sizeof(Bytecode);
 const u16 bytecodes_in_bucket = 30;
-const u16 register_in_stream = 2;
 
 struct BytecodeBucket{
     BytecodeBucket *next;
@@ -55,7 +52,7 @@ struct BytecodeBucket{
 };
 struct Expr{
     Type type;
-    u16 reg;
+    Reg reg;
 };
 
 struct BytecodeFile{
@@ -69,25 +66,26 @@ struct BytecodeFile{
     void newBucketAndUpdateCurBucket();
     void reserve(u16 reserve);
     void emit(Bytecode bc);
-    void emit(u16 bc);
     void emit(Type type);
+    void emit(Reg reg);
     Bytecode *getCurBytecodeAdd();
     void emitConstInt(s64 num);
     void emitConstDec(f64 num);
-    void alloc(Type type, u16 reg);
-    void store(u16 dest, u16 src);
-    void load(Type type, u16 dest, u16 src);
+    void alloc(Type type, Reg reg);
+    void store(Reg dest, Reg src);
+    void load(Type type, Reg dest, Reg src);
     void label(u16 label);
     void blockStart();
     void blockEnd();
     void jmp(u16 label);
-    void jmp(Bytecode op, u16 checkReg, u16 label);
-    void mov(Type type, u16 dest, u16 src);
-    void movConst(u16 reg, s64 num);
-    void movConst(u16 outputReg, f64 num);
-    void binOp(Bytecode op, Type type, u16 outputReg, u16 lhsReg, u16 rhsReg);
-    void cast(Type finalType, u16 finalReg, Type type, u16 reg);
-    void set(Bytecode op, u16 outputReg, u16 inputReg);
-    void neg(Type type, u16 newReg, u16 reg);
-    void ret(u16 reg, bool isVoid=false);
+    void jmp(Bytecode op, Reg checkReg, Reg label);
+    void cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs);
+    void mov(Type type, Reg dest, Reg src);
+    void movConst(Reg reg, s64 num);
+    void movConst(Reg outputReg, f64 num);
+    void binOp(Bytecode op, Type type, Reg outputReg, Reg lhsReg, Reg rhsReg);
+    void cast(Type finalType, Reg finalReg, Type type, Reg reg);
+    void set(Bytecode op, Reg outputReg, Reg inputReg);
+    void neg(Type type, Reg newReg, Reg reg);
+    void ret(Reg reg, bool isVoid=false);
 };

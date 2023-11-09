@@ -1,4 +1,5 @@
 #include "backend.cc"
+//#include "../frontend/typeBasic.cc"
 
 char *typeIDToName[] = {
     "unkown",
@@ -19,6 +20,14 @@ char *typeIDToName[] = {
     "i64",
 };
 
+void writeReg(Bytecode bc){
+    Reg reg = (Reg)bc;
+    if(reg < 0){
+	write("@_%d", reg*-1);
+	return;
+    };
+    write("%%_%d", reg);
+};
 void translateBlock(BytecodeBucket *buc, u32 &x);
 void translate(BytecodeBucket *buc, u32 &off){
     off += 1;
@@ -27,11 +36,11 @@ void translate(BytecodeBucket *buc, u32 &off){
     case Bytecode::RET:{
 	Bytecode bc = getBytecode(bytecodes, off);
 	write("ret ");
-	if(bc == Bytecode::TYPE){
+	if((bool)bc == true){
 	    write("void");
 	}else{
 	    bc = getBytecode(bytecodes, off);
-	    write("%%_%d", bc);
+	    writeReg(bc);
 	};
 	off += 1;
     }break;
@@ -39,10 +48,12 @@ void translate(BytecodeBucket *buc, u32 &off){
 	Bytecode bc = getBytecode(bytecodes, off);
 	if(bc == (Bytecode)Type::COMP_INTEGER){
 	    bc = getBytecode(bytecodes, off);
-	    write("%%_%d = add i64 0, %lld", bc, getConstIntAndUpdate(bytecodes, off));
+	    writeReg(bc);
+	    write(" = add i64 0, %lld", getConstIntAndUpdate(bytecodes, off));
 	}else{
 	    bc = getBytecode(bytecodes, off);
-	    write("%%_%d = add double 0, %f", bc, getConstDecAndUpdate(bytecodes, off));
+	    writeReg(bc);
+	    write(" = add double 0, %f", getConstDecAndUpdate(bytecodes, off));
 	};
     }break;
     case Bytecode::DEF:{
@@ -56,20 +67,70 @@ void translate(BytecodeBucket *buc, u32 &off){
 	Bytecode bc = getBytecode(bytecodes, off);
 	write("define %s @_%d(", typeIDToName[(u16)outputType], bc);
 	s64 inCount = getConstIntAndUpdate(bytecodes, off);
-	while(inCount != 1){
+	if(inCount != 0){
+	    while(inCount != 1){
+		Bytecode inputType = getBytecode(bytecodes, off);
+		bc = getBytecode(bytecodes, off);
+		write("%s ,", typeIDToName[(u16)inputType]);
+		writeReg(bc);
+		inCount -= 1;
+	    };
 	    Bytecode inputType = getBytecode(bytecodes, off);
 	    bc = getBytecode(bytecodes, off);
-	    write("%s %%_%d,", typeIDToName[(u16)inputType], bc);
-	    inCount -= 1;
+	    write("%s ", typeIDToName[(u16)inputType]);
+	    writeReg(bc);
 	};
-	Bytecode inputType = getBytecode(bytecodes, off);
-	bc = getBytecode(bytecodes, off);
-	write("%s %%_%d){\n", typeIDToName[(u16)inputType], bc);
 	off += 1;
+	write("){\n");
 	translateBlock(buc, off);
 	write("}");
 	off += 1;
     }break;
+    case Bytecode::LABEL:{
+	write("_%#010x:", getBytecode(bytecodes, off));
+    }break;
+    case Bytecode::CMP:{
+	char *cmp = "icmp";
+	char  type = NULL;
+	char *cmpMethod;
+	switch(getBytecode(bytecodes, off)){
+	case Bytecode::SETG:  cmpMethod="gt";break;
+	case Bytecode::SETL:  cmpMethod="lt";break;
+	case Bytecode::SETE:
+	    cmpMethod="eq";
+	    type = ' ';
+	    break;
+	case Bytecode::SETGE: cmpMethod="ge";break;
+	case Bytecode::SETLE: cmpMethod="le";break;
+	};
+       
+	Bytecode bc = getBytecode(bytecodes, off);
+	if(isFloat((Type)bc)){
+	    type = 'o';
+	    cmp  = "fcmp";
+	}else if(type == NULL){
+	    if(isIntU((Type)bc)){type = 's';}
+	    else{type = 'u';};
+	};
+
+	Bytecode dest = getBytecode(bytecodes, off);
+	Bytecode lhs  = getBytecode(bytecodes, off);
+	Bytecode rhs  = getBytecode(bytecodes, off);
+
+	writeReg(dest);
+	write(" = %s %c%s %s ", cmp, type, cmpMethod, typeIDToName[(u16)bc]);
+	writeReg(lhs);
+	write(", ");
+	writeReg(rhs);
+    }break;
+    case Bytecode::ALLOC:{
+	Bytecode type = getBytecode(bytecodes, off);
+	Bytecode reg = getBytecode(bytecodes, off);
+	writeReg(reg);
+	write(" = alloca %s", typeIDToName[(u16)type]);
+    }break;
+    default:
+	UNREACHABLE;
     };
     write("\n");
 };

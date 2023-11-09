@@ -39,12 +39,12 @@ void BytecodeFile::emit(Bytecode bc){
     curBucket->bytecodes[cursor] = bc;
     cursor += 1;
 };
-void BytecodeFile::emit(u16 bc){
-    curBucket->bytecodes[cursor] = (Bytecode)bc;
-    cursor += 1;
-};
 void BytecodeFile::emit(Type type){
     curBucket->bytecodes[cursor] = (Bytecode)type;
+    cursor += 1;
+};
+void BytecodeFile::emit(Reg reg){
+    curBucket->bytecodes[cursor] = (Bytecode)reg;
     cursor += 1;
 };
 Bytecode *BytecodeFile::getCurBytecodeAdd(){
@@ -63,19 +63,19 @@ void BytecodeFile::emitConstDec(f64 num){
     *memNum = num;
     cursor += const_in_stream;
 };
-void BytecodeFile::alloc(Type type, u16 reg){
+void BytecodeFile::alloc(Type type, Reg reg){
     reserve(1 + 1 + 1);
     emit(Bytecode::ALLOC);
     emit(type);
     emit(reg);
 };
-void BytecodeFile::store(u16 dest, u16 src){
+void BytecodeFile::store(Reg dest, Reg src){
     reserve(1 + 1 + 1);
     emit(Bytecode::STORE);
     emit(dest);
     emit(src);
 };
-void BytecodeFile::load(Type type, u16 dest, u16 src){
+void BytecodeFile::load(Type type, Reg dest, Reg src){
     reserve(1 + 1 + 1 + 1);
     emit(Bytecode::LOAD);
     emit(type);
@@ -105,33 +105,43 @@ void BytecodeFile::jmp(u16 label){
     emit(Bytecode::JMP);
     emit(label);
 };
-void BytecodeFile::jmp(Bytecode op, u16 checkReg, u16 label){
+void BytecodeFile::jmp(Bytecode op, Reg checkReg, Reg label){
+    reserve(1 + 1 + 1);
     emit(op);
     emit(checkReg);
     emit(label);
 };
-void BytecodeFile::mov(Type type, u16 dest, u16 src){
+void BytecodeFile::cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs){
+    reserve(1 + 1 + 1 + 1 + 1 + 1);
+    emit(Bytecode::CMP);
+    emit(op);
+    emit(type);
+    emit(des);
+    emit(lhs);
+    emit(rhs);
+};
+void BytecodeFile::mov(Type type, Reg dest, Reg src){
     reserve(1 + 1 + 1 + 1);
     emit(Bytecode::MOV);
     emit(type);
     emit(dest);
     emit(src);
 };
-void BytecodeFile::movConst(u16 reg, s64 num){
+void BytecodeFile::movConst(Reg reg, s64 num){
     reserve(1 + 1 + 1 + const_in_stream);
     emit(Bytecode::MOV_CONST);
     emit(Type::COMP_INTEGER);
     emit(reg);
     emitConstInt(num);
 };
-void BytecodeFile::movConst(u16 outputReg, f64 num){
-    reserve(1 + 1 + const_in_stream);
+void BytecodeFile::movConst(Reg outputReg, f64 num){
+    reserve(1 + 1 + 1 + const_in_stream);
     emit(Bytecode::MOV_CONST);
     emit(Type::COMP_DECIMAL);
     emit(outputReg);
     emitConstDec(num);
 };
-void BytecodeFile::binOp(Bytecode op, Type type, u16 outputReg, u16 lhsReg, u16 rhsReg){
+void BytecodeFile::binOp(Bytecode op, Type type, Reg outputReg, Reg lhsReg, Reg rhsReg){
     reserve(1 + 1 + 1 + 1 + 1);
     emit(op);
     emit(type);
@@ -139,7 +149,7 @@ void BytecodeFile::binOp(Bytecode op, Type type, u16 outputReg, u16 lhsReg, u16 
     emit(lhsReg);
     emit(rhsReg);
 };
-void BytecodeFile::cast(Type finalType, u16 finalReg, Type type, u16 reg){
+void BytecodeFile::cast(Type finalType, Reg finalReg, Type type, Reg reg){
     reserve(1 + 1 + 1 + 1 + 1);
     emit(Bytecode::CAST);
     emit(finalType);
@@ -147,30 +157,24 @@ void BytecodeFile::cast(Type finalType, u16 finalReg, Type type, u16 reg){
     emit(type);
     emit(reg);
 };
-void BytecodeFile::set(Bytecode op, u16 outputReg, u16 inputReg){
+void BytecodeFile::set(Bytecode op, Reg outputReg, Reg inputReg){
     reserve(1 + 1 + 1);
     emit(op);
     emit(outputReg);
     emit(inputReg);
 };
-void BytecodeFile::neg(Type type, u16 newReg, u16 reg){
-    reserve(1 + 1 + 1);
+void BytecodeFile::neg(Type type, Reg newReg, Reg reg){
+    reserve(1 + 1 + 1 + 1);
     emit(Bytecode::NEG);
     emit(type);
     emit(newReg);
     emit(reg);
 };
-void BytecodeFile::ret(u16 reg, bool isVoid){
+void BytecodeFile::ret(Reg reg, bool isVoid){
     reserve(1 + 1 + 1);
     emit(Bytecode::RET);
-    if(isVoid){
-	emit(Bytecode::TYPE);
-	emit(Type::XE_VOID);
-    }
-    else{
-	emit(Bytecode::REG);
-	emit(reg);
-    };
+    emit((Bytecode)isVoid);
+    emit(reg);
 };
 
 static u16 procID  = 0;
@@ -188,7 +192,7 @@ struct BytecodeContext{
     Type *varTypes;
     u32 registerID;
 
-    void init(u32 varCount, u32 procCount, u16 rgsID){
+    void init(u32 varCount, u32 procCount, Reg rgsID){
 	varToReg = nullptr;
 	registerID = rgsID;
 	if(varCount != 0){
@@ -207,8 +211,8 @@ struct BytecodeContext{
 	};
 	if(procToID.len != 0){procToID.uninit();};
     };
-    u16 newReg(Type type){
-	u16 reg = registerID;
+    Reg newReg(Type type){
+	Reg reg = registerID;
 	registerID += 1;
 	varTypes[reg] = type;
 	return reg;
@@ -222,7 +226,7 @@ Expr emitBinOpBc(Bytecode binOp, ASTBase *node, DynamicArray<BytecodeContext> &b
     auto lhs = compileExprToBytecode(op->lhs, see, bca, bf);
     auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);
     Type ansType = greaterType(lhs.type, rhs.type);
-    u16 outputReg = bc.newReg(ansType);
+    Reg outputReg = bc.newReg(ansType);
     bf.binOp(binOp, ansType, outputReg, lhs.reg, rhs.reg);
     out.reg = outputReg;
     out.type = ansType;
@@ -245,7 +249,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     Expr out = {};
     ASTType type = node->type;
     BytecodeContext &bc = bca[bca.count - 1];
-    u16 outputReg;
+    Reg outputReg;
     switch(type){
     case ASTType::STRING:{
 	ASTString *string = (ASTString*)node;
@@ -300,8 +304,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	auto lhs = compileExprToBytecode(op->lhs, see, bca, bf);	
 	auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);	
 	Type ansType = greaterType(lhs.type, rhs.type);
-	u16 cmpOutReg = bc.newReg(ansType);					
-			
+	
 	Bytecode set;
 	switch(op->type){
 	case ASTType::BIN_GRTE: set = Bytecode::SETGE; break;
@@ -310,20 +313,17 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	case ASTType::BIN_LSRE: set = Bytecode::SETLE; break;
 	case ASTType::BIN_EQU:  set = Bytecode::SETE;  break;
 	};
-	
-	outputReg = bc.newReg(ansType);
+	Reg cmpOutReg = bc.newReg(ansType);					
+	bf.cmp(set, ansType, cmpOutReg, lhs.reg, rhs.reg);
 
-	bf.binOp(Bytecode::CMP, ansType, cmpOutReg, lhs.reg, rhs.reg);
-	bf.set(set, outputReg, cmpOutReg);
-
-	out.reg = outputReg;
+	out.reg = cmpOutReg;
 	out.type = ansType;
 	return out;
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *uniOp = (ASTUniOp*)node;
 	auto operand = compileExprToBytecode(uniOp->node, see, bca, bf);
-	u16 newReg;
+	Reg newReg;
 	if(isIntU(operand.type)){
 	    newReg = bc.newReg((Type)((u32)operand.type-1));
 	}else{
@@ -360,10 +360,10 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
 	//TODO: check which architecture we are building for
 	if(entity.type == Type::STRUCT){
 	    //TODO: allocate a new id for a new struct
-	    u16 reg = bc.newReg(Type::STRUCT);
+	    Reg reg = bc.newReg(Type::STRUCT);
 	    bf.alloc(Type::STRUCT, reg);
 	}else{
-	    u16 reg = bc.newReg(entity.type);
+	    Reg reg = bc.newReg(entity.type);
 	    if(isFloat(entity.type)){
 		bf.movConst(reg, (f64)0.0);
 	    }else{
@@ -378,7 +378,7 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
 	const VariableEntity &firstEntityID = se->varEntities[firstID];
 	Type firstEntityType = firstEntityID.type;
 	for(u32 x=0; x<names.count; x+=1){
-	    u32 reg = bc.newReg(firstEntityType);
+	    Reg reg = bc.newReg(firstEntityType);
 	    if(isFloat(firstEntityType)){
 		bf.movConst(reg, (f64)0.0);
 	    }else{
@@ -394,7 +394,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	Flag flag = entity.flag;
 	if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
-	    u16 rhsReg = bc.newReg(entity.type);
+	    Reg rhsReg = bc.newReg(entity.type);
 	    bf.alloc(entity.type, rhsReg);
 	    bc.varToReg[id] = rhsReg;
 	}else{
@@ -413,7 +413,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: MULTI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    for(u32 x=0; x<names.count; x+=1){
-		u16 rhsReg = bc.newReg(type);
+		Reg rhsReg = bc.newReg(type);
 		bf.alloc(type, rhsReg);
 		bc.varToReg[x] = rhsReg;
 	    };
@@ -423,7 +423,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    for(u32 x=0; x<names.count; x+=1){
 		u32 id = se->varMap.getValue(names[x]);
 		const VariableEntity &entity = se->varEntities[id];
-		u16 regID = bc.newReg(rhs.type);
+		Reg regID = bc.newReg(rhs.type);
 		bc.varToReg[id] = regID;
 		bc.varTypes[regID] = rhs.type;
 		bf.mov(type, regID, rhs.reg);
@@ -474,23 +474,19 @@ ASTUniVar *var = (ASTUniVar*)node;
 		bf.movConst(incrementReg, (s64)1);
 	    };
 	    compileToBytecode(For->body[0], see, bca, bf);
-	    u16 varReg = blockBC.registerID-1;    //FIXME: 
+	    Reg varReg = blockBC.registerID-1;    //FIXME: 
 	    bf.label(loopStartLbl);
 	    
 	    auto cond = compileExprToBytecode(For->end, see, bca, bf);
-	    u16 cmpOutReg = blockBC.newReg(ent.type);
-	    bf.binOp(Bytecode::CMP, ent.type, cmpOutReg, varReg, cond.reg);
-
 	    Bytecode setOp;
 	    if(For->loopType == ForType::C_EQU){
 		setOp = Bytecode::SETE;
 	    }else{
 		setOp = Bytecode::SETL;
 	    };
-	    u16 outputReg = blockBC.newReg(ent.type);
-	    bf.set(setOp, outputReg, cmpOutReg);
-
-	    bf.jmp(Bytecode::JMPS, outputReg, loopEndLbl);
+	    Reg cmpOutReg = blockBC.newReg(ent.type);
+	    bf.cmp(setOp, ent.type, cmpOutReg, varReg, cond.reg);
+	    bf.jmp(Bytecode::JMPS, cmpOutReg, loopEndLbl);
 
 	    bf.blockStart();
 	    for(u32 x=1; x<For->body.count; x+=1){
@@ -501,8 +497,8 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    if(For->increment != nullptr){
 		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
 	    };
-	    u16 tempRes = blockBC.newReg(ent.type);
-	    u16 varVal  = blockBC.newReg(ent.type);
+	    Reg tempRes = blockBC.newReg(ent.type);
+	    Reg varVal  = blockBC.newReg(ent.type);
 	    bf.load(ent.type, varVal, varReg);
 	    bf.binOp(Bytecode::ADD, ent.type, tempRes, varVal, incrementReg);
 	    bf.store(varReg, tempRes);
@@ -574,7 +570,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    AST_Type *type = (AST_Type*)proc->out[x];
 	    bf.emit(type->type);
 	};
-	bf.emit(procBytecodeID);
+	bf.emit((Bytecode)procBytecodeID);
 	u32 inCount = proc->uniInCount + proc->multiInCount;
 	bf.emitConstInt(inCount);
 	for(u32 x=0; x<inCount;){
@@ -584,7 +580,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 		ASTUniVar *var = (ASTUniVar*)node;
 		u32 id = procSE->varMap.getValue(var->name);
 		const VariableEntity &entity = procSE->varEntities[id];
-		u16 regID = procBC.newReg(entity.type);
+		Reg regID = procBC.newReg(entity.type);
 		procBC.varToReg[id] = regID;
 		bf.emit(entity.type);
 		bf.emit(regID);
@@ -596,7 +592,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 		for(u32 y=0; y<names.count; y+=1){
 		    u32 id = procSE->varMap.getValue(names[y]);
 		    const VariableEntity &entity = procSE->varEntities[id];
-		    u16 regID = procBC.newReg(entity.type);
+		    Reg regID = procBC.newReg(entity.type);
 		    procBC.varToReg[id] = regID;
 		    bf.emit(entity.type);
 		    bf.emit(regID);
@@ -752,18 +748,17 @@ namespace dbg{
 	    DUMP_REG;
 	}break;
 	case Bytecode::CMP:{
-	    if(flag){printf("cmp");};
+	    printf("cmp ");
+	    Bytecode bc = getBytecode(buc, x);
+	    switch(bc){
+	    case Bytecode::SETG: printf("setg");break;
+	    case Bytecode::SETL: printf("setl");break;
+	    case Bytecode::SETE: printf("sete");break;
+	    case Bytecode::SETGE: printf("setge");break;
+	    case Bytecode::SETLE: printf("setle");break;
+	    };
 	    DUMP_TYPE;
 	    DUMP_REG;
-	    DUMP_REG;
-	    DUMP_REG;
-	}break;
-	case Bytecode::SETG:  printf("setg"); flag = false;
-	case Bytecode::SETL:  if(flag){printf("setl");  flag = false;};
-	case Bytecode::SETE:  if(flag){printf("sete");  flag = false;};
-	case Bytecode::SETGE: if(flag){printf("setge"); flag = false;};
-	case Bytecode::SETLE:{
-	    if(flag){printf("setle"); flag = false;};
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;
@@ -827,9 +822,10 @@ namespace dbg{
 	}break;
 	case Bytecode::RET:{
 	    printf("return");
-	    x += 1;
-	    if(buc->bytecodes[x] == Bytecode::TYPE){
-		DUMP_TYPE;
+	    if((bool)buc->bytecodes[x] == true){
+		x += 1;
+		printf(" void");
+		x += 1;
 	    }else{
 		DUMP_REG;
 	    };
