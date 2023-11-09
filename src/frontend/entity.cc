@@ -194,6 +194,7 @@ bool checkProcEntityPresentInScopeElseReg(String name, Flag flag, ScopeEntities 
     entity.name = name;
     entity.flag = flag;
     se->procEntities[id] = entity;
+    if(cmpString(name, config.entryPoint)){config.entryPointID = id;};
     return true;
 };
 bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see){

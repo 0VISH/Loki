@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../midend/bytecode.hh"
+#include "../config.hh"
 
 #if(WIN)
 #define EXPORT extern "C" __declspec(dllexport)
@@ -11,6 +12,4 @@
 struct Page{
     char *mem;
     u32   watermark;
-};
-struct Config{
 };

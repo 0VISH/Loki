@@ -11,6 +11,9 @@
 #pragma clang diagnostic ignored "-Wnull-conversion"
 #endif
 
+#include "basic.hh"
+#include "config.hh"
+Config config;
 #include "include.hh"
 
 s32 main(s32 argc, char **argv) {
@@ -18,6 +21,9 @@ s32 main(s32 argc, char **argv) {
 
     os::initTimer();
     os::startTimer(TimeSlot::TOTAL);
+
+    config.entryPoint   = "main";
+    config.entryPointID = -1;
     
     if (argc < 2) {
 	printf("main file path not provided\n");

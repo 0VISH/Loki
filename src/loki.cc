@@ -90,11 +90,11 @@ bool compile(char *fileName){
 	mem::free(se);
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
-	Config cf;
-	BackendCompile(&bf, &cf);
+	BackendCompile(&bf, &config);
 	bf.uninit();
     };
     BackendDump("out.ll");
+    callExternalDeps();
     uninitLLVMBackend();
     see.uninit();
     os::endTimer(TimeSlot::MIDEND);

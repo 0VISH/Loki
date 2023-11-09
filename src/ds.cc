@@ -54,6 +54,11 @@ bool cmpString(String str1, String str2) {
     //TODO: SIMD??
     return memcmp(str1.mem, str2.mem, str1.len) == 0;
 };
+bool cmpString(String str1, char *str2){
+    u32 len = strlen(str2);
+    if(str1.len != len){return false;};
+    return memcmp(str1.mem, str2, len) == 0;
+};
 
 //dynamic array
 template<typename T>

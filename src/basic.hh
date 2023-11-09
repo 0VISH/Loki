@@ -21,6 +21,7 @@ typedef float                   f32;
 typedef double                  f64;
 
 #if(DBG)
+#include <stdio.h>
 void unreachable(char *file, u32 line) {
     printf("\n[ERROR] unreachable area reached: %s:%d", file, line);
 };

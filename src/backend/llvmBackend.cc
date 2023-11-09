@@ -33,6 +33,7 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    bc = getBytecode(bytecodes, off);
 	    write("%%_%d", bc);
 	};
+	off += 1;
     }break;
     case Bytecode::MOV_CONST:{
 	Bytecode bc = getBytecode(bytecodes, off);
@@ -41,7 +42,7 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    write("%%_%d = add i64 0, %lld", bc, getConstIntAndUpdate(bytecodes, off));
 	}else{
 	    bc = getBytecode(bytecodes, off);
-	    write("%%_%d = add double 0, %lld", bc, getConstDecAndUpdate(bytecodes, off));
+	    write("%%_%d = add double 0, %f", bc, getConstDecAndUpdate(bytecodes, off));
 	};
     }break;
     case Bytecode::DEF:{
@@ -53,7 +54,7 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    outputType = getBytecode(bytecodes, off);
 	};
 	Bytecode bc = getBytecode(bytecodes, off);
-	write("define %s @%d(", typeIDToName[(u16)outputType], bc);
+	write("define %s @_%d(", typeIDToName[(u16)outputType], bc);
 	s64 inCount = getConstIntAndUpdate(bytecodes, off);
 	while(inCount != 1){
 	    Bytecode inputType = getBytecode(bytecodes, off);
@@ -95,4 +96,13 @@ EXPORT void initLLVMBackend(){
 };
 EXPORT void uninitLLVMBackend(){
     uninitBackend();
+};
+EXPORT void callExternalDeps(){
+    char buff[1024];
+    sprintf(buff, "clang out.ll -c");
+    printf("[LLVM] %s\n", buff);
+    system(buff);
+    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:_%d out.o", config.entryPointID);
+    printf("[LINKER] %s\n", buff);
+    system(buff);
 };
