@@ -1,2 +1,4 @@
+:: backend as dll with #if(WIN)
+:: cmd line parsing
 :: Add struct
 :: Dependency system and include files

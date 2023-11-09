@@ -4,7 +4,7 @@ Type greaterType(Type t1, Type t2){
 };
 bool isTypeNum(Type type){return (type > Type::XE_VOID) && (type <= Type::COMP_INTEGER);};
 bool isFloat(Type type){
-    return (type == Type::F_64 || type == Type::F_32 || type == Type::F_16 || type == Type::COMP_DECIMAL);
+    return (type == Type::F_64 || type == Type::F_32 || type == Type::COMP_DECIMAL);
 };
 bool isIntS(Type type){
     return (type == Type::S_64 || type == Type::S_32 || type == Type::S_16 || type == Type::S_8 || type == Type::COMP_INTEGER);

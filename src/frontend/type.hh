@@ -11,7 +11,6 @@ enum class Type : u16{
     F_32,
     S_32,
     U_32,
-    F_16,
     S_16,
     U_16,
     S_8,

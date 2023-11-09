@@ -26,7 +26,6 @@ enum class Bytecode : u16{
     SETE,
     SETGE,
     SETLE,
-    JMPNS,        //jumps if given register is 0
     JMPS,         //jumps if given register is not 0
     JMP,
     DEF,
@@ -72,13 +71,13 @@ struct BytecodeFile{
     void emitConstInt(s64 num);
     void emitConstDec(f64 num);
     void alloc(Type type, Reg reg);
-    void store(Reg dest, Reg src);
+    void store(Type type, Reg dest, Reg src);
     void load(Type type, Reg dest, Reg src);
     void label(u16 label);
     void blockStart();
     void blockEnd();
     void jmp(u16 label);
-    void jmp(Bytecode op, Reg checkReg, Reg label);
+    void jmp(Bytecode op, Reg checkReg, u16 labelT, u16 labelF);
     void cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs);
     void mov(Type type, Reg dest, Reg src);
     void movConst(Reg reg, s64 num);

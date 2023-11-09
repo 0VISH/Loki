@@ -69,9 +69,10 @@ void BytecodeFile::alloc(Type type, Reg reg){
     emit(type);
     emit(reg);
 };
-void BytecodeFile::store(Reg dest, Reg src){
-    reserve(1 + 1 + 1);
+void BytecodeFile::store(Type type, Reg dest, Reg src){
+    reserve(1 + 1 + 1 + 1);
     emit(Bytecode::STORE);
+    emit(type);
     emit(dest);
     emit(src);
 };
@@ -105,11 +106,12 @@ void BytecodeFile::jmp(u16 label){
     emit(Bytecode::JMP);
     emit(label);
 };
-void BytecodeFile::jmp(Bytecode op, Reg checkReg, Reg label){
-    reserve(1 + 1 + 1);
+void BytecodeFile::jmp(Bytecode op, Reg checkReg, u16 labelT, u16 labelF){
+    reserve(1 + 1 + 1 + 1);
     emit(op);
     emit(checkReg);
-    emit(label);
+    emit(labelT);
+    emit(labelF);
 };
 void BytecodeFile::cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs){
     reserve(1 + 1 + 1 + 1 + 1 + 1);
@@ -449,10 +451,12 @@ ASTUniVar *var = (ASTUniVar*)node;
 	}break;
 	case ForType::EXPR:{
 	    u16 loopStartLbl = newLabel();
+	    u16 loopBodyLbl = newLabel();
 	    u16 loopEndLbl = newLabel();
 	    bf.label(loopStartLbl);
 	    Expr expr = compileExprToBytecode(For->expr, see, bca, bf);
-	    bf.jmp(Bytecode::JMPNS, expr.reg, loopEndLbl);
+	    bf.jmp(Bytecode::JMPS, expr.reg, loopBodyLbl, loopEndLbl);
+	    bf.label(loopBodyLbl);
 	    bf.blockStart();
 	    for(u32 x=0; x<For->body.count; x+=1){
 		compileToBytecode(For->body[x], see, bca, bf);
@@ -466,6 +470,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    u32 id = ForSe->varMap.getValue(var->name);
 	    VariableEntity &ent = ForSe->varEntities[id];
 	    u16 loopStartLbl = newLabel();
+	    u16 loopBodyLbl = newLabel();
 	    u16 loopEndLbl = newLabel();
 
 	    u16 incrementReg;
@@ -474,7 +479,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 		bf.movConst(incrementReg, (s64)1);
 	    };
 	    compileToBytecode(For->body[0], see, bca, bf);
-	    Reg varReg = blockBC.registerID-1;    //FIXME: 
+	    Reg varRegPtr = blockBC.registerID-1;    //FIXME: 
 	    bf.label(loopStartLbl);
 	    
 	    auto cond = compileExprToBytecode(For->end, see, bca, bf);
@@ -485,9 +490,12 @@ ASTUniVar *var = (ASTUniVar*)node;
 		setOp = Bytecode::SETL;
 	    };
 	    Reg cmpOutReg = blockBC.newReg(ent.type);
-	    bf.cmp(setOp, ent.type, cmpOutReg, varReg, cond.reg);
-	    bf.jmp(Bytecode::JMPS, cmpOutReg, loopEndLbl);
+	    Reg varVal1 = blockBC.newReg(ent.type);
+	    bf.load(ent.type, varVal1, varRegPtr);
+	    bf.cmp(setOp, ent.type, cmpOutReg, varVal1, cond.reg);
+	    bf.jmp(Bytecode::JMPS, cmpOutReg, loopBodyLbl, loopEndLbl);
 
+	    bf.label(loopBodyLbl);
 	    bf.blockStart();
 	    for(u32 x=1; x<For->body.count; x+=1){
 		compileToBytecode(For->body[x], see, bca, bf);
@@ -498,10 +506,10 @@ ASTUniVar *var = (ASTUniVar*)node;
 		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
 	    };
 	    Reg tempRes = blockBC.newReg(ent.type);
-	    Reg varVal  = blockBC.newReg(ent.type);
-	    bf.load(ent.type, varVal, varReg);
-	    bf.binOp(Bytecode::ADD, ent.type, tempRes, varVal, incrementReg);
-	    bf.store(varReg, tempRes);
+	    Reg varVal2  = blockBC.newReg(ent.type);
+	    bf.load(ent.type, varVal2, varRegPtr);
+	    bf.binOp(Bytecode::ADD, ent.type, tempRes, varVal2, incrementReg);
+	    bf.store(ent.type, varRegPtr, tempRes);
 
 	    bf.jmp(loopStartLbl);
 
@@ -520,12 +528,13 @@ ASTUniVar *var = (ASTUniVar*)node;
 	ScopeEntities *IfSe = If->IfSe;
 	blockBC.init(IfSe->varMap.count, IfSe->procMap.count, bc.registerID);
 	see.push(IfSe);
+	u16 inIfLbl = newLabel();
 	u16 outIfLbl = newLabel();
 	u16 inElseLbl = outIfLbl;
 	if(If->elseBody.count != 0){
 	    inElseLbl = newLabel();
 	};
-	bf.jmp(Bytecode::JMPNS, exprID, inElseLbl);
+	bf.jmp(Bytecode::JMPS, exprID, inIfLbl, inElseLbl);
 	bf.blockStart();
 	for(u32 x=0; x<If->body.count; x+=1){
 	    compileToBytecode(If->body[x], see, bca, bf);
@@ -653,7 +662,6 @@ namespace dbg{
 	case Type::F_32: printf("f32");break;
 	case Type::S_16: printf("s16");break;
 	case Type::U_16: printf("u16");break;
-	case Type::F_16: printf("f16");break;
 	case Type::S_8: printf("s8");break;
 	case Type::U_8: printf("u8");break;
 	case Type::COMP_INTEGER: printf("comp_int");break;
@@ -766,13 +774,9 @@ namespace dbg{
 	    printf("jmps");
 	    DUMP_REG;
 	    Bytecode bc = getBytecode(buc, x);
-	    printf("%#010x(%p)", bc, labels[(u16)bc]-2); //-2 because it will be easier to comprehend when pointer address is the same as labels
-	}break;
-	case Bytecode::JMPNS:{
-	    printf("jmpns");
-	    DUMP_REG;
-	    Bytecode bc = getBytecode(buc, x);
-	    printf("%#010x(%p)", bc, labels[(u16)bc]-2); //-2 because it will be easier to comprehend when pointer address is the same as labels
+	    printf("%#010x(%p) ", bc, labels[(u16)bc]-2); //-2 because it will be easier to comprehend when pointer address is the same as labels
+	    bc = getBytecode(buc, x);
+	    printf("%#010x(%p)", bc, labels[(u16)bc]-2);
 	}break;
 	case Bytecode::JMP:{
 	    printf("jmp ");
@@ -837,6 +841,7 @@ namespace dbg{
 	}break;
 	case Bytecode::STORE:{
 	    printf("store");
+	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;

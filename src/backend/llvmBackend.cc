@@ -33,6 +33,31 @@ void translate(BytecodeBucket *buc, u32 &off){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
+    case Bytecode::STORE:{
+	Bytecode type = getBytecode(bytecodes, off);
+	Bytecode dst = getBytecode(bytecodes, off);
+	Bytecode src = getBytecode(bytecodes, off);
+	char *typeName = typeIDToName[(u16)type];
+	write("store %s ", typeName);
+	writeReg(src);
+	write(", %s* ", typeName);
+	writeReg(dst);
+    }break;
+    case Bytecode::JMPS:{
+	Bytecode cmpReg = getBytecode(bytecodes, off);
+	Bytecode labelT = getBytecode(bytecodes, off);
+	Bytecode labelF = getBytecode(bytecodes, off);
+	write("br i1 ");
+	writeReg(cmpReg);
+	write(", label %%__%d, label %%__%d", labelT, labelF);
+    }break;
+    case Bytecode::LOAD:{
+	Bytecode type = getBytecode(bytecodes, off);
+	writeReg(getBytecode(bytecodes, off));
+	char *typeName = typeIDToName[(u16)type];
+	write(" = load %s, %s* ", typeName, typeName);
+	writeReg(getBytecode(bytecodes, off));
+    }break;
     case Bytecode::RET:{
 	Bytecode bc = getBytecode(bytecodes, off);
 	write("ret ");
@@ -65,7 +90,7 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    outputType = getBytecode(bytecodes, off);
 	};
 	Bytecode bc = getBytecode(bytecodes, off);
-	write("define %s @_%d(", typeIDToName[(u16)outputType], bc);
+	write("define %s @__%d(", typeIDToName[(u16)outputType], bc);
 	s64 inCount = getConstIntAndUpdate(bytecodes, off);
 	if(inCount != 0){
 	    while(inCount != 1){
@@ -87,7 +112,8 @@ void translate(BytecodeBucket *buc, u32 &off){
 	off += 1;
     }break;
     case Bytecode::LABEL:{
-	write("_%#010x:", getBytecode(bytecodes, off));
+	Bytecode bc = getBytecode(bytecodes, off);
+	write("br label %%__%d\n__%d:", bc, bc);
     }break;
     case Bytecode::CMP:{
 	char *cmp = "icmp";
@@ -137,7 +163,13 @@ void translate(BytecodeBucket *buc, u32 &off){
 void translateBlock(BytecodeBucket *buc, u32 &x){
     u32 off = x;
     while(buc){
-	while(buc->bytecodes[off] != Bytecode::NEXT_BUCKET && off != bytecodes_in_bucket && buc->bytecodes[off] != Bytecode::NONE && buc->bytecodes[off] != Bytecode::BLOCK_END){
+	while(buc->bytecodes[off] != Bytecode::NEXT_BUCKET && off != bytecodes_in_bucket && buc->bytecodes[off] != Bytecode::NONE){
+	    switch(buc->bytecodes[off]){
+	    case Bytecode::BLOCK_START:
+	    case Bytecode::BLOCK_END:
+		off += 1;
+		continue;
+	    };
 	    translate(buc, off);
 	};
 	buc = buc->next;
@@ -161,9 +193,9 @@ EXPORT void uninitLLVMBackend(){
 EXPORT void callExternalDeps(){
     char buff[1024];
     sprintf(buff, "clang out.ll -c");
-    printf("[LLVM] %s\n", buff);
-    system(buff);
-    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:_%d out.o", config.entryPointID);
+    printf("\n[LLVM] %s\n", buff);
+    if(system(buff) != 0){return;};
+    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__%d out.o", config.entryPointID);
     printf("[LINKER] %s\n", buff);
     system(buff);
 };
