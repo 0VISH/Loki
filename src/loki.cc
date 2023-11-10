@@ -93,7 +93,9 @@ bool compile(char *fileName){
 	BackendCompile(&bf, &config);
 	bf.uninit();
     };
-    BackendDump("out.ll");
+    char buff[1024];
+    sprintf(buff, "%s.ll", config.out);
+    BackendDump(buff);
     callExternalDeps();
     uninitLLVMBackend();
     see.uninit();

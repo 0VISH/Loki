@@ -16,29 +16,94 @@
 Config config;
 #include "include.hh"
 
+enum class ArgType{
+    ENTRYPOINT,
+    FILE,
+    OUTNAME,
+    COUNT,
+};
+struct ArgData{
+    char *arg;
+    ArgType type;
+    char *help;
+};
+
+u16 getSwitchLen(char *arg, u32 argLen){
+    u32 off = 0;
+    while(off < argLen){
+	if(arg[off] == ':'){break;};
+	off += 1;
+    };
+    return off;
+};
 s32 main(s32 argc, char **argv) {
     SEH_EXCEPTION_BLOCK_START;
 
+    ArgData argsData[] = {
+	{"entrypoint", ArgType::ENTRYPOINT, "execution begins from this function"},
+	{"file", ArgType::FILE, "main file(file which is read first by the compiler)"},
+	{"out", ArgType::OUTNAME, "name of output file"},
+    };
+
+    
+    if(argc < 2) {
+	printf("----------switches----------\n");
+	for(u32 x=0; x<(u16)ArgType::COUNT; x+=1){
+	    printf("%s: %s\n", argsData[x].arg, argsData[x].help);
+	};
+	return EXIT_SUCCESS;
+    };
+    
     os::initTimer();
     os::startTimer(TimeSlot::TOTAL);
 
-    config.entryPoint   = "main";
     config.entryPointID = -1;
+    config.entryPoint   = "main";
+    config.file         = "main.loki";
+    config.out          = "out";
     
-    if (argc < 2) {
-	printf("main file path not provided\n");
+    Map argMap;
+    argMap.init((u16)ArgType::COUNT);
+    for(u32 i=0; i<(u16)ArgType::COUNT; i+=1){
+	argMap.insertValue({(char*)argsData[i].arg, (u32)strlen(argsData[i].arg) }, (u16)argsData[i].type);
+    };
+
+    
+    for(u32 x=1; x<argc; x+=1){
+	char *arg = argv[x];
+	u32 argLen = strlen(arg);
+	u32 len = getSwitchLen(arg, argLen);
+	
+	s32 type = argMap.getValue({arg, len});
+	if(type == -1){
+	    printf("unkown arg: %.*s", len, arg);
+	    argMap.uninit();
+	    return EXIT_SUCCESS;
+	};
+	switch((ArgType)type){
+	case ArgType::ENTRYPOINT:{
+	    config.entryPoint = arg + len + 1;
+	}break;
+	case ArgType::FILE:{
+	    config.file = arg + len + 1;
+	}break;
+	case ArgType::OUTNAME:{
+	    config.out = arg + len + 1;
+	}break;
+	};
+    };
+    argMap.uninit();
+
+    if(os::isFile(config.file) == false){
+	printf("invalid file path: %s", config.file);
 	return EXIT_SUCCESS;
     };
 
-    if(os::isFile(argv[1]) == false){
-	printf("invalid file path: %s", argv[1]);
-	return EXIT_SUCCESS;
-    };
     Word::init(Word::keywords, Word::keywordsData, Word::keywordCount);
     Word::init(Word::poundwords, Word::poundwordsData, Word::poundwordCount);
     GlobalStrings::init();
     Dep::init();
-    compile(argv[1]);
+    compile(config.file);
     Dep::uninit();
     GlobalStrings::uninit();
     Word::uninit(Word::poundwords);

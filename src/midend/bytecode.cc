@@ -93,13 +93,9 @@ void BytecodeFile::label(u16 label){
     Bytecode *mem = getCurBytecodeAdd();
     labels[label] = mem;
 };
-void BytecodeFile::blockStart(){
+void BytecodeFile::procEnd(){
     reserve(1);
-    emit(Bytecode::BLOCK_START);
-};
-void BytecodeFile::blockEnd(){
-    reserve(1);
-    emit(Bytecode::BLOCK_END);
+    emit(Bytecode::PROC_END);
 };
 void BytecodeFile::jmp(u16 label){
     reserve(1 + 1);
@@ -442,11 +438,9 @@ ASTUniVar *var = (ASTUniVar*)node;
 	case ForType::FOR_EVER:{
 	    u16 loopStartLbl = newLabel();
 	    bf.label(loopStartLbl);
-	    bf.blockStart();
 	    for(u32 x=0; x<For->body.count; x+=1){
 		compileToBytecode(For->body[x], see, bca, bf);
 	    };
-	    bf.blockEnd();
 	    bf.jmp(loopStartLbl);
 	}break;
 	case ForType::EXPR:{
@@ -457,11 +451,9 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    Expr expr = compileExprToBytecode(For->expr, see, bca, bf);
 	    bf.jmp(Bytecode::JMPS, expr.reg, loopBodyLbl, loopEndLbl);
 	    bf.label(loopBodyLbl);
-	    bf.blockStart();
 	    for(u32 x=0; x<For->body.count; x+=1){
 		compileToBytecode(For->body[x], see, bca, bf);
 	    };
-	    bf.blockEnd();
 	    bf.label(loopEndLbl);
 	}break;
 	case ForType::C_LES:
@@ -496,11 +488,9 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.jmp(Bytecode::JMPS, cmpOutReg, loopBodyLbl, loopEndLbl);
 
 	    bf.label(loopBodyLbl);
-	    bf.blockStart();
 	    for(u32 x=1; x<For->body.count; x+=1){
 		compileToBytecode(For->body[x], see, bca, bf);
 	    };
-	    bf.blockEnd();
 
 	    if(For->increment != nullptr){
 		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
@@ -535,11 +525,9 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    inElseLbl = newLabel();
 	};
 	bf.jmp(Bytecode::JMPS, exprID, inIfLbl, inElseLbl);
-	bf.blockStart();
 	for(u32 x=0; x<If->body.count; x+=1){
 	    compileToBytecode(If->body[x], see, bca, bf);
 	};
-	bf.blockEnd();
 	see.pop();
 	IfSe->uninit();
 	mem::free(IfSe);
@@ -551,11 +539,9 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    see.push(ElseSe);
 	    BytecodeContext &elseBC = bca.newElem();
 	    elseBC.init(ElseSe->varMap.count, ElseSe->procMap.count, bc.registerID);
-	    bf.blockStart();
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
 		compileToBytecode(If->elseBody[x], see, bca, bf);
 	    };
-	    bf.blockEnd();
 	    see.pop();
 	    ElseSe->uninit();
 	    mem::free(ElseSe);
@@ -612,12 +598,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 	};
 	//RESERVE ENDS HERE
 	see.push(procSE);
-	bf.blockStart();
 	for(u32 x=inCount; x<proc->body.count; x+=1){
 	    compileToBytecode(proc->body[x], see, bca, bf);
 	};
-	bf.blockEnd();
 	see.pop()->uninit();
+	bf.procEnd();
 	mem::free(procSE);
 	bca.pop().uninit();
     }break;
@@ -638,7 +623,7 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, DynamicArray<Scope
 
 #if(DBG)
 
-#define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(buc, x), pbuc, x, block);
+#define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(buc, x), pbuc, x);
 
 #define DUMP_REG dumpReg(getBytecode(buc, x));
 
@@ -689,11 +674,8 @@ namespace dbg{
     inline Bytecode getBytecode(BytecodeBucket *buc, u32 &x){
 	return buc->bytecodes[x++];
     };
-    BytecodeBucket *dumpBytecode(BytecodeBucket *buc, u32 &x, DynamicArray<Bytecode*> &labels, u32 &block){
-	printf("\n%p|%s", buc->bytecodes + x, spaces);
-	for(u32 v=0; v<block; v += 1){
-	    printf("   ");
-	};
+    BytecodeBucket *dumpBytecode(BytecodeBucket *buc, u32 &x, DynamicArray<Bytecode*> &labels){
+	printf("\n%p|%s    ", buc->bytecodes + x, spaces);
 	bool flag = true;
 	Bytecode bc = getBytecode(buc, x);
 	switch(bc){
@@ -702,14 +684,6 @@ namespace dbg{
 	    printf("NEXT_BUCKET");
 	    buc = buc->next;
 	    x = 0;
-	}break;
-	case Bytecode::BLOCK_START:{
-	    printf("{");
-	    block += 1;
-	}break;
-	case Bytecode::BLOCK_END:{
-	    printf("}");
-	    block -= 1;
 	}break;
 	case Bytecode::LABEL:{
 	    printf("%#010x:", getBytecode(buc, x));
@@ -809,14 +783,16 @@ namespace dbg{
 		printf(",");
 		inCount -= 1;
 	    };
-	    printf(")");
-
+	    printf("){");
 	    bc = buc->bytecodes[x];
-	    while(bc != Bytecode::BLOCK_END){
-		buc = dumpBytecode(buc, x, labels, block);
+	    while(bc != Bytecode::PROC_END){
+		buc = dumpBytecode(buc, x, labels);
 		bc = buc->bytecodes[x];
 	    };
-	    dumpBytecode(buc, x, labels, block);
+	    dumpBytecode(buc, x, labels);
+	}break;
+	case Bytecode::PROC_END:{
+	    printf("}");
 	}break;
 	case Bytecode::NEG:{
 	    printf("neg");
@@ -860,9 +836,8 @@ namespace dbg{
 	printf("\n\n[DUMPING BYTECODE FILE]");
 	BytecodeBucket *buc = bf.firstBucket;
 	u32 x = 0;
-	u32 block = 0;
 	while(buc){
-	    buc = dumpBytecode(buc, x, bf.labels, block);
+	    buc = dumpBytecode(buc, x, bf.labels);
 	};
 	printf("\n[FINISHED DUMPING BYTECODE FILE]\n\n");
     };

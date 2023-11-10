@@ -116,12 +116,10 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    write("%s ", typeIDToName[(u16)inputType]);
 	    writeReg(bc);
 	};
+	write("){");
     }break;
-    case Bytecode::BLOCK_START:{
-	write("{");
-    }break;
-    case Bytecode::BLOCK_END:{
-	write("}");
+    case Bytecode::PROC_END:{
+	write("}\n");
     }break;
     case Bytecode::LABEL:{
 	Bytecode bc = getBytecode(bytecodes, off);
@@ -196,10 +194,10 @@ EXPORT void uninitLLVMBackend(){
 };
 EXPORT void callExternalDeps(){
     char buff[1024];
-    sprintf(buff, "clang out.ll -c");
+    sprintf(buff, "clang %s.ll -c", config.out);
     printf("\n[LLVM] %s\n", buff);
     if(system(buff) != 0){return;};
-    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__%d out.o", config.entryPointID);
+    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__%d %s.o", config.entryPointID, config.out);
     printf("[LINKER] %s\n", buff);
     system(buff);
 };

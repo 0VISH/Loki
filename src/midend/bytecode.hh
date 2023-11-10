@@ -32,8 +32,7 @@ enum class Bytecode : u16{
     RET,
     NEG,
     LABEL,
-    BLOCK_START,
-    BLOCK_END,
+    PROC_END,
     ALLOC,
     NEXT_BUCKET,
     COUNT,
@@ -74,8 +73,7 @@ struct BytecodeFile{
     void store(Type type, Reg dest, Reg src);
     void load(Type type, Reg dest, Reg src);
     void label(u16 label);
-    void blockStart();
-    void blockEnd();
+    void procEnd();
     void jmp(u16 label);
     void jmp(Bytecode op, Reg checkReg, u16 labelT, u16 labelF);
     void cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs);
