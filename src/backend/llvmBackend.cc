@@ -28,8 +28,7 @@ void writeReg(Bytecode bc){
     };
     write("%%_%d", reg);
 };
-BytecodeBucket *translateBlock(BytecodeBucket *buc, u32 &x);
-BytecodeBucket *translate(BytecodeBucket *buc, u32 &off){
+void translate(BytecodeBucket *buc, u32 &off){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
@@ -117,11 +116,12 @@ BytecodeBucket *translate(BytecodeBucket *buc, u32 &off){
 	    write("%s ", typeIDToName[(u16)inputType]);
 	    writeReg(bc);
 	};
-	off += 1;
-	write("){\n");
-	buc = translateBlock(buc, off);
+    }break;
+    case Bytecode::BLOCK_START:{
+	write("{");
+    }break;
+    case Bytecode::BLOCK_END:{
 	write("}");
-	return buc;
     }break;
     case Bytecode::LABEL:{
 	Bytecode bc = getBytecode(bytecodes, off);
@@ -171,36 +171,22 @@ BytecodeBucket *translate(BytecodeBucket *buc, u32 &off){
 	UNREACHABLE;
     };
     write("\n");
-    return buc;
-};
-BytecodeBucket *translateBlock(BytecodeBucket *buc, u32 &x){
-    u32 off = x;
-    while(buc){
-	while(buc->bytecodes[off] != Bytecode::NEXT_BUCKET && off != bytecodes_in_bucket){
-	    switch(buc->bytecodes[off]){
-	    case Bytecode::NONE: return buc;
-	    case Bytecode::BLOCK_END:
-		x = off + 1;
-		return buc;
-	    case Bytecode::BLOCK_START:
-		off += 1;
-		buc = translateBlock(buc, off);
-		continue;
-	    };
-	    buc = translate(buc, off);
-	};
-	buc = buc->next;
-	off = 0;
-    };
-    x = off;
-    return buc;
 };
 
-EXPORT bool BackendCompile(BytecodeFile *bf, Config *config){
+EXPORT void BackendCompile(BytecodeFile *bf, Config *config){
     BytecodeBucket *curBucket = bf->firstBucket;
     u32 off = 0;
-    translateBlock(curBucket, off);
-    return true;
+    while(curBucket){
+	switch(curBucket->bytecodes[off]){
+	case Bytecode::NONE: return;
+	case Bytecode::NEXT_BUCKET:
+	    curBucket = curBucket->next;
+	    off = 0;
+	    continue;
+	};
+	translate(curBucket, off);
+    };
+    return;
 };
 EXPORT void initLLVMBackend(){
     initBackend();
