@@ -1,3 +1,4 @@
+:: change how llvm is generated(with min recursion)
 :: backend as dll with #if(WIN)
 :: cmd line parsing
 :: Add struct

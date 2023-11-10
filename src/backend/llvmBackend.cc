@@ -28,11 +28,23 @@ void writeReg(Bytecode bc){
     };
     write("%%_%d", reg);
 };
-void translateBlock(BytecodeBucket *buc, u32 &x);
-void translate(BytecodeBucket *buc, u32 &off){
+BytecodeBucket *translateBlock(BytecodeBucket *buc, u32 &x);
+BytecodeBucket *translate(BytecodeBucket *buc, u32 &off){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
+    case Bytecode::JMP:{
+	Bytecode label = getBytecode(bytecodes, off);
+	write("br label %%__%d", label);
+    }break;
+    case Bytecode::ADD:{
+	Bytecode type = getBytecode(bytecodes, off);
+	writeReg(getBytecode(bytecodes, off));
+	write(" = add %s ", typeIDToName[(u16)type]);
+	writeReg(getBytecode(bytecodes, off));
+	write(", ");
+	writeReg(getBytecode(bytecodes, off));
+    }break;
     case Bytecode::STORE:{
 	Bytecode type = getBytecode(bytecodes, off);
 	Bytecode dst = getBytecode(bytecodes, off);
@@ -107,9 +119,9 @@ void translate(BytecodeBucket *buc, u32 &off){
 	};
 	off += 1;
 	write("){\n");
-	translateBlock(buc, off);
+	buc = translateBlock(buc, off);
 	write("}");
-	off += 1;
+	return buc;
     }break;
     case Bytecode::LABEL:{
 	Bytecode bc = getBytecode(bytecodes, off);
@@ -159,23 +171,29 @@ void translate(BytecodeBucket *buc, u32 &off){
 	UNREACHABLE;
     };
     write("\n");
+    return buc;
 };
-void translateBlock(BytecodeBucket *buc, u32 &x){
+BytecodeBucket *translateBlock(BytecodeBucket *buc, u32 &x){
     u32 off = x;
     while(buc){
-	while(buc->bytecodes[off] != Bytecode::NEXT_BUCKET && off != bytecodes_in_bucket && buc->bytecodes[off] != Bytecode::NONE){
+	while(buc->bytecodes[off] != Bytecode::NEXT_BUCKET && off != bytecodes_in_bucket){
 	    switch(buc->bytecodes[off]){
-	    case Bytecode::BLOCK_START:
+	    case Bytecode::NONE: return buc;
 	    case Bytecode::BLOCK_END:
+		x = off + 1;
+		return buc;
+	    case Bytecode::BLOCK_START:
 		off += 1;
+		buc = translateBlock(buc, off);
 		continue;
 	    };
-	    translate(buc, off);
+	    buc = translate(buc, off);
 	};
 	buc = buc->next;
 	off = 0;
     };
     x = off;
+    return buc;
 };
 
 EXPORT bool BackendCompile(BytecodeFile *bf, Config *config){
