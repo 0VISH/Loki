@@ -192,12 +192,13 @@ EXPORT void initLLVMBackend(){
 EXPORT void uninitLLVMBackend(){
     uninitBackend();
 };
-EXPORT void callExternalDeps(){
+EXPORT void callExternalDeps(Config *config){
     char buff[1024];
-    sprintf(buff, "clang %s.ll -c", config.out);
+    sprintf(buff, "clang %s.ll -c -o %s.obj", config->out, config->out);
     printf("\n[LLVM] %s\n", buff);
     if(system(buff) != 0){return;};
-    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__%d %s.o", config.entryPointID, config.out);
+    if(config->end == EndType::STATIC){return;};
+    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__%d %s.obj /OUT:%s.%s", config->entryPointID, config->out, config->out, (config->end==EndType::EXECUTABLE)?"exe":"dll");
     printf("[LINKER] %s\n", buff);
     system(buff);
 };

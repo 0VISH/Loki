@@ -96,19 +96,9 @@ bool compile(char *fileName){
     char buff[1024];
     sprintf(buff, "%s.ll", config.out);
     BackendDump(buff);
-    callExternalDeps();
+    callExternalDeps(&config);
     uninitLLVMBackend();
     see.uninit();
     os::endTimer(TimeSlot::MIDEND);
-    /*
-    os::startTimer(TimeSlot::EXEC_BC);
-    VM vm;
-    vm.init(bf.firstBucket, &bf.labels, 0);
-    DEFER(vm.uninit());
-    if(execBytecode(vm) == false){
-	printf("TODO: VM ERRORs");
-    };
-    os::endTimer(TimeSlot::EXEC_BC);
-    */
     return true;
 };

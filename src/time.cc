@@ -3,7 +3,6 @@ enum class TimeSlot{
     FRONTEND,
     MIDEND,
     BACKEND,
-    EXEC_BC,
     COUNT,
 };
 

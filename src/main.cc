@@ -20,6 +20,7 @@ enum class ArgType{
     ENTRYPOINT,
     FILE,
     OUTNAME,
+    END,
     COUNT,
 };
 struct ArgData{
@@ -43,6 +44,7 @@ s32 main(s32 argc, char **argv) {
 	{"entrypoint", ArgType::ENTRYPOINT, "execution begins from this function"},
 	{"file", ArgType::FILE, "main file(file which is read first by the compiler)"},
 	{"out", ArgType::OUTNAME, "name of output file"},
+	{"end", ArgType::END, "end goal\n             1: exe\n             2: dll\n             3: check"},
     };
 
     
@@ -61,6 +63,7 @@ s32 main(s32 argc, char **argv) {
     config.entryPoint   = "main";
     config.file         = "main.loki";
     config.out          = "out";
+    config.end          = EndType::EXECUTABLE;
     
     Map argMap;
     argMap.init((u16)ArgType::COUNT);
@@ -89,6 +92,22 @@ s32 main(s32 argc, char **argv) {
 	}break;
 	case ArgType::OUTNAME:{
 	    config.out = arg + len + 1;
+	}break;
+	case ArgType::END:{
+	    char *end = arg + len + 1;
+	    if(strcmp("executable", end) == 0){
+		config.end = EndType::EXECUTABLE;
+	    }else if(strcmp("dynamic", end) == 0){
+		config.end = EndType::DYNAMIC;
+	    }else if(strcmp("static", end) == 0){
+		config.end = EndType::STATIC;
+	    }else if(strcmp("check", end) == 0){
+		config.end = EndType::CHECK;
+	    }else{
+		printf("unkown end goal: %s", end);
+		argMap.uninit();
+		return EXIT_SUCCESS;
+	    };
 	}break;
 	};
     };
