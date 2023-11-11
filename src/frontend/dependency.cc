@@ -2,17 +2,15 @@
 
 #define AST_PAGE_SIZE 1024
 
-typedef s16 FileID;
-
 struct ASTBase;
 
 struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
-    FileID id;
+    s16 id;
     u16 pageBrim;
 
-    void init(FileID fileID){
+    void init(s16 fileID){
 	id = fileID;
 	pageBrim = 0;
 	memPages.init(2);
@@ -34,18 +32,19 @@ struct ASTFile{
 
 namespace Dep{
     struct IDAndName{
-	FileID id;
+	s16 id;
 	char *name;
     };
     struct NodeScope{
 	DynamicArray<ASTBase*> *nodes;
 	ScopeEntities *se;
+	s16 id;
     };
     
     DynamicArray<ASTFile> files;
     DynamicArray<ScopeEntities*> fileIDToSE;
     hashmap *fileNameToID;
-    FileID fileID;
+    s16 fileID;
 
     DynamicArray<IDAndName> parseAndCheckQueue;
     DynamicArray<NodeScope> compileToBytecodeQueue;
@@ -74,30 +73,30 @@ namespace Dep{
 	fileIDToSE.uninit();
     };
 
-    void registerScopedEntities(FileID id, ScopeEntities *se){
+    void registerScopedEntities(s16 id, ScopeEntities *se){
 	if(id >= fileIDToSE.len){
 	    fileIDToSE.realloc(id + 5);
 	};
 	fileIDToSE.count = (u32)id;
 	fileIDToSE[(u32)id] = se;
     };
-    FileID getFileID(char *fileName){
+    s16 getFileID(char *fileName){
 	uintptr_t temp = fileID;
 	if(hashmap_get_set(fileNameToID, fileName, strlen(fileName), &temp) == false){
 	    ASTFile &file = files.newElem();
-	    file.init((FileID)temp);
+	    file.init((s16)temp);
 	    fileID += 1;
 	};
-	return (FileID)temp;
+	return (s16)temp;
     };
-    ASTFile &getASTFile(FileID id){
-	return files[(u32)id];
+    ASTFile &getASTFile(s16 id){
+	return files[id];
     };
     void pushToParseAndCheckQueue(char *name){
-	FileID fid = getFileID(name);
+	s16 fid = getFileID(name);
 	parseAndCheckQueue.push({fid, name});
     };
-    void pushToCompileQueue(DynamicArray<ASTBase*> *nodes, ScopeEntities *se){
-	compileToBytecodeQueue.push({nodes, se});
+    void pushToCompileQueue(DynamicArray<ASTBase*> *nodes, ScopeEntities *se, s16 id){
+	compileToBytecodeQueue.push({nodes, se, id});
     };
 };

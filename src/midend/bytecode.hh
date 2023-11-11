@@ -58,8 +58,9 @@ struct BytecodeFile{
     BytecodeBucket           *firstBucket;
     BytecodeBucket           *curBucket;
     u16                       cursor;
+    u8                        id;
 
-    void init();
+    void init(s16 fileID);
     void uninit();
     void newBucketAndUpdateCurBucket();
     void reserve(u16 reserve);

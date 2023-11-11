@@ -59,7 +59,6 @@ s32 main(s32 argc, char **argv) {
     os::initTimer();
     os::startTimer(TimeSlot::TOTAL);
 
-    config.entryPointID = -1;
     config.entryPoint   = "main";
     config.file         = "main.loki";
     config.out          = "out";

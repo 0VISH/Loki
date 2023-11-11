@@ -61,7 +61,7 @@ bool compile(char *fileName){
 	ASTFile &file = Dep::getASTFile(idf.id);
 	ScopeEntities *se = parseCheckAndLoadEntities(idf.name, file);
 	if(se){
-	    Dep::pushToCompileQueue(&file.nodes, se);
+	    Dep::pushToCompileQueue(&file.nodes, se, file.id);
 	};
     };
     os::endTimer(TimeSlot::FRONTEND);
@@ -77,14 +77,14 @@ bool compile(char *fileName){
     see.init();
     initLLVMBackend();
     for(u32 x=0; x<Dep::compileToBytecodeQueue.count; x+=1){
-	auto ns = Dep::compileToBytecodeQueue[x];
-	ScopeEntities *se = ns.se;
+	auto nsi = Dep::compileToBytecodeQueue[x];
+	ScopeEntities *se = nsi.se;
 	BytecodeFile bf;
-	bf.init();
+	bf.init(nsi.id);
 	BytecodeContext &bc = bca.newElem();
 	bc.init(se->varMap.count, se->procMap.count, 0);
 	see.push(se);
-	compileASTNodesToBytecode(*ns.nodes, see, bca, bf);
+	compileASTNodesToBytecode(*nsi.nodes, see, bca, bf);
 	see.pop();
 	se->uninit();
 	mem::free(se);

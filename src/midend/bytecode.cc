@@ -1,8 +1,9 @@
 #include "bytecode.hh"
 
-void BytecodeFile::init(){
+void BytecodeFile::init(s16 fileID){
     labels.init();
     cursor = 0;
+    id = fileID;
     firstBucket = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
     firstBucket->next = nullptr;
     firstBucket->prev = nullptr;

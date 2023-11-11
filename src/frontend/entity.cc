@@ -187,14 +187,16 @@ bool checkProcEntityPresentInScopeElseReg(String name, Flag flag, ScopeEntities 
 
     ScopeEntities *se = see[see.count-1];
     Map &map = se->procMap;
-    
-    u32 id = map.count;
+
+    u32 id = map.count + 1;
+    if(cmpString(name, config.entryPoint)){
+	id = 0;
+    };
     map.insertValue(name,id);
     ProcEntity entity;
     entity.name = name;
     entity.flag = flag;
     se->procEntities[id] = entity;
-    if(cmpString(name, config.entryPoint)){config.entryPointID = id;};
     return true;
 };
 bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see){

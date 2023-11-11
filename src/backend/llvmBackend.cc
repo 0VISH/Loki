@@ -20,29 +20,29 @@ char *typeIDToName[] = {
     "i64",
 };
 
-void writeReg(Bytecode bc){
+void writeReg(Bytecode bc, s16 id){
     Reg reg = (Reg)bc;
     if(reg < 0){
 	write("@_%d", reg*-1);
 	return;
     };
-    write("%%_%d", reg);
+    write("%%_%d%d", id, reg);
 };
-void translate(BytecodeBucket *buc, u32 &off){
+void translate(BytecodeBucket *buc, u32 &off, s16 id){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
     case Bytecode::JMP:{
 	Bytecode label = getBytecode(bytecodes, off);
-	write("br label %%__%d", label);
+	write("br label %%__%d%d", id, label);
     }break;
     case Bytecode::ADD:{
 	Bytecode type = getBytecode(bytecodes, off);
-	writeReg(getBytecode(bytecodes, off));
+	writeReg(getBytecode(bytecodes, off), id);
 	write(" = add %s ", typeIDToName[(u16)type]);
-	writeReg(getBytecode(bytecodes, off));
+	writeReg(getBytecode(bytecodes, off), id);
 	write(", ");
-	writeReg(getBytecode(bytecodes, off));
+	writeReg(getBytecode(bytecodes, off), id);
     }break;
     case Bytecode::STORE:{
 	Bytecode type = getBytecode(bytecodes, off);
@@ -50,24 +50,24 @@ void translate(BytecodeBucket *buc, u32 &off){
 	Bytecode src = getBytecode(bytecodes, off);
 	char *typeName = typeIDToName[(u16)type];
 	write("store %s ", typeName);
-	writeReg(src);
+	writeReg(src, id);
 	write(", %s* ", typeName);
-	writeReg(dst);
+	writeReg(dst, id);
     }break;
     case Bytecode::JMPS:{
 	Bytecode cmpReg = getBytecode(bytecodes, off);
 	Bytecode labelT = getBytecode(bytecodes, off);
 	Bytecode labelF = getBytecode(bytecodes, off);
 	write("br i1 ");
-	writeReg(cmpReg);
-	write(", label %%__%d, label %%__%d", labelT, labelF);
+	writeReg(cmpReg, id);
+	write(", label %%__%d%d, label %%__%d%d", id, labelT, id, labelF);
     }break;
     case Bytecode::LOAD:{
 	Bytecode type = getBytecode(bytecodes, off);
-	writeReg(getBytecode(bytecodes, off));
+	writeReg(getBytecode(bytecodes, off), id);
 	char *typeName = typeIDToName[(u16)type];
 	write(" = load %s, %s* ", typeName, typeName);
-	writeReg(getBytecode(bytecodes, off));
+	writeReg(getBytecode(bytecodes, off), id);
     }break;
     case Bytecode::RET:{
 	Bytecode bc = getBytecode(bytecodes, off);
@@ -76,7 +76,7 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    write("void");
 	}else{
 	    bc = getBytecode(bytecodes, off);
-	    writeReg(bc);
+	    writeReg(bc, id);
 	};
 	off += 1;
     }break;
@@ -84,11 +84,11 @@ void translate(BytecodeBucket *buc, u32 &off){
 	Bytecode bc = getBytecode(bytecodes, off);
 	if(bc == (Bytecode)Type::COMP_INTEGER){
 	    bc = getBytecode(bytecodes, off);
-	    writeReg(bc);
+	    writeReg(bc, id);
 	    write(" = add i64 0, %lld", getConstIntAndUpdate(bytecodes, off));
 	}else{
 	    bc = getBytecode(bytecodes, off);
-	    writeReg(bc);
+	    writeReg(bc, id);
 	    write(" = add double 0, %f", getConstDecAndUpdate(bytecodes, off));
 	};
     }break;
@@ -101,20 +101,25 @@ void translate(BytecodeBucket *buc, u32 &off){
 	    outputType = getBytecode(bytecodes, off);
 	};
 	Bytecode bc = getBytecode(bytecodes, off);
-	write("define %s @__%d(", typeIDToName[(u16)outputType], bc);
+	write("define %s @__", typeIDToName[(u16)outputType]);
+	if((u16)bc == 0){
+	    write("main(");
+	}else{;
+	    write("%d%d(", id, bc);
+	};
 	s64 inCount = getConstIntAndUpdate(bytecodes, off);
 	if(inCount != 0){
 	    while(inCount != 1){
 		Bytecode inputType = getBytecode(bytecodes, off);
 		bc = getBytecode(bytecodes, off);
 		write("%s ,", typeIDToName[(u16)inputType]);
-		writeReg(bc);
+		writeReg(bc, id);
 		inCount -= 1;
 	    };
 	    Bytecode inputType = getBytecode(bytecodes, off);
 	    bc = getBytecode(bytecodes, off);
 	    write("%s ", typeIDToName[(u16)inputType]);
-	    writeReg(bc);
+	    writeReg(bc, id);
 	};
 	write("){");
     }break;
@@ -123,7 +128,7 @@ void translate(BytecodeBucket *buc, u32 &off){
     }break;
     case Bytecode::LABEL:{
 	Bytecode bc = getBytecode(bytecodes, off);
-	write("br label %%__%d\n__%d:", bc, bc);
+	write("br label %%__%d%d\n__%d%d:", id, bc, id, bc);
     }break;
     case Bytecode::CMP:{
 	char *cmp = "icmp";
@@ -153,16 +158,16 @@ void translate(BytecodeBucket *buc, u32 &off){
 	Bytecode lhs  = getBytecode(bytecodes, off);
 	Bytecode rhs  = getBytecode(bytecodes, off);
 
-	writeReg(dest);
+	writeReg(dest, id);
 	write(" = %s %c%s %s ", cmp, type, cmpMethod, typeIDToName[(u16)bc]);
-	writeReg(lhs);
+	writeReg(lhs, id);
 	write(", ");
-	writeReg(rhs);
+	writeReg(rhs, id);
     }break;
     case Bytecode::ALLOC:{
 	Bytecode type = getBytecode(bytecodes, off);
 	Bytecode reg = getBytecode(bytecodes, off);
-	writeReg(reg);
+	writeReg(reg, id);
 	write(" = alloca %s", typeIDToName[(u16)type]);
     }break;
     default:
@@ -182,7 +187,7 @@ EXPORT void BackendCompile(BytecodeFile *bf, Config *config){
 	    off = 0;
 	    continue;
 	};
-	translate(curBucket, off);
+	translate(curBucket, off, bf->id);
     };
     return;
 };
@@ -198,7 +203,7 @@ EXPORT void callExternalDeps(Config *config){
     printf("\n[LLVM] %s\n", buff);
     if(system(buff) != 0){return;};
     if(config->end == EndType::STATIC){return;};
-    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__%d %s.obj /OUT:%s.%s", config->entryPointID, config->out, config->out, (config->end==EndType::EXECUTABLE)?"exe":"dll");
+    sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__main %s.obj /OUT:%s.%s", config->out, config->out, (config->end==EndType::EXECUTABLE)?"exe":"dll");
     printf("[LINKER] %s\n", buff);
     system(buff);
 };
