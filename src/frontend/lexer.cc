@@ -143,7 +143,7 @@ struct Lexer {
 	tokenOffsets.uninit();
     };
     void emitErr(u64 off, char *fmt, ...) {
-	if (report::errorOff == MAX_REPORTS) { return; };
+	if (report::errorOff == MAX_ERRORS) { return; };
 	report::Error &rep = report::errors[report::errorOff];
 	report::errorOff += 1;
 	rep.fileName = fileName;

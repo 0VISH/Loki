@@ -1,4 +1,4 @@
-#define MAX_REPORTS 30
+#define MAX_ERRORS 10
 
 #if(MSVC_COMPILER && SIMD)
 #define __builtin_popcount __popcnt
@@ -13,7 +13,7 @@ namespace report{
 	char *fileContent;
     };
 
-    Error errors[MAX_REPORTS];
+    Error errors[MAX_ERRORS];
     u8 errorOff = 0;
     char reportBuff[1024];
     u32 reportBuffTop = 0;

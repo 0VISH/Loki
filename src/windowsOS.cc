@@ -5,9 +5,9 @@ namespace os{
     
     char *getFileFullName(char *filePath) {
 	char fullFilePathBuff[1024];
-	u32 len = GetFullPathNameA(filePath, 1024, fullFilePathBuff, NULL);
+	u32 len = GetFullPathNameA(filePath, 1024, fullFilePathBuff, NULL) + 1;
 	char *fullPath = (char*)mem::salloc(len);
-	memcpy(fullPath, fullFilePathBuff, len + 1);
+	memcpy(fullPath, fullFilePathBuff, len);
 	return fullPath;
     };
     bool isFile(char *filePath){

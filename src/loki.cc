@@ -12,9 +12,13 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     };
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
-	if (base == nullptr) { return nullptr; };
+	if(base == nullptr){break;};
 	astFile.nodes.push(base);
 	eatNewlines(lexer.tokenTypes, off);
+    };
+    if(report::errorOff != 0){
+	report::flushReports();
+	return nullptr;
     };
     dbg::dumpASTFile(astFile, lexer);
     DynamicArray<ScopeEntities*> see;
@@ -65,10 +69,7 @@ bool compile(char *fileName){
 	};
     };
     os::endTimer(TimeSlot::FRONTEND);
-    if (report::errorOff != 0) {
-	report::flushReports();
-	return false;
-    };
+    if(report::errorOff != 0){return false;};
     os::startTimer(TimeSlot::MIDEND);
     DynamicArray<BytecodeContext> bca;
     bca.init(3);
