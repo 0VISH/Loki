@@ -42,14 +42,6 @@ void write(char *fmt, ...){
     pg.watermark += res;
     va_end(args);
 };
-void BackendDump(char *fileName){
-    FILE *f = fopen(fileName, "w");
-    for(u32 x=0; x<pages.count; x+=1){
-	Page &pg = pages[x];
-	fwrite(pg.mem, 1, pg.watermark, f);
-    };
-    fclose(f);
-};
 s64 getConstIntAndUpdate(Bytecode *page, u32 &x){
 	s64 *mem = (s64*)(page + x);
 	x += const_in_stream;

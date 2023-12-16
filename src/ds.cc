@@ -25,6 +25,13 @@ struct Array {
     T *mem;
     u32 len;
 
+    Array(u32 length){
+	len = length;
+	mem = (T*)mem::alloc(sizeof(T)*len);
+    };
+    void uninit(){
+	mem::free(mem);
+    };
     T& operator[](u32 index) {
 #if(DBG == true)
 	if (index >= len) {

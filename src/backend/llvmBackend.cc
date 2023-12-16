@@ -176,7 +176,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
     write("\n");
 };
 
-EXPORT void BackendCompile(BytecodeFile *bf, Config *config){
+EXPORT void BackendCompileStage1(BytecodeFile *bf, Config *config){
     BytecodeBucket *curBucket = bf->firstBucket;
     u32 off = 0;
     while(curBucket){
@@ -197,8 +197,17 @@ EXPORT void initLLVMBackend(){
 EXPORT void uninitLLVMBackend(){
     uninitBackend();
 };
-EXPORT void callExternalDeps(Config *config){
+EXPORT void BackendCompileStage2(Config *config){
     char buff[1024];
+
+    sprintf(buff, "%s.ll", config->out);
+    FILE *f = fopen(buff, "w");
+    for(u32 x=0; x<pages.count; x+=1){
+	Page &pg = pages[x];
+	fwrite(pg.mem, 1, pg.watermark, f);
+    };
+    fclose(f);
+    
     sprintf(buff, "clang %s.ll -c -o %s.obj", config->out, config->out);
     printf("\n[LLVM] %s\n", buff);
     if(system(buff) != 0){return;};

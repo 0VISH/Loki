@@ -59,13 +59,13 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
 };
 bool compile(char *fileName){
     os::startTimer(TimeSlot::FRONTEND);
-    Dep::pushToParseAndCheckQueue(fileName);
-    while(Dep::parseAndCheckQueue.count != 0){
-	Dep::IDAndName idf = Dep::parseAndCheckQueue.pop();
+    Dep::pushToParseAndCheckStack(fileName);
+    while(Dep::parseAndCheckStack.count != 0){
+	Dep::IDAndName idf = Dep::parseAndCheckStack.pop();
 	ASTFile &file = Dep::getASTFile(idf.id);
 	ScopeEntities *se = parseCheckAndLoadEntities(idf.name, file);
 	if(se){
-	    Dep::pushToCompileQueue(&file.nodes, se, file.id);
+	    Dep::pushToCompileStack(&file.nodes, se, file.id);
 	};
     };
     os::endTimer(TimeSlot::FRONTEND);
@@ -75,12 +75,14 @@ bool compile(char *fileName){
     bca.init(3);
     DEFER(bca.uninit());
     DynamicArray<ScopeEntities*> see;
+    Array<BytecodeFile> bfs(Dep::compileStack.count);
+    DEFER(bfs.uninit());
     see.init();
-    initLLVMBackend();
-    for(u32 x=0; x<Dep::compileToBytecodeQueue.count; x+=1){
-	auto nsi = Dep::compileToBytecodeQueue[x];
+    for(u32 x=Dep::compileStack.count; x>0;){
+	x -= 1;
+	auto nsi = Dep::compileStack[x];
 	ScopeEntities *se = nsi.se;
-	BytecodeFile bf;
+	BytecodeFile &bf = bfs[x];
 	bf.init(nsi.id);
 	BytecodeContext &bc = bca.newElem();
 	bc.init(se->varMap.count, se->procMap.count, 0);
@@ -91,15 +93,19 @@ bool compile(char *fileName){
 	mem::free(se);
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
-	BackendCompile(&bf, &config);
-	bf.uninit();
     };
-    char buff[1024];
-    sprintf(buff, "%s.ll", config.out);
-    BackendDump(buff);
-    callExternalDeps(&config);
-    uninitLLVMBackend();
     see.uninit();
     os::endTimer(TimeSlot::MIDEND);
+    os::startTimer(TimeSlot::BACKEND);
+    initLLVMBackend();
+    for(u32 x=Dep::compileStack.count; x>0;){
+	x -= 1;
+	BytecodeFile &bf = bfs[x];
+	BackendCompileStage1(&bf, &config);
+	bf.uninit();
+    };
+    BackendCompileStage2(&config);
+    uninitLLVMBackend();
+    os::endTimer(TimeSlot::BACKEND);
     return true;
 };

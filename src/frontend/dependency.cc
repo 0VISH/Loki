@@ -46,15 +46,15 @@ namespace Dep{
     hashmap *fileNameToID;
     s16 fileID;
 
-    DynamicArray<IDAndName> parseAndCheckQueue;
-    DynamicArray<NodeScope> compileToBytecodeQueue;
+    DynamicArray<IDAndName> parseAndCheckStack;
+    DynamicArray<NodeScope> compileStack;
 
     void init(){
 	fileNameToID = hashmap_create();
 	fileID = 0;
 	files.init(3);
-	parseAndCheckQueue.init();
-	compileToBytecodeQueue.init();
+	parseAndCheckStack.init();
+	compileStack.init();
 	fileIDToSE.init();
     };
     void uninit(){
@@ -63,8 +63,8 @@ namespace Dep{
 	    files[x].uninit();
 	};
 	files.uninit();
-	parseAndCheckQueue.uninit();
-	compileToBytecodeQueue.uninit();
+	parseAndCheckStack.uninit();
+	compileStack.uninit();
 	for(u32 x=0; x<fileIDToSE.count; x+=1){
 	    ScopeEntities *se = fileIDToSE[x];
 	    se->uninit();
@@ -92,11 +92,11 @@ namespace Dep{
     ASTFile &getASTFile(s16 id){
 	return files[id];
     };
-    void pushToParseAndCheckQueue(char *name){
+    void pushToParseAndCheckStack(char *name){
 	s16 fid = getFileID(name);
-	parseAndCheckQueue.push({fid, name});
+	parseAndCheckStack.push({fid, name});
     };
-    void pushToCompileQueue(DynamicArray<ASTBase*> *nodes, ScopeEntities *se, s16 id){
-	compileToBytecodeQueue.push({nodes, se, id});
+    void pushToCompileStack(DynamicArray<ASTBase*> *nodes, ScopeEntities *se, s16 id){
+	compileStack.push({nodes, se, id});
     };
 };

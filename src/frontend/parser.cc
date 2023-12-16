@@ -551,7 +551,7 @@ ASTBase *parseBlock(Lexer &lexer, ASTFile &file, u32 &x) {
 	    lexer.emitErr(tokOffs[x].off, "Invalid file path");
 	    return nullptr;
 	};
-	Dep::pushToParseAndCheckQueue(fullFileName);
+	Dep::pushToParseAndCheckStack(fullFileName);
 	x += 1;
 	ASTImport *Import = (ASTImport*)allocAST(sizeof(ASTImport), ASTType::IMPORT, file);
 	Import->fileName = fullFileName;
