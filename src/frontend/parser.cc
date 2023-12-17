@@ -1286,7 +1286,16 @@ namespace dbg {
 		__dumpNodesWithoutEndPadding(Struct->body[v], lexer, padding + 1);
 	    };
 	}break;
-	default: UNREACHABLE;
+	case ASTType::IMPORT:{
+	    ASTImport *imp = (ASTImport*)node;
+	    printf("import");
+	    PAD;
+	    printf("file_path: %s", imp->fileName);
+	}break;
+	default:{
+	    printf("\nASTType: %d", type);
+	    UNREACHABLE;
+	}break;
 	};
     };
     void dumpNodes(ASTBase *node, Lexer &lexer, u8 padding = 0) {

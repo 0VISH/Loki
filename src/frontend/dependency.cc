@@ -7,6 +7,7 @@ struct ASTBase;
 struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
+    ScopeEntities *scope;
     s16 id;
     u16 pageBrim;
 
@@ -35,11 +36,6 @@ namespace Dep{
 	s16 id;
 	char *name;
     };
-    struct NodeScope{
-	DynamicArray<ASTBase*> *nodes;
-	ScopeEntities *se;
-	s16 id;
-    };
     
     DynamicArray<ASTFile> files;
     DynamicArray<ScopeEntities*> fileIDToSE;
@@ -47,12 +43,13 @@ namespace Dep{
     s16 fileID;
 
     DynamicArray<IDAndName> parseAndCheckStack;
-    DynamicArray<NodeScope> compileStack;
+    DynamicArray<ASTFile*> compileStack;
 
     void init(){
 	fileNameToID = hashmap_create();
 	fileID = 0;
 	files.init(3);
+	files.zero();
 	parseAndCheckStack.init();
 	compileStack.init();
 	fileIDToSE.init();
@@ -83,20 +80,20 @@ namespace Dep{
     s16 getFileID(char *fileName){
 	uintptr_t temp = fileID;
 	if(hashmap_get_set(fileNameToID, fileName, strlen(fileName), &temp) == false){
-	    ASTFile &file = files.newElem();
-	    file.init((s16)temp);
 	    fileID += 1;
 	};
 	return (s16)temp;
     };
-    ASTFile &getASTFile(s16 id){
-	return files[id];
+    ASTFile &createASTFile(s16 id){
+	ASTFile &file = files.newElem();
+	file.init(id);
+	return file;
     };
     void pushToParseAndCheckStack(char *name){
 	s16 fid = getFileID(name);
 	parseAndCheckStack.push({fid, name});
     };
-    void pushToCompileStack(DynamicArray<ASTBase*> *nodes, ScopeEntities *se, s16 id){
-	compileStack.push({nodes, se, id});
+    void pushToCompileStack(ASTFile *file){
+	compileStack.push(file);
     };
 };

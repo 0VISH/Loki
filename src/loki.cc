@@ -62,10 +62,10 @@ bool compile(char *fileName){
     Dep::pushToParseAndCheckStack(fileName);
     while(Dep::parseAndCheckStack.count != 0){
 	Dep::IDAndName idf = Dep::parseAndCheckStack.pop();
-	ASTFile &file = Dep::getASTFile(idf.id);
-	ScopeEntities *se = parseCheckAndLoadEntities(idf.name, file);
-	if(se){
-	    Dep::pushToCompileStack(&file.nodes, se, file.id);
+	ASTFile &file = Dep::createASTFile(idf.id);
+	file.scope  = parseCheckAndLoadEntities(idf.name, file);
+	if(file.scope){
+	    Dep::pushToCompileStack(&file);
 	};
     };
     os::endTimer(TimeSlot::FRONTEND);
@@ -80,14 +80,15 @@ bool compile(char *fileName){
     see.init();
     for(u32 x=Dep::compileStack.count; x>0;){
 	x -= 1;
-	auto nsi = Dep::compileStack[x];
-	ScopeEntities *se = nsi.se;
+	ASTFile *file = Dep::compileStack[x];
+	ScopeEntities *se = file->scope;
+	printf("SE: %d %d %d\n", se->varMap.len, se->procMap.len, se->structMap.len);
 	BytecodeFile &bf = bfs[x];
-	bf.init(nsi.id);
+	bf.init(file->id);
 	BytecodeContext &bc = bca.newElem();
 	bc.init(se->varMap.count, se->procMap.count, 0);
 	see.push(se);
-	compileASTNodesToBytecode(*nsi.nodes, see, bca, bf);
+	compileASTNodesToBytecode(file->nodes, see, bca, bf);
 	see.pop();
 	se->uninit();
 	mem::free(se);
