@@ -2,3 +2,6 @@ bin/
 misc/
 **/.vs/
 **/*.sln
+**/*.bin
+**/*.ll
+**/*.obj
