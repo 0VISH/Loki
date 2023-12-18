@@ -32,3 +32,32 @@ struct ASTFile{
 	mem::free(scope);
     };
 };
+
+namespace Dep{
+    DynamicArray<char*>   parseCheckStack;
+    DynamicArray<s16>     compileStack;
+    DynamicArray<ASTFile> astFiles;
+
+    void init(){
+	parseCheckStack.init();
+	compileStack.init();
+	astFiles.init();
+    };
+    void uninit(){
+	parseCheckStack.uninit();
+	astFiles.uninit();
+	compileStack.uninit();
+    };
+    void pushToParseCheckStack(char *fileName){
+	parseCheckStack.push(fileName);
+    };
+    void pushToCompileStacke(s16 id){
+	compileStack.push(id);
+    };
+    ASTFile &newASTFile(){
+	u32 id = astFiles.count;
+	ASTFile &astFile = astFiles.newElem();
+	astFile.init(id);
+	return astFile;
+    };
+};

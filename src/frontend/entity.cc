@@ -349,6 +349,10 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    };
 	};
     }break;
+    case ASTType::IMPORT:{
+	ASTImport *imp = (ASTImport*)node;
+	Dep::pushToParseCheckStack(imp->fileName);
+    }break;
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
 	switch(For->loopType){
@@ -464,7 +468,6 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
     } break;
-    case ASTType::IMPORT: break;
     case ASTType::RETURN:{
 	//TODO: 
     }break;
