@@ -176,7 +176,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
     write("\n");
 };
 
-EXPORT void BackendCompileStage1(BytecodeFile *bf, Config *config){
+void BackendCompileStage1(BytecodeFile *bf, Config *config){
     BytecodeBucket *curBucket = bf->firstBucket;
     u32 off = 0;
     while(curBucket){
@@ -191,13 +191,13 @@ EXPORT void BackendCompileStage1(BytecodeFile *bf, Config *config){
     };
     return;
 };
-EXPORT void initLLVMBackend(){
+void initLLVMBackend(){
     initBackend();
 };
-EXPORT void uninitLLVMBackend(){
+void uninitLLVMBackend(){
     uninitBackend();
 };
-EXPORT void BackendCompileStage2(Config *config){
+void BackendCompileStage2(Config *config){
     char buff[1024];
 
     sprintf(buff, "%s.ll", config->out);

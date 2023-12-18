@@ -603,13 +603,14 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    compileToBytecode(proc->body[x], see, bca, bf);
 	};
 	see.pop()->uninit();
-	bf.procEnd();
 	mem::free(procSE);
+	bf.procEnd();
 	bca.pop().uninit();
     }break;
     case ASTType::STRUCT_DEFENITION:
     case ASTType::IMPORT: break;
     default:
+	printf("BYTECODE: %d\n", type);
 	UNREACHABLE;
 	break;
     };

@@ -7,6 +7,8 @@ plat = "win"
 backend = None
 if "lin" in argv: plat = "lin"
 if "llvm" in argv: backend = "llvm"
+import platform
+if platform.system() == "Linux": plat = "lin"
 
 Omen.setBuildDir(plat, dbg)
 

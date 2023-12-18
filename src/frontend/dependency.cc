@@ -28,6 +28,8 @@ struct ASTFile{
 	};
 	memPages.uninit();
 	nodes.uninit();
+	scope->uninit();
+	mem::free(scope);
     };
 };
 
@@ -38,12 +40,11 @@ namespace Dep{
     };
     
     DynamicArray<ASTFile> files;
-    DynamicArray<ScopeEntities*> fileIDToSE;
     hashmap *fileNameToID;
     s16 fileID;
 
     DynamicArray<IDAndName> parseAndCheckStack;
-    DynamicArray<ASTFile*> compileStack;
+    DynamicArray<s16> compileStack;
 
     void init(){
 	fileNameToID = hashmap_create();
@@ -52,7 +53,6 @@ namespace Dep{
 	files.zero();
 	parseAndCheckStack.init();
 	compileStack.init();
-	fileIDToSE.init();
     };
     void uninit(){
 	hashmap_free(fileNameToID);
@@ -62,21 +62,8 @@ namespace Dep{
 	files.uninit();
 	parseAndCheckStack.uninit();
 	compileStack.uninit();
-	for(u32 x=0; x<fileIDToSE.count; x+=1){
-	    ScopeEntities *se = fileIDToSE[x];
-	    se->uninit();
-	    mem::free(se);
-	};
-	fileIDToSE.uninit();
     };
 
-    void registerScopedEntities(s16 id, ScopeEntities *se){
-	if(id >= fileIDToSE.len){
-	    fileIDToSE.realloc(id + 5);
-	};
-	fileIDToSE.count = (u32)id;
-	fileIDToSE[(u32)id] = se;
-    };
     s16 getFileID(char *fileName){
 	uintptr_t temp = fileID;
 	if(hashmap_get_set(fileNameToID, fileName, strlen(fileName), &temp) == false){
@@ -84,7 +71,8 @@ namespace Dep{
 	};
 	return (s16)temp;
     };
-    ASTFile &createASTFile(s16 id){
+    ASTFile &createASTFile(){
+	u32 id = files.count;
 	ASTFile &file = files.newElem();
 	file.init(id);
 	return file;
@@ -93,7 +81,7 @@ namespace Dep{
 	s16 fid = getFileID(name);
 	parseAndCheckStack.push({fid, name});
     };
-    void pushToCompileStack(ASTFile *file){
-	compileStack.push(file);
+    void pushToCompileStack(s16 fileID){
+	compileStack.push(fileID);
     };
 };

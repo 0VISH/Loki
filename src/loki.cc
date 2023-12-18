@@ -25,6 +25,7 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     see.init(3);
     DEFER(see.uninit());
     ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
+    astFile.scope = fileScopeEntities;
     see.push(fileScopeEntities);
     if (checkEntities(astFile.nodes, lexer, see) == false) {
 	return nullptr;
@@ -54,18 +55,18 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
 	    SET_BIT(entity.flag, Flags::GLOBAL);
 	};
     };
-    Dep::registerScopedEntities(astFile.id, fileScopeEntities);
     return fileScopeEntities;
 };
 bool compile(char *fileName){
     os::startTimer(TimeSlot::FRONTEND);
     Dep::pushToParseAndCheckStack(fileName);
     while(Dep::parseAndCheckStack.count != 0){
+	//TODO: remove id
 	Dep::IDAndName idf = Dep::parseAndCheckStack.pop();
-	ASTFile &file = Dep::createASTFile(idf.id);
+	ASTFile &file = Dep::createASTFile();
 	file.scope  = parseCheckAndLoadEntities(idf.name, file);
 	if(file.scope){
-	    Dep::pushToCompileStack(&file);
+	    Dep::pushToCompileStack(file.id);
 	};
     };
     os::endTimer(TimeSlot::FRONTEND);
@@ -80,18 +81,16 @@ bool compile(char *fileName){
     see.init();
     for(u32 x=Dep::compileStack.count; x>0;){
 	x -= 1;
-	ASTFile *file = Dep::compileStack[x];
-	ScopeEntities *se = file->scope;
-	printf("SE: %d %d %d\n", se->varMap.len, se->procMap.len, se->structMap.len);
+	s16 fileID = Dep::compileStack[x];
+	ASTFile &file = Dep::files[fileID];
+	ScopeEntities *fileScope = file.scope;
 	BytecodeFile &bf = bfs[x];
-	bf.init(file->id);
+	bf.init(file.id);
 	BytecodeContext &bc = bca.newElem();
-	bc.init(se->varMap.count, se->procMap.count, 0);
-	see.push(se);
-	compileASTNodesToBytecode(file->nodes, see, bca, bf);
+	bc.init(fileScope->varMap.count, fileScope->procMap.count, 0);
+	see.push(fileScope);
+	compileASTNodesToBytecode(file.nodes, see, bca, bf);
 	see.pop();
-	se->uninit();
-	mem::free(se);
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
     };
