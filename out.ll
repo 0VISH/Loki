@@ -3,7 +3,7 @@ define void @__main(){
 %_01 = alloca i64
 br label %__01
 __01:
-%_02 = add i64 0, 4
+%_02 = add i64 0, 400
 %_04 = load i64, i64* %_01
 %_03 = icmp  eq i64 %_04, %_02
 br i1 %_03, label %__02, label %__03

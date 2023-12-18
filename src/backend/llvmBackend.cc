@@ -1,5 +1,5 @@
 #include "backend.cc"
-//#include "../frontend/typeBasic.cc"
+#include "../frontend/typeBasic.cc"
 
 char *typeIDToName[] = {
     "unkown",
@@ -176,7 +176,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
     write("\n");
 };
 
-void BackendCompileStage1(BytecodeFile *bf, Config *config){
+EXPORT void backendCompileStage1(BytecodeFile *bf, Config *config){
     BytecodeBucket *curBucket = bf->firstBucket;
     u32 off = 0;
     while(curBucket){
@@ -191,13 +191,13 @@ void BackendCompileStage1(BytecodeFile *bf, Config *config){
     };
     return;
 };
-void initLLVMBackend(){
+EXPORT void initLLVMBackend(){
     initBackend();
 };
-void uninitLLVMBackend(){
+EXPORT void uninitLLVMBackend(){
     uninitBackend();
 };
-void BackendCompileStage2(Config *config){
+EXPORT void backendCompileStage2(Config *config){
     char buff[1024];
 
     sprintf(buff, "%s.ll", config->out);

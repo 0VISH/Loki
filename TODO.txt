@@ -2,3 +2,6 @@
 :: tracy
 :: Add struct
 :: Dependency system and include files
+
+BUG
+:: #import works fine, but checkentities induces chaos. Works fine on linux, but on windows it just crashes at random time at random places.

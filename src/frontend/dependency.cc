@@ -51,7 +51,7 @@ namespace Dep{
     void pushToParseCheckStack(char *fileName){
 	parseCheckStack.push(fileName);
     };
-    void pushToCompileStacke(s16 id){
+    void pushToCompileStack(s16 id){
 	compileStack.push(id);
     };
     ASTFile &newASTFile(){

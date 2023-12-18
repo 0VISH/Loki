@@ -57,76 +57,17 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     };
     return fileScopeEntities;
 };
-ScopeEntities *parseCheckAndLoadEntities2(char *fileName, ASTFile &astFile){
-    Lexer lexer;
-    lexer.init(fileName);
-    DEFER(lexer.uninit());
-    if(lexer.genTokens() == false) {
-	return nullptr;
-    };
-    u32 off = 0;
-    eatNewlines(lexer.tokenTypes, off);
-    if(lexer.tokenTypes[off] == Token_Type::END_OF_FILE) {
-	return nullptr;
-    };
-    while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
-	ASTBase *base = parseBlock(lexer, astFile, off);
-	if(base == nullptr){break;};
-	astFile.nodes.push(base);
-	eatNewlines(lexer.tokenTypes, off);
-    };
-    if(report::errorOff != 0){
-	report::flushReports();
-	return nullptr;
-    };
-    dbg::dumpASTFile(astFile, lexer);
-    DynamicArray<ScopeEntities*> see;
-    see.init(3);
-    DEFER(see.uninit());
-    ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
-    astFile.scope = fileScopeEntities;
-    see.push(fileScopeEntities);
-    //ERROR
-    if (checkEntities(astFile.nodes, lexer, see) == false) {
-    //ERROR
-	return nullptr;
-    } else {
-	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
-	    VariableEntity &entity = fileScopeEntities->varEntities[x];
-	    if (!IS_BIT(entity.flag, Flags::CONSTANT)) {
-		u32 nodeOff = 0;
-		for (u32 varCount = 0; nodeOff < astFile.nodes.count; nodeOff += 1) {
-		    if (varCount == x+1) { break; };
-		    ASTBase *base = astFile.nodes[nodeOff];
-		    if (base->type >= ASTType::UNI_INITIALIZATION_T_UNKNOWN && base->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN) {
-			varCount += 1;
-		    };
-		};
-		ASTBase *node = astFile.nodes[nodeOff-1];
-		u32 off;
-		if(node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN){
-		    ASTMultiVar *multiAss = (ASTMultiVar*)node;
-		    off = multiAss->tokenOff;
-		}else{
-		    ASTUniVar *uniAss = (ASTUniVar*)node;
-		    off = uniAss->tokenOff;
-		};
-		lexer.emitErr(lexer.tokenOffsets[off].off, "Variable at global scope is not comptime");
-	    };
-	    SET_BIT(entity.flag, Flags::GLOBAL);
-	};
-    };
-    return fileScopeEntities;
-};
 bool compile(char *fileName){
     os::startTimer(TimeSlot::FRONTEND);
     Dep::pushToParseCheckStack(fileName);
-    ASTFile &file = Dep::newASTFile();
-    file.scope  = parseCheckAndLoadEntities(fileName, file);
-    ASTFile &file2 = Dep::newASTFile();
-    //ERROR
-    file2.scope = parseCheckAndLoadEntities2("bin/b.loki", file2);
-    //ERROR
+    while(Dep::parseCheckStack.count != 0){
+	char *filePath = Dep::parseCheckStack.pop();
+	ASTFile &file = Dep::newASTFile();
+	file.scope = parseCheckAndLoadEntities(filePath, file);
+	if(file.scope != nullptr){
+	    Dep::pushToCompileStack(file.id);
+	};
+    };
     os::endTimer(TimeSlot::FRONTEND);
     if(report::errorOff != 0){return false;};
     os::startTimer(TimeSlot::MIDEND);
@@ -136,23 +77,37 @@ bool compile(char *fileName){
     DynamicArray<ScopeEntities*> see;
     see.init();
     DEFER(see.uninit());
-    ScopeEntities *fileScope = file.scope;
-    BytecodeFile bf;
-    bf.init(0);
-    BytecodeContext &bc = bca.newElem();
-    bc.init(fileScope->varMap.count, fileScope->procMap.count, 0);
-    see.push(fileScope);
-    compileASTNodesToBytecode(file.nodes, see, bca, bf);
-    see.pop();
-    bca.pop().uninit();
-    dbg::dumpBytecodeFile(bf);
+    Array<BytecodeFile> bfs(Dep::compileStack.count);
+    DEFER(bfs.uninit());
+    for(u32 x=Dep::compileStack.count; x>0;){
+	x -= 1;
+	s16 fileID = Dep::compileStack[x];
+	ASTFile &file = Dep::astFiles[fileID];
+	ScopeEntities *fileScope = file.scope;
+	BytecodeFile &bf = bfs[x];
+	bf.init(0);
+	BytecodeContext &bc = bca.newElem();
+	bc.init(fileScope->varMap.count, fileScope->procMap.count, 0);
+	see.push(fileScope);
+	compileASTNodesToBytecode(file.nodes, see, bca, bf);
+	see.pop();
+	bca.pop().uninit();
+	dbg::dumpBytecodeFile(bf);
+	file.uninit();
+    };
     os::endTimer(TimeSlot::MIDEND);
     os::startTimer(TimeSlot::BACKEND);
-    initLLVMBackend();
-    BackendCompileStage1(&bf, &config);
-    bf.uninit();
-    BackendCompileStage2(&config);
-    uninitLLVMBackend();
+    BackendRef &backRef = loadRef(BackendType::LLVM);
+    backRef.initBackend();
+    for(u32 x=Dep::compileStack.count; x>0;){
+	x -= 1;
+	BytecodeFile &bf = bfs[x];
+	backRef.backendCompileStage1(&bf, &config);
+	bf.uninit();
+    };
+    backRef.backendCompileStage2(&config);
+    backRef.uninitBackend();
+    unloadRef(backRef);
     os::endTimer(TimeSlot::BACKEND);
     return true;
 };
