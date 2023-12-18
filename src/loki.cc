@@ -59,16 +59,10 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
 };
 bool compile(char *fileName){
     os::startTimer(TimeSlot::FRONTEND);
-    Dep::pushToParseAndCheckStack(fileName);
-    while(Dep::parseAndCheckStack.count != 0){
-	//TODO: remove id
-	Dep::IDAndName idf = Dep::parseAndCheckStack.pop();
-	ASTFile &file = Dep::createASTFile();
-	file.scope  = parseCheckAndLoadEntities(idf.name, file);
-	if(file.scope){
-	    Dep::pushToCompileStack(file.id);
-	};
-    };
+    ASTFile file;
+    file.init(0);
+    DEFER(file.uninit());
+    file.scope  = parseCheckAndLoadEntities(fileName, file);
     os::endTimer(TimeSlot::FRONTEND);
     if(report::errorOff != 0){return false;};
     os::startTimer(TimeSlot::MIDEND);
@@ -76,34 +70,23 @@ bool compile(char *fileName){
     bca.init(3);
     DEFER(bca.uninit());
     DynamicArray<ScopeEntities*> see;
-    Array<BytecodeFile> bfs(Dep::compileStack.count);
-    DEFER(bfs.uninit());
     see.init();
-    for(u32 x=Dep::compileStack.count; x>0;){
-	x -= 1;
-	s16 fileID = Dep::compileStack[x];
-	ASTFile &file = Dep::files[fileID];
-	ScopeEntities *fileScope = file.scope;
-	BytecodeFile &bf = bfs[x];
-	bf.init(file.id);
-	BytecodeContext &bc = bca.newElem();
-	bc.init(fileScope->varMap.count, fileScope->procMap.count, 0);
-	see.push(fileScope);
-	compileASTNodesToBytecode(file.nodes, see, bca, bf);
-	see.pop();
-	bca.pop().uninit();
-	dbg::dumpBytecodeFile(bf);
-    };
-    see.uninit();
+    DEFER(see.uninit());
+    ScopeEntities *fileScope = file.scope;
+    BytecodeFile bf;
+    bf.init(0);
+    BytecodeContext &bc = bca.newElem();
+    bc.init(fileScope->varMap.count, fileScope->procMap.count, 0);
+    see.push(fileScope);
+    compileASTNodesToBytecode(file.nodes, see, bca, bf);
+    see.pop();
+    bca.pop().uninit();
+    dbg::dumpBytecodeFile(bf);
     os::endTimer(TimeSlot::MIDEND);
     os::startTimer(TimeSlot::BACKEND);
     initLLVMBackend();
-    for(u32 x=Dep::compileStack.count; x>0;){
-	x -= 1;
-	BytecodeFile &bf = bfs[x];
-	BackendCompileStage1(&bf, &config);
-	bf.uninit();
-    };
+    BackendCompileStage1(&bf, &config);
+    bf.uninit();
     BackendCompileStage2(&config);
     uninitLLVMBackend();
     os::endTimer(TimeSlot::BACKEND);

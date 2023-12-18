@@ -110,7 +110,7 @@ struct DynamicArray {
 	return mem[count];
     };
     T& newElem(){
-	if (count == len) { realloc(len + len / 2 + 1); };
+	if (count == len) { realloc(len + (len/2) + 1); };
 	count += 1;
 	return mem[count-1];
     };

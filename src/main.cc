@@ -120,9 +120,7 @@ s32 main(s32 argc, char **argv) {
     Word::init(Word::keywords, Word::keywordsData, Word::keywordCount);
     Word::init(Word::poundwords, Word::poundwordsData, Word::poundwordCount);
     GlobalStrings::init();
-    Dep::init();
     compile(config.file);
-    Dep::uninit();
     GlobalStrings::uninit();
     Word::uninit(Word::poundwords);
     Word::uninit(Word::keywords);
@@ -134,9 +132,11 @@ s32 main(s32 argc, char **argv) {
     printf("\nCALLS NOT FREED: %d\n", mem::calls);
 #endif
 
+    printf("\nDONE :)\n");
     return EXIT_SUCCESS;
     
     SEH_EXCEPTION_BLOCK_END;
+    printf("LKSDJFKLSDJF");
 };
 
 
