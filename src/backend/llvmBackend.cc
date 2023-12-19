@@ -104,7 +104,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
 	write("define %s @__", typeIDToName[(u16)outputType]);
 	if((u16)bc == 0){
 	    write("main(");
-	}else{;
+	}else{
 	    write("%d%d(", id, bc);
 	};
 	s64 inCount = getConstIntAndUpdate(bytecodes, off);
@@ -129,6 +129,18 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
     case Bytecode::LABEL:{
 	Bytecode bc = getBytecode(bytecodes, off);
 	write("br label %%__%d%d\n__%d%d:", id, bc, id, bc);
+    }break;
+    case Bytecode::GLOBAL:{
+	Bytecode reg = getBytecode(bytecodes, off);
+	Bytecode type = getBytecode(bytecodes, off);
+	write("@_%d = global %s ", reg, typeIDToName[(u16)type]);
+	if(isFloat((Type)type)){
+	    f64 num = getConstDecAndUpdate(bytecodes, off);
+	    write("%f", num);
+	}else{
+	    s64 num = getConstIntAndUpdate(bytecodes, off);
+	    write("%lld", num);
+	};
     }break;
     case Bytecode::CMP:{
 	char *cmp = "icmp";

@@ -175,6 +175,20 @@ void BytecodeFile::ret(Reg reg, bool isVoid){
     emit((Bytecode)isVoid);
     emit(reg);
 };
+void BytecodeFile::gbl(Reg reg, Type type, s64 num){
+    reserve(1 + 1 + const_in_stream);
+    emit(Bytecode::GLOBAL);
+    emit(reg);
+    emit(type);
+    emitConstInt(num);
+};
+void BytecodeFile::gbl(Reg reg, Type type, f64 num){
+    reserve(1 + 1 + const_in_stream);
+    emit(Bytecode::GLOBAL);
+    emit(reg);
+    emit(type);
+    emitConstDec(num);
+};
 
 static u16 procID  = 0;
 static u16 labelID = 1;
@@ -391,7 +405,12 @@ ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
 	Flag flag = entity.flag;
-	if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
+	if(IS_BIT(flag, Flags::GLOBAL)){
+	    Reg reg = bc.newReg(entity.type) * -1;
+	    //TODO: 
+	    bf.gbl(reg, entity.type, (s64)0);
+	    bc.varToReg[id] = reg;
+	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    Reg rhsReg = bc.newReg(entity.type);
 	    bf.alloc(entity.type, rhsReg);
@@ -409,7 +428,14 @@ ASTUniVar *var = (ASTUniVar*)node;
 	const VariableEntity &firstEntity = se->varEntities[firstID];
 	Flag flag = firstEntity.flag;
 	Type type = firstEntity.type;
-	if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
+	if(IS_BIT(flag, Flags::GLOBAL)){
+	    for(u32 x=0; x<names.count; x+=1){
+		Reg reg = bc.newReg(type) * -1;
+		//TODO: 
+		bf.gbl(reg, type, (s64)0);
+		bc.varToReg[x] = reg;
+	    };
+	} else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: MULTI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    for(u32 x=0; x<names.count; x+=1){
 		Reg rhsReg = bc.newReg(type);
@@ -635,9 +661,13 @@ namespace dbg{
     char *spaces = "    ";
     
     void dumpReg(Bytecode id){
-	printf(" %%%d ", id);
+	if((s32)id < 0){
+	    printf(" $%d ", id);
+	}else{
+	    printf(" %%%d ", id);
+	};
     };
-    void dumpType(Type type){
+    Type dumpType(Type type){
 	printf(" ");
 	switch(type){
 	case Type::XE_VOID: printf("void");break;
@@ -655,8 +685,9 @@ namespace dbg{
 	case Type::COMP_DECIMAL: printf("comp_dec");break;
 	default:
 	    UNREACHABLE;
-	    return;
+	    return Type::UNKOWN;
 	};
+	return type;
     };
     s64 getConstIntAndUpdate(Bytecode *page, u32 &x){
 	s64 *mem = (s64*)(page + x);
@@ -814,7 +845,7 @@ namespace dbg{
 	}break;
 	case Bytecode::ALLOC:{
 	    printf("alloc");
-	    DUMP_TYPE
+	    DUMP_TYPE;
 	    DUMP_REG;
 	}break;
 	case Bytecode::STORE:{
@@ -828,6 +859,18 @@ namespace dbg{
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
+	}break;
+	case Bytecode::GLOBAL:{
+	    printf("global");
+	    DUMP_REG;
+	    Type type = DUMP_TYPE;
+	    if(isFloat(type)){
+		f64 num = getConstDecAndUpdate(buc->bytecodes, x);
+		printf(" %f", num);
+	    }else{
+		s64 num = getConstIntAndUpdate(buc->bytecodes, x);
+		printf(" %lld", num);
+	    };
 	}break;
 	default:
 	    UNREACHABLE;

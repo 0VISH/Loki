@@ -34,6 +34,7 @@ enum class Bytecode : u16{
     LABEL,
     PROC_END,
     ALLOC,
+    GLOBAL,
     NEXT_BUCKET,
     COUNT,
 };
@@ -86,4 +87,6 @@ struct BytecodeFile{
     void set(Bytecode op, Reg outputReg, Reg inputReg);
     void neg(Type type, Reg newReg, Reg reg);
     void ret(Reg reg, bool isVoid=false);
+    void gbl(Reg reg, Type type, s64 num);
+    void gbl(Reg reg, Type type, f64 num);
 };
