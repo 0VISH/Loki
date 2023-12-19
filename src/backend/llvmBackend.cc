@@ -23,7 +23,7 @@ char *typeIDToName[] = {
 void writeReg(Bytecode bc, s16 id){
     Reg reg = (Reg)bc;
     if(reg < 0){
-	write("@_%d", reg*-1);
+	write("@_%d%d", id, reg*-1);
 	return;
     };
     write("%%_%d%d", id, reg);
@@ -133,7 +133,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
     case Bytecode::GLOBAL:{
 	Bytecode reg = getBytecode(bytecodes, off);
 	Bytecode type = getBytecode(bytecodes, off);
-	write("@_%d = global %s ", reg, typeIDToName[(u16)type]);
+	write("@_%d%d = global %s ", id, ((Reg)reg)*-1, typeIDToName[(u16)type]);
 	if(isFloat((Type)type)){
 	    f64 num = getConstDecAndUpdate(bytecodes, off);
 	    write("%f", num);
@@ -182,14 +182,20 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
 	writeReg(reg, id);
 	write(" = alloca %s", typeIDToName[(u16)type]);
     }break;
+    case Bytecode::_TEXT_STARTUP_START:{
+	write("define internal void @_GLOBAL__sub_I_%d() section \".text.startup\" {", id);
+    }break;
+    case Bytecode::_TEXT_STARTUP_END:{
+	write("ret void\n}");
+    }break;
     default:
 	UNREACHABLE;
     };
     write("\n");
 };
 
-EXPORT void backendCompileStage1(BytecodeFile *bf, Config *config){
-    BytecodeBucket *curBucket = bf->firstBucket;
+EXPORT void backendCompileStage1(BytecodeBucket *buc, s16 id, Config *config){
+    BytecodeBucket *curBucket = buc;
     u32 off = 0;
     while(curBucket){
 	switch(curBucket->bytecodes[off]){
@@ -199,7 +205,7 @@ EXPORT void backendCompileStage1(BytecodeFile *bf, Config *config){
 	    off = 0;
 	    continue;
 	};
-	translate(curBucket, off, bf->id);
+	translate(curBucket, off, id);
     };
     return;
 };

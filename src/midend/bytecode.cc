@@ -1,195 +1,208 @@
 #include "bytecode.hh"
 
-void BytecodeFile::init(s16 fileID){
-    labels.init();
-    cursor = 0;
-    id = fileID;
-    firstBucket = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
-    firstBucket->next = nullptr;
-    firstBucket->prev = nullptr;
-    firstBucket->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
-    curBucket = firstBucket;
-};
-void BytecodeFile::uninit(){
-    BytecodeBucket *buc = firstBucket;
-    while(buc){
-	BytecodeBucket *temp = buc;
-	buc = buc->next;
-	mem::free(temp);
-    };
-    labels.uninit();
-};
-void BytecodeFile::newBucketAndUpdateCurBucket(){
-    ASSERT(curBucket);
-
-    cursor = 0;
+BytecodeBucket *newBucket(BytecodeBucket *curBucket){
     BytecodeBucket *nb = (BytecodeBucket*)mem::alloc(sizeof(BytecodeBucket));
     nb->next = nullptr;
     nb->prev = curBucket;
     nb->bytecodes[bytecodes_in_bucket] = Bytecode::NEXT_BUCKET;
-    curBucket->next = nb;
-    curBucket = nb;
-};
-void BytecodeFile::reserve(u16 reserve){
-    if(cursor + reserve >= bytecodes_in_bucket){
-	emit(Bytecode::NEXT_BUCKET);
-	newBucketAndUpdateCurBucket();
-    };
-};
-void BytecodeFile::emit(Bytecode bc){
-    curBucket->bytecodes[cursor] = bc;
-    cursor += 1;
-};
-void BytecodeFile::emit(Type type){
-    curBucket->bytecodes[cursor] = (Bytecode)type;
-    cursor += 1;
-};
-void BytecodeFile::emit(Reg reg){
-    curBucket->bytecodes[cursor] = (Bytecode)reg;
-    cursor += 1;
-};
-Bytecode *BytecodeFile::getCurBytecodeAdd(){
-    return curBucket->bytecodes + cursor;
-};
-//encoding constant into bytecode page for cache
-void BytecodeFile::emitConstInt(s64 num){
-    Bytecode *mem = getCurBytecodeAdd();
-    u64 *memNum = (u64*)(mem);
-    *memNum = num;
-    cursor += const_in_stream;
-};
-void BytecodeFile::emitConstDec(f64 num){
-    Bytecode *mem = getCurBytecodeAdd();
-    f64 *memNum = (f64*)(mem);
-    *memNum = num;
-    cursor += const_in_stream;
-};
-void BytecodeFile::alloc(Type type, Reg reg){
-    reserve(1 + 1 + 1);
-    emit(Bytecode::ALLOC);
-    emit(type);
-    emit(reg);
-};
-void BytecodeFile::store(Type type, Reg dest, Reg src){
-    reserve(1 + 1 + 1 + 1);
-    emit(Bytecode::STORE);
-    emit(type);
-    emit(dest);
-    emit(src);
-};
-void BytecodeFile::load(Type type, Reg dest, Reg src){
-    reserve(1 + 1 + 1 + 1);
-    emit(Bytecode::LOAD);
-    emit(type);
-    emit(dest);
-    emit(src);
-};
-void BytecodeFile::label(u16 label){
-    reserve(1 + 1);
-    emit(Bytecode::LABEL);
-    emit(label);
-    if(label >= labels.len){
-	labels.realloc(label + 5);
-    };
-    Bytecode *mem = getCurBytecodeAdd();
-    labels[label] = mem;
-};
-void BytecodeFile::procEnd(){
-    reserve(1);
-    emit(Bytecode::PROC_END);
-};
-void BytecodeFile::jmp(u16 label){
-    reserve(1 + 1);
-    emit(Bytecode::JMP);
-    emit(label);
-};
-void BytecodeFile::jmp(Bytecode op, Reg checkReg, u16 labelT, u16 labelF){
-    reserve(1 + 1 + 1 + 1);
-    emit(op);
-    emit(checkReg);
-    emit(labelT);
-    emit(labelF);
-};
-void BytecodeFile::cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs){
-    reserve(1 + 1 + 1 + 1 + 1 + 1);
-    emit(Bytecode::CMP);
-    emit(op);
-    emit(type);
-    emit(des);
-    emit(lhs);
-    emit(rhs);
-};
-void BytecodeFile::mov(Type type, Reg dest, Reg src){
-    reserve(1 + 1 + 1 + 1);
-    emit(Bytecode::MOV);
-    emit(type);
-    emit(dest);
-    emit(src);
-};
-void BytecodeFile::movConst(Reg reg, s64 num){
-    reserve(1 + 1 + 1 + const_in_stream);
-    emit(Bytecode::MOV_CONST);
-    emit(Type::COMP_INTEGER);
-    emit(reg);
-    emitConstInt(num);
-};
-void BytecodeFile::movConst(Reg outputReg, f64 num){
-    reserve(1 + 1 + 1 + const_in_stream);
-    emit(Bytecode::MOV_CONST);
-    emit(Type::COMP_DECIMAL);
-    emit(outputReg);
-    emitConstDec(num);
-};
-void BytecodeFile::binOp(Bytecode op, Type type, Reg outputReg, Reg lhsReg, Reg rhsReg){
-    reserve(1 + 1 + 1 + 1 + 1);
-    emit(op);
-    emit(type);
-    emit(outputReg);
-    emit(lhsReg);
-    emit(rhsReg);
-};
-void BytecodeFile::cast(Type finalType, Reg finalReg, Type type, Reg reg){
-    reserve(1 + 1 + 1 + 1 + 1);
-    emit(Bytecode::CAST);
-    emit(finalType);
-    emit(finalReg);
-    emit(type);
-    emit(reg);
-};
-void BytecodeFile::set(Bytecode op, Reg outputReg, Reg inputReg){
-    reserve(1 + 1 + 1);
-    emit(op);
-    emit(outputReg);
-    emit(inputReg);
-};
-void BytecodeFile::neg(Type type, Reg newReg, Reg reg){
-    reserve(1 + 1 + 1 + 1);
-    emit(Bytecode::NEG);
-    emit(type);
-    emit(newReg);
-    emit(reg);
-};
-void BytecodeFile::ret(Reg reg, bool isVoid){
-    reserve(1 + 1 + 1);
-    emit(Bytecode::RET);
-    emit((Bytecode)isVoid);
-    emit(reg);
-};
-void BytecodeFile::gbl(Reg reg, Type type, s64 num){
-    reserve(1 + 1 + const_in_stream);
-    emit(Bytecode::GLOBAL);
-    emit(reg);
-    emit(type);
-    emitConstInt(num);
-};
-void BytecodeFile::gbl(Reg reg, Type type, f64 num){
-    reserve(1 + 1 + const_in_stream);
-    emit(Bytecode::GLOBAL);
-    emit(reg);
-    emit(type);
-    emitConstDec(num);
+    return nb;
 };
 
+struct BytecodeFile{
+    DynamicArray<Bytecode*>   labels;
+    DynamicArray<ASTBase*>    startupNodes;
+    BytecodeBucket           *firstBucket;
+    BytecodeBucket           *curBucket;
+    u16                       cursor;
+    u8                        id;
+
+    void init(s16 fileID){
+	labels.init();
+	startupNodes.init();
+	cursor = 0;
+	id = fileID;
+	firstBucket = newBucket(nullptr);
+	curBucket = firstBucket;
+    };
+    void uninit(){
+	BytecodeBucket *buc = firstBucket;
+	while(buc){
+	    BytecodeBucket *temp = buc;
+	    buc = buc->next;
+	    mem::free(temp);
+	};
+	startupNodes.uninit();
+	labels.uninit();
+    };
+    void newBucketAndUpdateCurBucket(){
+	ASSERT(curBucket);
+
+	cursor = 0;
+	BytecodeBucket *nb = newBucket(curBucket);
+	curBucket->next = nb;
+	curBucket = nb;
+    };
+    void reserve(u16 reserve){
+	if(cursor + reserve >= bytecodes_in_bucket){
+	    emit(Bytecode::NEXT_BUCKET);
+	    newBucketAndUpdateCurBucket();
+	};
+    };
+    void emit(Bytecode bc){
+	curBucket->bytecodes[cursor] = bc;
+	cursor += 1;
+    };
+    void emit(Type type){
+	curBucket->bytecodes[cursor] = (Bytecode)type;
+	cursor += 1;
+    };
+    void emit(Reg reg){
+	curBucket->bytecodes[cursor] = (Bytecode)reg;
+	cursor += 1;
+    };
+    Bytecode *getCurBytecodeAdd(){
+	return curBucket->bytecodes + cursor;
+    };
+    //encoding constant into bytecode page for cache
+    void emitConstInt(s64 num){
+	Bytecode *mem = getCurBytecodeAdd();
+	u64 *memNum = (u64*)(mem);
+	*memNum = num;
+	cursor += const_in_stream;
+    };
+    void emitConstDec(f64 num){
+	Bytecode *mem = getCurBytecodeAdd();
+	f64 *memNum = (f64*)(mem);
+	*memNum = num;
+	cursor += const_in_stream;
+    };
+    void alloc(Type type, Reg reg){
+	reserve(1 + 1 + 1);
+	emit(Bytecode::ALLOC);
+	emit(type);
+	emit(reg);
+    };
+    void store(Type type, Reg dest, Reg src){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::STORE);
+	emit(type);
+	emit(dest);
+	emit(src);
+    };
+    void load(Type type, Reg dest, Reg src){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::LOAD);
+	emit(type);
+	emit(dest);
+	emit(src);
+    };
+    void label(u16 label){
+	reserve(1 + 1);
+	emit(Bytecode::LABEL);
+	emit(label);
+	if(label >= labels.len){
+	    labels.realloc(label + 5);
+	};
+	Bytecode *mem = getCurBytecodeAdd();
+	labels[label] = mem;
+    };
+    void procEnd(){
+	reserve(1);
+	emit(Bytecode::PROC_END);
+    };
+    void jmp(u16 label){
+	reserve(1 + 1);
+	emit(Bytecode::JMP);
+	emit(label);
+    };
+    void jmp(Bytecode op, Reg checkReg, u16 labelT, u16 labelF){
+	reserve(1 + 1 + 1 + 1);
+	emit(op);
+	emit(checkReg);
+	emit(labelT);
+	emit(labelF);
+    };
+    void cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs){
+	reserve(1 + 1 + 1 + 1 + 1 + 1);
+	emit(Bytecode::CMP);
+	emit(op);
+	emit(type);
+	emit(des);
+	emit(lhs);
+	emit(rhs);
+    };
+    void mov(Type type, Reg dest, Reg src){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::MOV);
+	emit(type);
+	emit(dest);
+	emit(src);
+    };
+    void movConst(Reg reg, s64 num){
+	reserve(1 + 1 + 1 + const_in_stream);
+	emit(Bytecode::MOV_CONST);
+	emit(Type::COMP_INTEGER);
+	emit(reg);
+	emitConstInt(num);
+    };
+    void movConst(Reg outputReg, f64 num){
+	reserve(1 + 1 + 1 + const_in_stream);
+	emit(Bytecode::MOV_CONST);
+	emit(Type::COMP_DECIMAL);
+	emit(outputReg);
+	emitConstDec(num);
+    };
+    void binOp(Bytecode op, Type type, Reg outputReg, Reg lhsReg, Reg rhsReg){
+	reserve(1 + 1 + 1 + 1 + 1);
+	emit(op);
+	emit(type);
+	emit(outputReg);
+	emit(lhsReg);
+	emit(rhsReg);
+    };
+    void cast(Type finalType, Reg finalReg, Type type, Reg reg){
+	reserve(1 + 1 + 1 + 1 + 1);
+	emit(Bytecode::CAST);
+	emit(finalType);
+	emit(finalReg);
+	emit(type);
+	emit(reg);
+    };
+    void set(Bytecode op, Reg outputReg, Reg inputReg){
+	reserve(1 + 1 + 1);
+	emit(op);
+	emit(outputReg);
+	emit(inputReg);
+    };
+    void neg(Type type, Reg newReg, Reg reg){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::NEG);
+	emit(type);
+	emit(newReg);
+	emit(reg);
+    };
+    void ret(Reg reg, bool isVoid){
+	reserve(1 + 1 + 1);
+	emit(Bytecode::RET);
+	emit((Bytecode)isVoid);
+	emit(reg);
+    };
+    void gbl(Reg reg, Type type, s64 num){
+	reserve(1 + 1 + const_in_stream);
+	emit(Bytecode::GLOBAL);
+	emit(reg);
+	emit(type);
+	emitConstInt(num);
+    };
+    void gbl(Reg reg, Type type, f64 num){
+	reserve(1 + 1 + const_in_stream);
+	emit(Bytecode::GLOBAL);
+	emit(reg);
+	emit(type);
+	emitConstDec(num);
+    };
+
+};
 static u16 procID  = 0;
 static u16 labelID = 1;
 
@@ -200,10 +213,10 @@ u16 newLabel(){
 };
 
 struct BytecodeContext{
-    Map procToID;
+    Map   procToID;
     u32  *varToReg;
     Type *varTypes;
-    u32 registerID;
+    Reg   registerID;
 
     void init(u32 varCount, u32 procCount, Reg rgsID){
 	varToReg = nullptr;
@@ -283,7 +296,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	const Type type = Type::COMP_DECIMAL;
 	outputReg = bc.newReg(type);
 	ASTNumDec *numDec = (ASTNumDec*)node;
-	f64 num = numDec->dec;
+	f64 num = numDec->num;
 	bf.movConst(outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
@@ -352,7 +365,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     };
     return out;
 };
-void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     BytecodeContext &bc = bca[bca.count-1];
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
@@ -404,11 +417,25 @@ void compileToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dynamic
 ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
-	Flag flag = entity.flag;
+	Flag flag = var->flag;
 	if(IS_BIT(flag, Flags::GLOBAL)){
 	    Reg reg = bc.newReg(entity.type) * -1;
-	    //TODO: 
-	    bf.gbl(reg, entity.type, (s64)0);
+	    if(IS_BIT(flag, Flags::UNINITIALIZED)){
+		bf.gbl(reg, entity.type, (s64)0);
+	    }else if(var->rhs->type == ASTType::NUM_INTEGER){
+		ASTNumInt *numInt = (ASTNumInt*)var->rhs;
+		bf.gbl(reg, entity.type, numInt->num);
+	    }else if(var->rhs->type == ASTType::NUM_DECIMAL){
+		ASTNumDec *numDec = (ASTNumDec*)var->rhs;
+		bf.gbl(reg, entity.type, numDec->num);
+	    }else{
+		bf.gbl(reg, entity.type, (s64)0);
+		ASTGblVarInit *gvi = (ASTGblVarInit*)allocAST(sizeof(ASTGblVarInit), ASTType::GLOBAL_VAR_INIT, file);
+		gvi->reg = reg;
+		gvi->rhs = var->rhs;
+		gvi->type = entity.type;
+		bf.startupNodes.push(gvi);
+	    };
 	    bc.varToReg[id] = reg;
 	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
@@ -419,6 +446,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
 	    bc.varToReg[id] = rhs.reg;
 	};
+    }break;
+    case ASTType::GLOBAL_VAR_INIT:{
+	ASTGblVarInit *gvi = (ASTGblVarInit*)node;
+	auto rhs = compileExprToBytecode(gvi->rhs, see, bca, bf);
+	bf.store(gvi->type, gvi->reg, rhs.reg);
     }break;
     case ASTType::MULTI_INITIALIZATION_T_KNOWN:
     case ASTType::MULTI_INITIALIZATION_T_UNKNOWN:{
@@ -466,7 +498,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    u16 loopStartLbl = newLabel();
 	    bf.label(loopStartLbl);
 	    for(u32 x=0; x<For->body.count; x+=1){
-		compileToBytecode(For->body[x], see, bca, bf);
+		compileToBytecode(For->body[x], file, see, bca, bf);
 	    };
 	    bf.jmp(loopStartLbl);
 	}break;
@@ -479,7 +511,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.jmp(Bytecode::JMPS, expr.reg, loopBodyLbl, loopEndLbl);
 	    bf.label(loopBodyLbl);
 	    for(u32 x=0; x<For->body.count; x+=1){
-		compileToBytecode(For->body[x], see, bca, bf);
+		compileToBytecode(For->body[x], file, see, bca, bf);
 	    };
 	    bf.label(loopEndLbl);
 	}break;
@@ -497,7 +529,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 		incrementReg = blockBC.newReg(ent.type);
 		bf.movConst(incrementReg, (s64)1);
 	    };
-	    compileToBytecode(For->body[0], see, bca, bf);
+	    compileToBytecode(For->body[0], file, see, bca, bf);
 	    Reg varRegPtr = blockBC.registerID-1;    //FIXME: 
 	    bf.label(loopStartLbl);
 	    
@@ -516,7 +548,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 
 	    bf.label(loopBodyLbl);
 	    for(u32 x=1; x<For->body.count; x+=1){
-		compileToBytecode(For->body[x], see, bca, bf);
+		compileToBytecode(For->body[x], file, see, bca, bf);
 	    };
 
 	    if(For->increment != nullptr){
@@ -553,7 +585,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	};
 	bf.jmp(Bytecode::JMPS, exprID, inIfLbl, inElseLbl);
 	for(u32 x=0; x<If->body.count; x+=1){
-	    compileToBytecode(If->body[x], see, bca, bf);
+	    compileToBytecode(If->body[x], file, see, bca, bf);
 	};
 	see.pop();
 	IfSe->uninit();
@@ -567,7 +599,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    BytecodeContext &elseBC = bca.newElem();
 	    elseBC.init(ElseSe->varMap.count, ElseSe->procMap.count, bc.registerID);
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
-		compileToBytecode(If->elseBody[x], see, bca, bf);
+		compileToBytecode(If->elseBody[x], file, see, bca, bf);
 	    };
 	    see.pop();
 	    ElseSe->uninit();
@@ -626,7 +658,7 @@ ASTUniVar *var = (ASTUniVar*)node;
 	//RESERVE ENDS HERE
 	see.push(procSE);
 	for(u32 x=inCount; x<proc->body.count; x+=1){
-	    compileToBytecode(proc->body[x], see, bca, bf);
+	    compileToBytecode(proc->body[x], file, see, bca, bf);
 	};
 	see.pop()->uninit();
 	mem::free(procSE);
@@ -641,10 +673,18 @@ ASTUniVar *var = (ASTUniVar*)node;
 	break;
     };
 };
-void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
-    for(u32 x=0; x<nodes.count; x+=1){
-	ASTBase *node = nodes[x];
-	compileToBytecode(node, see, bca, bf);
+void compileASTNodesToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+    for(u32 x=0; x<file.nodes.count; x+=1){
+	ASTBase *node = file.nodes[x];
+	compileToBytecode(node, file, see, bca, bf);
+    };
+    if(bf.startupNodes.count > 0){
+	bf.emit(Bytecode::_TEXT_STARTUP_START);
+	for(u32 x=0; x<bf.startupNodes.count; x+=1){
+	    ASTBase *node = bf.startupNodes[x];
+	    compileToBytecode(node, file, see, bca, bf);
+	};
+	bf.emit(Bytecode::_TEXT_STARTUP_END);
     };
     bf.emit(Bytecode::NONE);
 };
@@ -653,18 +693,18 @@ void compileASTNodesToBytecode(DynamicArray<ASTBase*> &nodes, DynamicArray<Scope
 
 #define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(buc, x), pbuc, x);
 
-#define DUMP_REG dumpReg(getBytecode(buc, x));
+#define DUMP_REG dumpReg((Reg)getBytecode(buc, x));
 
 #define DUMP_TYPE dumpType((Type)getBytecode(buc, x));
 
 namespace dbg{
     char *spaces = "    ";
     
-    void dumpReg(Bytecode id){
-	if((s32)id < 0){
-	    printf(" $%d ", id);
+    void dumpReg(Reg reg){
+	if(reg < 0){
+	    printf(" $%d ", reg * -1);
 	}else{
-	    printf(" %%%d ", id);
+	    printf(" %%%d ", reg);
 	};
     };
     Type dumpType(Type type){
@@ -798,7 +838,7 @@ namespace dbg{
 	    DUMP_REG;
 	}break;
 	case Bytecode::DEF:{
-	    printf("def (");
+	    printf("def ");
 	    s64 outCount = getConstIntAndUpdate(buc->bytecodes, x);
 	    while(outCount != 0){
 		bc = getBytecode(buc, x);
@@ -807,7 +847,7 @@ namespace dbg{
 		outCount -= 1;
 	    };
 	    bc = getBytecode(buc, x);
-	    printf(") _%d(", (u32)bc);
+	    printf("_%d(", (u32)bc);
 	    s64 inCount = getConstIntAndUpdate(buc->bytecodes, x);
 	    while(inCount != 0){
 		bc = getBytecode(buc, x);
@@ -871,6 +911,12 @@ namespace dbg{
 		s64 num = getConstIntAndUpdate(buc->bytecodes, x);
 		printf(" %lld", num);
 	    };
+	}break;
+	case Bytecode::_TEXT_STARTUP_START:{
+	    printf("_TEXT_STARTUP_START:");
+	}break;
+	case Bytecode::_TEXT_STARTUP_END:{
+	    printf("_TEXT_STARTUP_END");
 	}break;
 	default:
 	    UNREACHABLE;

@@ -5,7 +5,7 @@
 #define REGISTER_COUNT      100
 
 /*
-  $d  global   //TODO:
+  $d  global
   %d  register
   @d  proc
 */
@@ -35,6 +35,8 @@ enum class Bytecode : u16{
     PROC_END,
     ALLOC,
     GLOBAL,
+    _TEXT_STARTUP_START,
+    _TEXT_STARTUP_END,
     NEXT_BUCKET,
     COUNT,
 };
@@ -52,41 +54,4 @@ struct BytecodeBucket{
 struct Expr{
     Type type;
     Reg reg;
-};
-
-struct BytecodeFile{
-    DynamicArray<Bytecode*>   labels;
-    BytecodeBucket           *firstBucket;
-    BytecodeBucket           *curBucket;
-    u16                       cursor;
-    u8                        id;
-
-    void init(s16 fileID);
-    void uninit();
-    void newBucketAndUpdateCurBucket();
-    void reserve(u16 reserve);
-    void emit(Bytecode bc);
-    void emit(Type type);
-    void emit(Reg reg);
-    Bytecode *getCurBytecodeAdd();
-    void emitConstInt(s64 num);
-    void emitConstDec(f64 num);
-    void alloc(Type type, Reg reg);
-    void store(Type type, Reg dest, Reg src);
-    void load(Type type, Reg dest, Reg src);
-    void label(u16 label);
-    void procEnd();
-    void jmp(u16 label);
-    void jmp(Bytecode op, Reg checkReg, u16 labelT, u16 labelF);
-    void cmp(Bytecode op, Type type, Reg des, Reg lhs, Reg rhs);
-    void mov(Type type, Reg dest, Reg src);
-    void movConst(Reg reg, s64 num);
-    void movConst(Reg outputReg, f64 num);
-    void binOp(Bytecode op, Type type, Reg outputReg, Reg lhsReg, Reg rhsReg);
-    void cast(Type finalType, Reg finalReg, Type type, Reg reg);
-    void set(Bytecode op, Reg outputReg, Reg inputReg);
-    void neg(Type type, Reg newReg, Reg reg);
-    void ret(Reg reg, bool isVoid=false);
-    void gbl(Reg reg, Type type, s64 num);
-    void gbl(Reg reg, Type type, f64 num);
 };

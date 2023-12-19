@@ -13,6 +13,7 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	ASTBase *base = parseBlock(lexer, astFile, off);
 	if(base == nullptr){break;};
+	SET_BIT(base->flag, Flags::GLOBAL);
 	astFile.nodes.push(base);
 	eatNewlines(lexer.tokenTypes, off);
     };
@@ -27,33 +28,8 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
     astFile.scope = fileScopeEntities;
     see.push(fileScopeEntities);
-    if (checkEntities(astFile.nodes, lexer, see) == false) {
+    if(checkEntities(astFile.nodes, lexer, see) == false){
 	return nullptr;
-    } else {
-	for (u16 x = 0; x < fileScopeEntities->varMap.count; x += 1) {
-	    VariableEntity &entity = fileScopeEntities->varEntities[x];
-	    if (!IS_BIT(entity.flag, Flags::CONSTANT)) {
-		u32 nodeOff = 0;
-		for (u32 varCount = 0; nodeOff < astFile.nodes.count; nodeOff += 1) {
-		    if (varCount == x+1) { break; };
-		    ASTBase *base = astFile.nodes[nodeOff];
-		    if (base->type >= ASTType::UNI_INITIALIZATION_T_UNKNOWN && base->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN) {
-			varCount += 1;
-		    };
-		};
-		ASTBase *node = astFile.nodes[nodeOff-1];
-		u32 off;
-		if(node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN){
-		    ASTMultiVar *multiAss = (ASTMultiVar*)node;
-		    off = multiAss->tokenOff;
-		}else{
-		    ASTUniVar *uniAss = (ASTUniVar*)node;
-		    off = uniAss->tokenOff;
-		};
-		lexer.emitErr(lexer.tokenOffsets[off].off, "Variable at global scope is not comptime");
-	    };
-	    SET_BIT(entity.flag, Flags::GLOBAL);
-	};
     };
     return fileScopeEntities;
 };
@@ -87,9 +63,9 @@ bool compile(char *fileName){
 	BytecodeFile &bf = bfs[x];
 	bf.init(0);
 	BytecodeContext &bc = bca.newElem();
-	bc.init(fileScope->varMap.count, fileScope->procMap.count, 0);
+	bc.init(fileScope->varMap.count, fileScope->procMap.count, 1);
 	see.push(fileScope);
-	compileASTNodesToBytecode(file.nodes, see, bca, bf);
+	compileASTNodesToBytecode(file, see, bca, bf);
 	see.pop();
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
@@ -102,7 +78,7 @@ bool compile(char *fileName){
     for(u32 x=Dep::compileStack.count; x>0;){
 	x -= 1;
 	BytecodeFile &bf = bfs[x];
-	backRef.backendCompileStage1(&bf, &config);
+	backRef.backendCompileStage1(bf.firstBucket, bf.id, &config);
 	bf.uninit();
     };
     backRef.backendCompileStage2(&config);

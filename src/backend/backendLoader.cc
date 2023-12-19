@@ -2,7 +2,7 @@ enum class BackendType{
     LLVM,
 };
 
-typedef void(*backendCompileStage1Type)(BytecodeFile *bf, Config *config);
+typedef void(*backendCompileStage1Type)(BytecodeBucket *buc, s16 id, Config *config);
 typedef void(*backendCompileStage2Type)(Config *config);
 typedef void(*initializeBackendType)();
 typedef void(*startStopBackendType)();

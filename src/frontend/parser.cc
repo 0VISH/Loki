@@ -29,6 +29,7 @@ enum class ASTType {
     IMPORT,
     STRUCT_DEFENITION,
     MODIFIER,
+    GLOBAL_VAR_INIT,
     RETURN
 };
 enum class ForType{
@@ -41,6 +42,12 @@ enum class ForType{
 struct ScopeEntities;
 struct ASTBase {
     ASTType type;
+    Flag flag;
+};
+struct ASTGblVarInit : ASTBase{
+    s16 reg;
+    ASTBase *rhs;
+    Type type;
 };
 struct ASTImport : ASTBase{
     char *fileName;
@@ -49,7 +56,7 @@ struct ASTNumInt : ASTBase{
     s64 num;
 };
 struct ASTNumDec : ASTBase{
-    f64 dec;
+    f64 num;
 };
 struct ASTString : ASTBase{
     u32 tokenOff;
@@ -59,7 +66,6 @@ struct ASTUniVar : ASTBase{
     String name;
     ASTBase *rhs;
     u32 tokenOff;
-    Flag flag;
 };
 struct ASTBinOp : ASTBase{
     ASTBase *lhs;
@@ -73,7 +79,6 @@ struct ASTMultiVar : ASTBase{
     ASTBase *rhs;
     u64 size;
     u32 tokenOff;
-    Flag flag;
 };
 struct ASTUniOp : ASTBase{
     ASTBase *node;
@@ -95,7 +100,6 @@ struct ASTProcDef : ASTBase {
     u32 uniInCount;        //number of single input
     u32 multiInCount;      //number of multiple input
     u32 multiInInputCount; //total number of variables in multiple input
-    Flag flag;
 };
 struct ASTVariable : ASTBase{
     String name;
@@ -329,7 +333,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     case Token_Type::DECIMAL:{
 	ASTNumDec *numNode = (ASTNumDec*)allocAST(sizeof(ASTNumDec), ASTType::NUM_DECIMAL, file);
 	String str = makeStringFromTokOff(x, lexer);
-	numNode->dec = string2float(str);	
+	numNode->num = string2float(str);	
 	x += 1;
 	return (ASTBase*)numNode;
     }break;
@@ -1083,7 +1087,7 @@ namespace dbg {
 	    printf("num_decimal");
 	    ASTNumDec *numDec = (ASTNumDec*)node;
 	    PAD;
-	    printf("num: %f", numDec->dec);
+	    printf("num: %f", numDec->num);
 	} break;
 	case ASTType::BIN_GRT: c = '>'; printf("bin_grt");
 	case ASTType::BIN_GRTE: if(c == NULL) { c = '>'; printf("bin_grte"); printEqual=true;};
