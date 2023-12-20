@@ -11,10 +11,10 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
 	return nullptr;
     };
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
-	ASTBase *base = parseBlock(lexer, astFile, off);
-	if(base == nullptr){break;};
+	bool result = parseBlock(lexer, astFile, astFile.nodes, off);
+	if(result == false){break;};
+	ASTBase *base = astFile.nodes[astFile.nodes.count - 1];
 	SET_BIT(base->flag, Flags::GLOBAL);
-	astFile.nodes.push(base);
 	eatNewlines(lexer.tokenTypes, off);
     };
     if(report::errorOff != 0){
