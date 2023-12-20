@@ -442,31 +442,6 @@ u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
     return x;
 };
 
-s8 varDeclAddTableEntriesAST(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<ASTBase*> &table, bool typesIncluded=false) {
-    BRING_TOKENS_TO_SCOPE;
-    s8 varCount = 0;
-    while (true) {
-	bool a;
-	if (typesIncluded) { a = isType(tokTypes[x]); }
-	else { a = tokTypes[x] == Token_Type::IDENTIFIER; };
-	if (a == false) {
-	    lexer.emitErr(tokOffs[x].off, "Expected identifier%s", (typesIncluded)?" or a type":" ");
-	    table.uninit();
-	    return -1;
-	};
-	varCount += 1;
-	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
-	var->name = makeStringFromTokOff(x, lexer);
-	table.push((ASTBase*)var);
-	x += 1;
-	if (tokTypes[x] == (Token_Type)',') {
-	    x += 1;
-	    continue;
-	};
-	return varCount;
-    };
-    return varCount;
-};
 s8 varDeclAddTableEntriesStr(Lexer &lexer, ASTFile &file, u32 &x, DynamicArray<String> &table) {
     BRING_TOKENS_TO_SCOPE;
     s8 varCount = 0;

@@ -273,6 +273,10 @@ Bytecode *getPointer(Bytecode *page){
 };
 Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     Expr out = {};
+    if(IS_BIT(node->flag, Flags::GLOBAL) && node->type != ASTType::PROC_DEFENITION && node->type != ASTType::UNI_DECLERATION && node->type != ASTType::UNI_INITIALIZATION_T_KNOWN && node->type != ASTType::UNI_INITIALIZATION_T_UNKNOWN){
+	bf.startupNodes.push(node);
+	return out;
+    };
     ASTType type = node->type;
     BytecodeContext &bc = bca[bca.count - 1];
     Reg outputReg;
