@@ -30,6 +30,7 @@ enum class ASTType {
     STRUCT_DEFENITION,
     MODIFIER,
     GLOBAL_VAR_INIT,
+    MULTI_VAR_RHS,
     RETURN
 };
 enum class ForType{
@@ -43,6 +44,10 @@ struct ScopeEntities;
 struct ASTBase {
     ASTType type;
     Flag flag;
+};
+struct ASTMultiVarRHS : ASTBase{
+    s16 reg;
+    ASTBase *rhs;
 };
 struct ASTGblVarInit : ASTBase{
     s16 reg;
@@ -195,6 +200,7 @@ ASTBase *allocAST(u32 nodeSize, ASTType type, ASTFile &file) {
     ASTBase *node = (ASTBase*)(file.memPages[memPageOff] + file.pageBrim);
     file.pageBrim += nodeSize;
     node->type = type;
+    node->flag = 0;
     return node;
 };
 
@@ -960,20 +966,24 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    };
 	    EXIT_LOOP_MULTI_VAR:
 	    Flag flag = 0;
-	    ASTBase *rhs = nullptr;
+	    ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)allocAST(sizeof(ASTMultiVarRHS), ASTType::MULTI_VAR_RHS, file);
 	    u32 end = getEndNewlineEOF(tokTypes, equalSignPos);
 	    if(equalSignPos != 0){
 		if(tokTypes[equalSignPos] == Token_Type::TDOT){
 		    SET_BIT(flag, Flags::UNINITIALIZED);
+		    x = end;
+		    return true;
 		}else{
-		    rhs = genASTExprTree(lexer, file, equalSignPos, end);
+		    mvr->rhs = genASTExprTree(lexer, file, equalSignPos, end);
+		    if(mvr->rhs == nullptr){return false;}
 		};
 	    };
+	    table.push(mvr);
 	    while(true){
 		if(tokTypes[x] == Token_Type::IDENTIFIER){
 		    ASTUniVar *uv = (ASTUniVar*)allocAST(sizeof(ASTUniVar), type, file);
 		    uv->flag = flag;
-		    uv->rhs = rhs;
+		    uv->rhs = mvr;
 		    uv->name = makeStringFromTokOff(x, lexer);
 		    table.push(uv);
 		}else{
@@ -1068,6 +1078,14 @@ namespace dbg {
 		PAD;
 		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
 	    };
+	}break;
+	case ASTType::MULTI_VAR_RHS:{
+	    ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
+	    printf("multi_var_rhs");
+	    PAD;
+	    printf("rhs");
+	    PAD;
+	    __dumpNodesWithoutEndPadding(mvr->rhs, lexer, padding+1);
 	}break;
 	case ASTType::NUM_INTEGER: {
 	    ASTNumInt *numInt = (ASTNumInt*)node;

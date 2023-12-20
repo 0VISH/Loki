@@ -383,6 +383,12 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    bf.ret(rhs.reg, false);
 	};
     }break;
+    case ASTType::MULTI_VAR_RHS:{
+	ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
+	auto rhs = compileExprToBytecode(mvr->rhs, see, bca, bf);
+	mvr->reg = rhs.reg;
+	printf("mvr->reg: %d\n", mvr->reg);
+    }break;
     case ASTType::UNI_DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
@@ -447,8 +453,16 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.alloc(entity.type, rhsReg);
 	    bc.varToReg[id] = rhsReg;
 	}else{
-	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
-	    bc.varToReg[id] = rhs.reg;
+	    if(var->rhs->type == ASTType::MULTI_VAR_RHS){
+		ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)var->rhs;
+		Reg reg = bc.newReg(entity.type);
+		bf.mov(entity.type, reg, mvr->reg);
+		printf("mvrREG: %d\n", mvr->reg);
+		bc.varToReg[id] = reg;
+	    }else{
+		auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
+		bc.varToReg[id] = rhs.reg;
+	    };
 	};
     }break;
     case ASTType::GLOBAL_VAR_INIT:{
@@ -686,6 +700,7 @@ void compileASTNodesToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see,
 	bf.emit(Bytecode::_TEXT_STARTUP_START);
 	for(u32 x=0; x<bf.startupNodes.count; x+=1){
 	    ASTBase *node = bf.startupNodes[x];
+	    CLEAR_BIT(node->flag, Flags::GLOBAL);
 	    compileToBytecode(node, file, see, bca, bf);
 	};
 	bf.emit(Bytecode::_TEXT_STARTUP_END);

@@ -216,9 +216,12 @@ bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, Dyna
 };
 
 #define CHECK_TREE_AND_MERGE_FLAGS					\
-    if(checkExpression(var->rhs, lexer, see) == false){return false;};	\
+    ASTBase *rhs = var->rhs;						\
+    if(rhs->type != ASTType::MULTI_VAR_RHS){				\
+	if(checkExpression(rhs, lexer, see) == false){return false;};	\
+    }else{rhs = ((ASTMultiVarRHS*)rhs)->rhs;};   /* WOW :) */		\
     Flag treeFlag = 0;							\
-    Type treeType = getTreeType(var->rhs, treeFlag, see, lexer);	\
+    Type treeType = getTreeType(rhs, treeFlag, see, lexer);		\
     if(treeType == Type::UNKOWN){return false;};			\
     flag |= treeFlag;							\
 
@@ -288,6 +291,10 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 		return false;
 	    };
 	};
+    }break;
+    case ASTType::MULTI_VAR_RHS:{
+	ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
+	if(checkExpression(mvr->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::UNI_INITIALIZATION_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
