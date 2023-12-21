@@ -967,6 +967,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    EXIT_LOOP_MULTI_VAR:
 	    Flag flag = 0;
 	    ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)allocAST(sizeof(ASTMultiVarRHS), ASTType::MULTI_VAR_RHS, file);
+	    mvr->reg = 0;
 	    u32 end = getEndNewlineEOF(tokTypes, equalSignPos);
 	    if(equalSignPos != 0){
 		if(tokTypes[equalSignPos] == Token_Type::TDOT){
@@ -978,7 +979,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    if(mvr->rhs == nullptr){return false;}
 		};
 	    };
-	    table.push(mvr);
 	    while(true){
 		if(tokTypes[x] == Token_Type::IDENTIFIER){
 		    ASTUniVar *uv = (ASTUniVar*)allocAST(sizeof(ASTUniVar), type, file);

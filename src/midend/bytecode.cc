@@ -281,6 +281,17 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     BytecodeContext &bc = bca[bca.count - 1];
     Reg outputReg;
     switch(type){
+    case ASTType::MULTI_VAR_RHS:{
+	ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
+	out.type = Type::UNKOWN;
+	if(mvr->reg == 0){
+	    auto rhs = compileExprToBytecode(mvr->rhs, see, bca, bf);
+	    mvr->reg = rhs.reg;
+	    out.type = rhs.type;
+	};
+	out.reg = mvr->reg;
+	return out;
+    }break;
     case ASTType::STRING:{
 	ASTString *string = (ASTString*)node;
 	GlobalStrings::addEntryIfRequired(string->str);
@@ -364,6 +375,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	return operand;
     }break;
     default:
+	printf("TYPE: %d", type);
 	UNREACHABLE;
 	break;
     };
@@ -382,12 +394,6 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    auto rhs = compileExprToBytecode(ret->expr, see, bca, bf);
 	    bf.ret(rhs.reg, false);
 	};
-    }break;
-    case ASTType::MULTI_VAR_RHS:{
-	ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
-	auto rhs = compileExprToBytecode(mvr->rhs, see, bca, bf);
-	mvr->reg = rhs.reg;
-	printf("mvr->reg: %d\n", mvr->reg);
     }break;
     case ASTType::UNI_DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
@@ -455,9 +461,9 @@ ASTUniVar *var = (ASTUniVar*)node;
 	}else{
 	    if(var->rhs->type == ASTType::MULTI_VAR_RHS){
 		ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)var->rhs;
+		compileExprToBytecode(mvr->rhs, see, bca, bf);
 		Reg reg = bc.newReg(entity.type);
 		bf.mov(entity.type, reg, mvr->reg);
-		printf("mvrREG: %d\n", mvr->reg);
 		bc.varToReg[id] = reg;
 	    }else{
 		auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
