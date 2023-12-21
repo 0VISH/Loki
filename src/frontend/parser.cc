@@ -14,12 +14,9 @@ enum class ASTType {
     BIN_LSR,
     BIN_LSRE,
     BIN_EQU,
-    UNI_DECLERATION,
-    UNI_INITIALIZATION_T_UNKNOWN,
-    UNI_INITIALIZATION_T_KNOWN,
-    MULTI_DECLERATION,
-    MULTI_INITIALIZATION_T_UNKNOWN,
-    MULTI_INITIALIZATION_T_KNOWN,
+    DECLERATION,
+    INITIALIZATION_T_UNKNOWN,
+    INITIALIZATION_T_KNOWN,
     PROC_DEFENITION,
     VARIABLE,
     TYPE,
@@ -80,12 +77,6 @@ struct ASTBinOp : ASTBase{
     Type lhsType;
     Type rhsType;
 };
-struct ASTMultiVar : ASTBase{
-    DynamicArray<String> names;
-    ASTBase *rhs;
-    u64 size;
-    u32 tokenOff;
-};
 struct ASTUniOp : ASTBase{
     ASTBase *node;
 };
@@ -102,10 +93,8 @@ struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> out;
     String name;
     ScopeEntities *se;
+    u32 inCount;
     u32 tokenOff;
-    u32 uniInCount;        //number of single input
-    u32 multiInCount;      //number of multiple input
-    u32 multiInInputCount; //total number of variables in multiple input
 };
 struct ASTVariable : ASTBase{
     String name;
@@ -155,12 +144,6 @@ void freeBody(DynamicArray<ASTBase*> &body){
 };
 void freeNodeInternal(ASTBase *base){
     switch(base->type){
-    case ASTType::MULTI_DECLERATION:
-    case ASTType::MULTI_INITIALIZATION_T_UNKNOWN:
-    case ASTType::MULTI_INITIALIZATION_T_KNOWN:{
-	ASTMultiVar *mv = (ASTMultiVar*)base;
-	mv->names.uninit();
-    }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)base;
         freeBody(proc->body);
@@ -546,7 +529,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    if(tokTypes[x+1] != (Token_Type)':'){
 		goto PARSE_FOR_EXPR;
 	    };
-	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_INITIALIZATION_T_UNKNOWN, file);
+	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::INITIALIZATION_T_UNKNOWN, file);
 	    var->typeTokenOff = 0;
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
@@ -557,7 +540,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    x += 2;
 	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
 		var->typeTokenOff = x;
-		var->type = ASTType::UNI_INITIALIZATION_T_KNOWN;
+		var->type = ASTType::INITIALIZATION_T_KNOWN;
 		x += 1;
 	    };
 	    s32 end = getTokenOffInLine(Token_Type::TDOT, lexer, x);
@@ -727,7 +710,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	switch (tokTypes[x]) {
 	case (Token_Type)':': {
 	    x += 1;
-	    ASTType uniVarType = ASTType::UNI_INITIALIZATION_T_UNKNOWN; 
+	    ASTType uniVarType = ASTType::INITIALIZATION_T_UNKNOWN; 
 	    switch (tokTypes[x]) {
 	    case (Token_Type)'=': {
 		//single variable assignment
@@ -764,7 +747,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    Struct->name = makeStringFromTokOff(start, lexer);
 		    Struct->body.init();
 		    Struct->tokenOff = start;
-		    u32 count = 0;
 		    while (tokTypes[x] != (Token_Type)'}') {
 			//parse body
 			u32 start = x;
@@ -772,18 +754,14 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			if(result == false) {return false;};
 			ASTBase *node = Struct->body[Struct->body.count - 1];
 			switch(node->type){
-			case ASTType::UNI_DECLERATION: count += 1;break;
-			case ASTType::MULTI_DECLERATION:{
-			    ASTMultiVar *multiVar = (ASTMultiVar*)node;
-			    count += multiVar->names.count;
-			}break;
+			case ASTType::DECLERATION: break;
 			default:
 			    lexer.emitErr(tokOffs[x].off, "Invalid statement. Struct only takes uni/multi decleration");
 			    return nullptr;
 			};
 			eatNewlines(tokTypes, x);
 		    };
-		    Struct->memberCount = count;
+		    Struct->memberCount = Struct->body.count;  //TODO: remove??
 		    x += 1;
 		    table.push(Struct);
 		    return true;
@@ -801,9 +779,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    proc->name = makeStringFromTokOff(start, lexer);
 		    proc->body.init();
 		    proc->out.zero();
-		    u32 uniInCount = 0;
-		    u32 multiInCount = 0;
-		    u32 multiInInputCount = 0;
+		    u32 inCount = 0;
 		    //parse input
 		    x += 1;
 		    if(tokTypes[x] == (Token_Type)')'){goto END_PROC_INPUT_PARSING_LOOP;};
@@ -812,16 +788,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			bool result = parseBlock(lexer, file, proc->body, x);
 			if(result == false){return false;};
 			ASTBase *base = proc->body[proc->body.count - 1];
-			switch(base->type){
-			case ASTType::MULTI_DECLERATION:{
-			    ASTMultiVar *multiVar = (ASTMultiVar*)base;
-			    multiInCount += 1;
-			    multiInInputCount = multiVar->names.count;
-			}break;
-			case ASTType::UNI_DECLERATION:{
-			    uniInCount += 1;
-			}break;
-			};
 			switch(tokTypes[x]){
 			case (Token_Type)')':{
 			    goto END_PROC_INPUT_PARSING_LOOP;
@@ -830,14 +796,13 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			    x += 1;
 			}break;
 			default:
+			    printf("TYPE: %d", tokTypes[x]);
 			    lexer.emitErr(tokOffs[x].off, "Expected ','");
 			    return false;
 			};
 		    };
 		    END_PROC_INPUT_PARSING_LOOP:
-		    proc->uniInCount = uniInCount;
-		    proc->multiInCount = multiInCount;
-		    proc->multiInInputCount = multiInInputCount;
+		    proc->inCount = proc->body.count;
 		    if(tokTypes[x] != (Token_Type)')'){
 			lexer.emitErr(tokOffs[x].off, "Expected ')'");
 			return false;
@@ -914,10 +879,10 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		if (isType(tokTypes[x])) {
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') {
-			uniVarType = ASTType::UNI_INITIALIZATION_T_KNOWN;
+			uniVarType = ASTType::INITIALIZATION_T_KNOWN;
 			goto SINGLE_VARIABLE_ASSIGNMENT;
 		    };
-		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::UNI_DECLERATION, file);
+		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::DECLERATION, file);
 		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    assign->flag = flag;
@@ -936,19 +901,21 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    x = start;
 	    ASTType type;
 	    u32 equalSignPos = 0;
+	    u32 end = getEndNewlineEOF(tokTypes, equalSignPos);
 	    while(true){
 		switch(tokTypes[i]){
 		case (Token_Type)':':{
 		    i += 1;
-		    if(tokTypes[i] == Token_Type::IDENTIFIER){
+		    if(tokTypes[i] == Token_Type::IDENTIFIER || isType(tokTypes[i])){
 			if(tokTypes[i+1] == (Token_Type)'='){
-			    type = ASTType::UNI_INITIALIZATION_T_KNOWN;
+			    type = ASTType::INITIALIZATION_T_KNOWN;
 			    equalSignPos = i + 1;
 			}else{
-			    type = ASTType::UNI_DECLERATION;
+			    type = ASTType::DECLERATION;
+			    end = i+1;
 			};
 		    }else if(tokTypes[i] == (Token_Type)'='){
-			type = ASTType::UNI_INITIALIZATION_T_UNKNOWN;
+			type = ASTType::INITIALIZATION_T_UNKNOWN;
 			equalSignPos = i + 1;
 		    }else{
 			lexer.emitErr(tokOffs[i].off, "Expected a type or '='");
@@ -966,9 +933,11 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    };
 	    EXIT_LOOP_MULTI_VAR:
 	    Flag flag = 0;
-	    ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)allocAST(sizeof(ASTMultiVarRHS), ASTType::MULTI_VAR_RHS, file);
-	    mvr->reg = 0;
-	    u32 end = getEndNewlineEOF(tokTypes, equalSignPos);
+	    ASTMultiVarRHS *mvr = nullptr;
+	    if(type != ASTType::DECLERATION){
+		mvr = (ASTMultiVarRHS*)allocAST(sizeof(ASTMultiVarRHS), ASTType::MULTI_VAR_RHS, file);
+		mvr->reg = 0;
+	    };
 	    if(equalSignPos != 0){
 		if(tokTypes[equalSignPos] == Token_Type::TDOT){
 		    SET_BIT(flag, Flags::UNINITIALIZED);
@@ -985,6 +954,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    uv->flag = flag;
 		    uv->rhs = mvr;
 		    uv->name = makeStringFromTokOff(x, lexer);
+		    uv->typeTokenOff = i;
 		    table.push(uv);
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected an identifier");
@@ -1130,10 +1100,10 @@ namespace dbg {
 	    String name = var->name;
 	    printf("name: %.*s", name.len, name.mem);
 	}break;
-	case ASTType::UNI_DECLERATION: {
+	case ASTType::DECLERATION: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
-	    u32 x = decl->tokenOff+2;
-	    printf("uni_decleration");
+	    u32 x = decl->typeTokenOff;
+	    printf("decleration");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	    PAD;
@@ -1146,33 +1116,17 @@ namespace dbg {
 	    ASTUniOp *uniOp = (ASTUniOp*)node;
 	    __dumpNodesWithoutEndPadding(uniOp->node, lexer, padding + 1);
 	}break;
-	case ASTType::MULTI_DECLERATION:{
-	    ASTMultiVar *decl = (ASTMultiVar*)node;
-	    u32 x = decl->tokenOff+2;
-	    printf("multi_decleration");
-	    PAD;
-	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-	    PAD;
-	    printf("names:");
-	    ASTMultiVar *multiAss = (ASTMultiVar*)node;
-	    DynamicArray<String> &names = multiAss->names;
-	    for (u8 x=0; x<names.count; x +=1) {
-		String name = names[x];
-		PAD;
-		printf("      %.*s", name.len, name.mem);
-	    };
-	}break;
-	case ASTType::UNI_INITIALIZATION_T_KNOWN: {
+	case ASTType::INITIALIZATION_T_KNOWN: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    u32 x = decl->typeTokenOff;
-	    printf("UNI_INITIALIZATION_T_KNOWN");
+	    printf("initialization_t_unkown");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
 	};
 	    flag = true;
-	case ASTType::UNI_INITIALIZATION_T_UNKNOWN: {
+	case ASTType::INITIALIZATION_T_UNKNOWN: {
 	    if (flag) { flag = false; }
-	    else { printf("uni_initialization_t_unkown"); };	
+	    else { printf("initialization_t_unkown"); };	
 	    PAD;
 	    ASTUniVar *decl = (ASTUniVar*)node;
 	    printf("name: %.*s", decl->name.len, decl->name.mem);
@@ -1184,36 +1138,6 @@ namespace dbg {
 		printf("uninitialized");
 	    }else{
 		if (decl->rhs != nullptr) {__dumpNodesWithoutEndPadding(decl->rhs, lexer, padding + 1);};
-	    };
-	} break;
-	case ASTType::MULTI_INITIALIZATION_T_KNOWN: {
-	    ASTMultiVar *decl = (ASTMultiVar*)node;
-	    u32 x = decl->tokenOff + 2;
-	    printf("MULTI_INITIALIZATION_T_KNOWN");
-	    PAD;
-	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
-	};
-	    flag = true;
-	case ASTType::MULTI_INITIALIZATION_T_UNKNOWN: {
-	    if (flag) { flag = false; }
-	    else { printf("multi_initialization_t_unkown"); };
-	    PAD;
-	    printf("names:");
-	    ASTMultiVar *multiAss = (ASTMultiVar*)node;
-	    DynamicArray<String> &names = multiAss->names;
-	    for (u8 x=0; x<names.count; x +=1) {
-		String name = names[x];
-		PAD;
-		printf("      %.*s", name.len, name.mem);
-	    };
-	    PAD;
-	    printf("RHS");
-	    if(IS_BIT(multiAss->flag, Flags::UNINITIALIZED)){
-		padding += 1;
-		PAD;
-		printf("uninitialized");
-	    }else{
-		if (multiAss->rhs != nullptr) {__dumpNodesWithoutEndPadding(multiAss->rhs, lexer, padding + 1);};
 	    };
 	} break;
 	case ASTType::FOR:{
@@ -1260,8 +1184,7 @@ namespace dbg {
 	    PAD;
 	    printf("name: %.*s", proc->name.len, proc->name.mem);
 	    PAD;
-	    u32 inCount = proc->uniInCount + proc->multiInCount;
-	    for(u32 x=0; x<inCount; x+=1){
+	    for(u32 x=0; x<proc->inCount; x+=1){
 		ASTBase *node = proc->body[x];
 		__dumpNodesWithoutEndPadding(node, lexer, padding + 1);
 	    };
@@ -1271,7 +1194,7 @@ namespace dbg {
 	    DynamicArray<ASTBase*> &table = proc->body;
 	    PAD;
 	    printf("BODY");
-	    for (u32 v=inCount; v < table.count; v += 1) {
+	    for (u32 v=proc->inCount; v < table.count; v += 1) {
 		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
 	} break;

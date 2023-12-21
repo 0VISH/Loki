@@ -51,11 +51,8 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
 	ASTBase *node = entities[x];
 	if (node->type == ASTType::PROC_DEFENITION) {
 	    procCount += 1;
-	} else if (node->type >= ASTType::UNI_DECLERATION && node->type <= ASTType::UNI_INITIALIZATION_T_KNOWN) {
+	} else if (node->type >= ASTType::DECLERATION && node->type <= ASTType::INITIALIZATION_T_KNOWN) {
 	    varCount += 1;
-	} else if (node->type >= ASTType::MULTI_DECLERATION && node->type <= ASTType::MULTI_INITIALIZATION_T_KNOWN){
-	    ASTMultiVar *multi = (ASTMultiVar*)node;
-	    varCount += multi->names.count;
 	} else if(node->type == ASTType::STRUCT_DEFENITION){
 	    structCount += 1;
 	};
@@ -252,7 +249,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	see.push(StructSe);
 	if(checkEntities(Struct->body, lexer, see) == false){return false;};
 	for(u32 x=0; x<Struct->body.count; x+=1){
-	    if(Struct->body[x]->type == ASTType::UNI_DECLERATION){
+	    if(Struct->body[x]->type == ASTType::DECLERATION){
 		ASTUniVar *var = (ASTUniVar*)Struct->body[x];
 		if(entity.varToOff.getValue(var->name) != -1){
 		    lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
@@ -269,9 +266,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	entity.size = size;
 	se->structEntities[id] = entity;
     }break;
-    case ASTType::UNI_DECLERATION:{
+    case ASTType::DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see);
+	Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
 	if(type == Type::UNKOWN){return false;};
 	SET_BIT(var->flag, Flags::CONSTANT);
 	if(checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see) == false){
@@ -279,82 +276,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    return false;
 	};
     }break;
-    case ASTType::MULTI_DECLERATION:{
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see);
-	SET_BIT(var->flag, Flags::CONSTANT);
-	DynamicArray<String> &names = var->names;
-	for(u32 x=0; x<names.count; x+=1){
-	    String &name = names[x];
-	    if(checkVarEntityPresentInScopeElseReg(name, var->flag, type, see) == false){
-		lexer.emitErr(tokOffs[var->tokenOff + 2*(x - var->names.count) + 2].off, "Variable redecleration");
-		return false;
-	    };
-	};
-    }break;
     case ASTType::MULTI_VAR_RHS:{
 	ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
 	if(checkExpression(mvr->rhs, lexer, see) == false){return false;};
-    }break;
-    case ASTType::UNI_INITIALIZATION_T_KNOWN:{
-	ASTUniVar *var = (ASTUniVar*)node;
-	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see);
-	Flag flag = var->flag;
-	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
-	    CHECK_TREE_AND_MERGE_FLAGS;
-	    IS_EXPLICIT_CAST_REQUIRED;
-	};
-	if(checkVarEntityPresentInScopeElseReg(var->name, flag, type, see) == false){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
-	    return false;
-	};
-    }break;
-    case ASTType::MULTI_INITIALIZATION_T_KNOWN:{
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see);
-	Flag flag = var->flag;
-	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
-	    CHECK_TREE_AND_MERGE_FLAGS;
-	    IS_EXPLICIT_CAST_REQUIRED;
-	};
-	DynamicArray<String> &names = var->names;
-	for(u32 x=0; x<names.count; x+=1){
-	    String &name = names[x];
-	    if(checkVarEntityPresentInScopeElseReg(name, flag, type, see) == false){
-		lexer.emitErr(tokOffs[var->tokenOff + 2*(x - var->names.count) + 2].off, "Variable redefinition");
-		return false;
-	    };
-	};
-    }break;
-    case ASTType::UNI_INITIALIZATION_T_UNKNOWN:{
-	ASTUniVar *var = (ASTUniVar*)node;
-	Flag flag = var->flag;
-	if(IS_BIT(flag, Flags::UNINITIALIZED)){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Cannot keep the variable uninitialized since the type is unkown.");
-	    return false;
-	};
-	CHECK_TREE_AND_MERGE_FLAGS;
-	if(checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see) == false){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
-	    return false;
-	};
-    }break;
-    case ASTType::MULTI_INITIALIZATION_T_UNKNOWN:{
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	Flag flag = var->flag;
-	if(IS_BIT(flag, Flags::UNINITIALIZED)){
-	    lexer.emitErr(tokOffs[var->tokenOff - (var->names.count-1)*2].off, "Cannot keep the variable uninitialized since the type is unkown.");
-	    return false;
-	};
-	CHECK_TREE_AND_MERGE_FLAGS;
-	DynamicArray<String> &names = var->names;
-	for(u32 x=0; x<names.count; x+=1){
-	    String &name = names[x];
-	    if(checkVarEntityPresentInScopeElseReg(name, flag, treeType, see) == false){
-		lexer.emitErr(tokOffs[var->tokenOff + 2*(x - var->names.count) + 2].off, "Variable redefinition");
-		return false;
-	    };
-	};
     }break;
     case ASTType::IMPORT:{
 	ASTImport *imp = (ASTImport*)node;

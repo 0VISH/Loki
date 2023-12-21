@@ -273,7 +273,7 @@ Bytecode *getPointer(Bytecode *page){
 };
 Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     Expr out = {};
-    if(IS_BIT(node->flag, Flags::GLOBAL) && node->type != ASTType::PROC_DEFENITION && node->type != ASTType::UNI_DECLERATION && node->type != ASTType::UNI_INITIALIZATION_T_KNOWN && node->type != ASTType::UNI_INITIALIZATION_T_UNKNOWN){
+    if(IS_BIT(node->flag, Flags::GLOBAL) && node->type != ASTType::PROC_DEFENITION && node->type != ASTType::DECLERATION && node->type != ASTType::INITIALIZATION_T_KNOWN && node->type != ASTType::INITIALIZATION_T_UNKNOWN){
 	bf.startupNodes.push(node);
 	return out;
     };
@@ -395,7 +395,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    bf.ret(rhs.reg, false);
 	};
     }break;
-    case ASTType::UNI_DECLERATION:{
+    case ASTType::DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
@@ -413,103 +413,10 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    };
 	};
     }break;
-    case ASTType::MULTI_DECLERATION:{
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	DynamicArray<String> &names = var->names;
-	u32 firstID = se->varMap.getValue(names[0]);
-	const VariableEntity &firstEntityID = se->varEntities[firstID];
-	Type firstEntityType = firstEntityID.type;
-	for(u32 x=0; x<names.count; x+=1){
-	    Reg reg = bc.newReg(firstEntityType);
-	    if(isFloat(firstEntityType)){
-		bf.movConst(reg, (f64)0.0);
-	    }else{
-		bf.movConst(reg, (s64)0);
-	    };
-	};
-    }break;
-    case ASTType::UNI_INITIALIZATION_T_KNOWN:
-    case ASTType::UNI_INITIALIZATION_T_UNKNOWN:{
-ASTUniVar *var = (ASTUniVar*)node;
-	u32 id = se->varMap.getValue(var->name);
-	const VariableEntity &entity = se->varEntities[id];
-	Flag flag = var->flag;
-	if(IS_BIT(flag, Flags::GLOBAL)){
-	    Reg reg = bc.newReg(entity.type) * -1;
-	    if(IS_BIT(flag, Flags::UNINITIALIZED)){
-		bf.gbl(reg, entity.type, (s64)0);
-	    }else if(var->rhs->type == ASTType::NUM_INTEGER){
-		ASTNumInt *numInt = (ASTNumInt*)var->rhs;
-		bf.gbl(reg, entity.type, numInt->num);
-	    }else if(var->rhs->type == ASTType::NUM_DECIMAL){
-		ASTNumDec *numDec = (ASTNumDec*)var->rhs;
-		bf.gbl(reg, entity.type, numDec->num);
-	    }else{
-		bf.gbl(reg, entity.type, (s64)0);
-		ASTGblVarInit *gvi = (ASTGblVarInit*)allocAST(sizeof(ASTGblVarInit), ASTType::GLOBAL_VAR_INIT, file);
-		gvi->reg = reg;
-		gvi->rhs = var->rhs;
-		gvi->type = entity.type;
-		bf.startupNodes.push(gvi);
-	    };
-	    bc.varToReg[id] = reg;
-	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
-	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
-	    Reg rhsReg = bc.newReg(entity.type);
-	    bf.alloc(entity.type, rhsReg);
-	    bc.varToReg[id] = rhsReg;
-	}else{
-	    if(var->rhs->type == ASTType::MULTI_VAR_RHS){
-		ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)var->rhs;
-		compileExprToBytecode(mvr->rhs, see, bca, bf);
-		Reg reg = bc.newReg(entity.type);
-		bf.mov(entity.type, reg, mvr->reg);
-		bc.varToReg[id] = reg;
-	    }else{
-		auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
-		bc.varToReg[id] = rhs.reg;
-	    };
-	};
-    }break;
     case ASTType::GLOBAL_VAR_INIT:{
 	ASTGblVarInit *gvi = (ASTGblVarInit*)node;
 	auto rhs = compileExprToBytecode(gvi->rhs, see, bca, bf);
 	bf.store(gvi->type, gvi->reg, rhs.reg);
-    }break;
-    case ASTType::MULTI_INITIALIZATION_T_KNOWN:
-    case ASTType::MULTI_INITIALIZATION_T_UNKNOWN:{
-	ASTMultiVar *var = (ASTMultiVar*)node;
-	DynamicArray<String> &names = var->names;
-	u32 firstID = se->varMap.getValue(names[0]);
-	const VariableEntity &firstEntity = se->varEntities[firstID];
-	Flag flag = firstEntity.flag;
-	Type type = firstEntity.type;
-	if(IS_BIT(flag, Flags::GLOBAL)){
-	    for(u32 x=0; x<names.count; x+=1){
-		Reg reg = bc.newReg(type) * -1;
-		//TODO: 
-		bf.gbl(reg, type, (s64)0);
-		bc.varToReg[x] = reg;
-	    };
-	} else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
-	    //NOTE: MULTI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
-	    for(u32 x=0; x<names.count; x+=1){
-		Reg rhsReg = bc.newReg(type);
-		bf.alloc(type, rhsReg);
-		bc.varToReg[x] = rhsReg;
-	    };
-	}else{
-	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
-	    Bytecode byte;
-	    for(u32 x=0; x<names.count; x+=1){
-		u32 id = se->varMap.getValue(names[x]);
-		const VariableEntity &entity = se->varEntities[id];
-		Reg regID = bc.newReg(rhs.type);
-		bc.varToReg[id] = regID;
-		bc.varTypes[regID] = rhs.type;
-		bf.mov(type, regID, rhs.reg);
-	    };
-	};
     }break;
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
@@ -640,8 +547,8 @@ ASTUniVar *var = (ASTUniVar*)node;
 	ScopeEntities *procSE = proc->se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count, bc.registerID);
-	//        DEF    OUTPUT_COUNT         OUTPUT       ID     INPUT_COUNT                  INPUT
-	bf.reserve(1  + const_in_stream + proc->out.count + 1 + const_in_stream + (proc->uniInCount + proc->multiInInputCount)*2);
+	//        DEF    OUTPUT_COUNT         OUTPUT       ID     INPUT_COUNT     INPUT*(Type + Reg)
+	bf.reserve(1  + const_in_stream + proc->out.count + 1 + const_in_stream + (proc->inCount)*2);
 	bf.emit(Bytecode::DEF);
 	bf.emitConstInt(proc->out.count);
 	for(u32 x=0; x<proc->out.count; x+=1){
@@ -649,12 +556,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 	    bf.emit(type->type);
 	};
 	bf.emit((Bytecode)procBytecodeID);
-	u32 inCount = proc->uniInCount + proc->multiInCount;
-	bf.emitConstInt(inCount);
-	for(u32 x=0; x<inCount;){
+	bf.emitConstInt(proc->inCount);
+	for(u32 x=0; x<proc->inCount;){
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
-	    case ASTType::UNI_DECLERATION:{
+	    case ASTType::DECLERATION:{
 		ASTUniVar *var = (ASTUniVar*)node;
 		u32 id = procSE->varMap.getValue(var->name);
 		const VariableEntity &entity = procSE->varEntities[id];
@@ -664,24 +570,11 @@ ASTUniVar *var = (ASTUniVar*)node;
 		bf.emit(regID);
 		x += 1;
 	    }break;
-	    case ASTType::MULTI_DECLERATION:{
-		ASTMultiVar *var = (ASTMultiVar*)node;
-		DynamicArray<String> &names = var->names;
-		for(u32 y=0; y<names.count; y+=1){
-		    u32 id = procSE->varMap.getValue(names[y]);
-		    const VariableEntity &entity = procSE->varEntities[id];
-		    Reg regID = procBC.newReg(entity.type);
-		    procBC.varToReg[id] = regID;
-		    bf.emit(entity.type);
-		    bf.emit(regID);
-		};
-		x += var->names.count;
-	    }break;
 	    };
 	};
 	//RESERVE ENDS HERE
 	see.push(procSE);
-	for(u32 x=inCount; x<proc->body.count; x+=1){
+	for(u32 x=proc->inCount; x<proc->body.count; x+=1){
 	    compileToBytecode(proc->body[x], file, see, bca, bf);
 	};
 	see.pop()->uninit();
