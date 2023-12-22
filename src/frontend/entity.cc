@@ -179,8 +179,8 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     return true;
 };
 
-bool checkProcEntityPresentInScopeElseReg(String name, Flag flag, ScopeEntities *procSe, DynamicArray<ScopeEntities*> &see) {
-    if(getProcEntity(name, see) != nullptr){return false;};
+ProcEntity *checkProcEntityPresentElseReg(String name, Flag flag, ScopeEntities *procSe, DynamicArray<ScopeEntities*> &see) {
+    if(getProcEntity(name, see) != nullptr){return nullptr;};
 
     ScopeEntities *se = see[see.count-1];
     Map &map = se->procMap;
@@ -193,8 +193,9 @@ bool checkProcEntityPresentInScopeElseReg(String name, Flag flag, ScopeEntities 
     ProcEntity entity;
     entity.name = name;
     entity.flag = flag;
+    entity.id   = id;
     se->procEntities[id] = entity;
-    return true;
+    return se->procEntities + id;
 };
 bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see){
     if(getVarEntity(name, see) != nullptr){return false;};
@@ -349,7 +350,6 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	};
     }break;
     case ASTType::IF:{
-	BRING_TOKENS_TO_SCOPE;
 	ASTIf *If = (ASTIf*)node;
 	if(checkExpression(If->expr, lexer, see) == false){return false;};
 	Flag treeFlag;
@@ -372,14 +372,30 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	if(checkEntities(If->elseBody, lexer, see) == false) { return false; };
 	see.pop();
     }break;
+    case ASTType::PROC_CALL:{
+	ASTProcCall *pc = (ASTProcCall*)node;
+	ProcEntity *pe = getProcEntity(pc->name, see);
+	if(pe == nullptr){
+	    lexer.emitErr(tokOffs[pc->off].off, "Procedure not defined: %.*s", pc->name.len, pc->name.mem);
+	    return false;
+	};
+	if(pc->args.count != pe->argTypes.count){
+	    lexer.emitErr(tokOffs[pc->off].off, "Procedure definition has %d argument%s but while calling %d argument%shas been passed", pe->argTypes.count, (pe->argTypes.count==1)?",":"s,", pc->args.count, (pc->args.count==1)?" ":"s ");
+	    return false;
+	};
+	for(u32 x=0; x<pc->args.count; x+=1){
+	    if(checkExpression(pc->args[x], lexer, see) == false){return false;};
+	    //to be continued.....
+	};
+    }break;
     case ASTType::PROC_DEFENITION: {
-	BRING_TOKENS_TO_SCOPE;
 	ASTProcDef *proc = (ASTProcDef*)node;
 	String name = proc->name;
 	
 	ScopeEntities *procSE = allocScopeEntity(Scope::PROC);
 	proc->se = procSE;
-	if(checkProcEntityPresentInScopeElseReg(name, proc->flag, procSE, see) == false){
+	ProcEntity *pe = checkProcEntityPresentElseReg(name, proc->flag, procSE, see);
+	if(pe == nullptr){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};
@@ -398,6 +414,20 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	see.push(procSE);
 	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
+	pe->argTypes.init();
+	for(u32 x=0; x<proc->inCount; x+=1){
+	    ASTBase *arg = proc->body[x];
+	    switch(arg->type){
+	    case ASTType::INITIALIZATION_T_KNOWN:{
+		ASTUniVar *var = (ASTUniVar*)arg;
+		Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
+		pe->argTypes.push(type);
+	    }break;
+	    default:
+		//TODO:
+		return false;
+	    };
+	};
     } break;
     case ASTType::RETURN:{
 	//TODO: 

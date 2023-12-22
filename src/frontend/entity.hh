@@ -15,7 +15,9 @@ struct VariableEntity : Entity{
     Type type;
 };
 struct ProcEntity : Entity{
+    DynamicArray<Type> argTypes;
     Flag flag;
+    u32 id;
 };
 struct StructEntity : Entity{
     Map varToOff;

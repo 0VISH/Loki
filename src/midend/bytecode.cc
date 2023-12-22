@@ -203,7 +203,7 @@ struct BytecodeFile{
     };
 
 };
-static u16 procID  = 0;
+
 static u16 labelID = 1;
 
 u16 newLabel(){
@@ -541,9 +541,9 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
-	u32 procBytecodeID = procID;
+	ProcEntity *pe = getProcEntity(proc->name, see);
+	u32 procBytecodeID = pe->id;
 	bc.procToID.insertValue(proc->name, procBytecodeID);
-	procID += 1;
 	ScopeEntities *procSE = proc->se;
 	BytecodeContext &procBC = bca.newElem();
         procBC.init(procSE->varMap.count, procSE->procMap.count, bc.registerID);

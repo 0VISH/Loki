@@ -42,12 +42,14 @@ bool compile(char *fileName){
 	char *filePath = Dep::parseCheckStack.pop();
 	ASTFile &file = Dep::newASTFile();
 	file.scope = parseCheckAndLoadEntities(filePath, file);
-	if(file.scope != nullptr){
-	    Dep::pushToCompileStack(file.id);
-	};
+	if(file.scope == nullptr){break;};
+	Dep::pushToCompileStack(file.id);
     };
     os::endTimer(TimeSlot::FRONTEND);
-    if(report::errorOff != 0){return false;};
+    if(report::errorOff != 0){
+	report::flushReports();
+	return false;
+    };
     os::startTimer(TimeSlot::MIDEND);
     DynamicArray<BytecodeContext> bca;
     bca.init(3);

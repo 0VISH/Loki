@@ -28,6 +28,7 @@ enum class ASTType {
     MODIFIER,
     GLOBAL_VAR_INIT,
     MULTI_VAR_RHS,
+    PROC_CALL,
     RETURN
 };
 enum class ForType{
@@ -95,6 +96,11 @@ struct ASTProcDef : ASTBase {
     ScopeEntities *se;
     u32 inCount;
     u32 tokenOff;
+};
+struct ASTProcCall : ASTBase{
+    DynamicArray<ASTBase*> args;
+    String name;
+    u32 off;
 };
 struct ASTVariable : ASTBase{
     String name;
@@ -294,6 +300,25 @@ ASTBase *genVariable(u32 &x, Lexer &lexer, ASTFile &file){
     };
     return root;
 };
+u32 getEnd(DynamicArray<Token_Type>& tokTypes, u32 x) {
+    //SIMD?
+    u8 bra = 1;
+    while(true){
+	switch(tokTypes[x]){
+	case (Token_Type)'\n': return x;
+	case (Token_Type)',': return x;
+	case (Token_Type)'(': bra += 1; break;
+	case (Token_Type)')':{
+	    bra -= 1;
+	    if(bra == 0){return x;};
+	}break;
+	case Token_Type::END_OF_FILE: return x;
+	};
+	x += 1;
+    };
+    return x;
+};
+ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 end);
 ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
     BRING_TOKENS_TO_SCOPE;
  CHECK_TYPE_AST_OPERAND:
@@ -335,11 +360,35 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	goto CHECK_TYPE_AST_OPERAND;
     }break;
     case Token_Type::IDENTIFIER:{
-	ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
-	var->name = makeStringFromTokOff(x, lexer);
-	var->tokenOff = x;
-	x += 1;
-	return (ASTBase*)var;
+	if(tokTypes[x+1] == (Token_Type)'('){
+	    ASTProcCall *pc = (ASTProcCall*)allocAST(sizeof(ASTProcCall), ASTType::PROC_CALL, file);
+	    pc->off = x;
+	    pc->name = makeStringFromTokOff(x, lexer);
+	    x += 2;
+	    pc->args.init();
+	    while(true){
+		u32 end = getEnd(tokTypes, x);
+		ASTBase *arg = genASTExprTree(lexer, file, x, end);
+		if(arg == false){return nullptr;};
+		pc->args.push(arg);
+		switch(tokTypes[x]){
+		case (Token_Type)')': goto EXIT_LOOP_PROC_CALL;
+		case (Token_Type)',': x+=1; break;
+		default:
+		    lexer.emitErr(tokOffs[x].off, "Expected ',' or ')'");
+		    return nullptr;
+		};
+	    };
+	EXIT_LOOP_PROC_CALL:
+	    x += 1;
+	    return (ASTBase*)pc;
+	}else{
+	    ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
+	    var->name = makeStringFromTokOff(x, lexer);
+	    var->tokenOff = x;
+	    x += 1;
+	    return (ASTBase*)var;
+	};
     }break;
     default:
 	lexer.emitErr(tokOffs[x].off, "Invalid operand");
@@ -424,14 +473,6 @@ ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 end) {
     };
     return (ASTBase*)lhs;
 };
-u32 getEndNewlineEOF(DynamicArray<Token_Type>& tokTypes, u32 x) {
-    //SIMD?
-    while (tokTypes[x] != (Token_Type)'\n' && tokTypes[x] != Token_Type::END_OF_FILE) {
-	x += 1;
-    };
-    return x;
-};
-
 ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
     BRING_TOKENS_TO_SCOPE;
     AST_Type *type = (AST_Type*)allocAST(sizeof(AST_Type), ASTType::TYPE, file);
@@ -719,7 +760,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		assign->tokenOff = start;
 		assign->name = makeStringFromTokOff(start, lexer);
 		x += 1;
-		u32 end = getEndNewlineEOF(tokTypes, x);
+		u32 end = getEnd(tokTypes, x);
 		if(tokTypes[x] == Token_Type::TDOT){
 		    SET_BIT(flag, Flags::UNINITIALIZED);
 		    x += 1;
@@ -873,8 +914,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    return true;
 		}break;
 		};
-		
-	    } break;
+	    }break;
 	    default: {
 		if (isType(tokTypes[x])) {
 		    x += 1;
@@ -894,14 +934,14 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		};
 	    } break;
 	    } break;
-	} break;
+	}break;
 	case (Token_Type)',': {
 	    //multi var def/decl
 	    u32 i = x;
 	    x = start;
 	    ASTType type;
 	    u32 equalSignPos = 0;
-	    u32 end = getEndNewlineEOF(tokTypes, equalSignPos);
+	    u32 end = getEnd(tokTypes, equalSignPos);
 	    while(true){
 		switch(tokTypes[i]){
 		case (Token_Type)':':{
@@ -972,11 +1012,15 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    };
 	    x = end;
 	    return true;
-	} break;
-	} break;
-    } break;
+	}break;
+	default:
+	    goto PARSE_EXPR;
+	}break;
+    }break;
     default: {
-	u32 end = getEndNewlineEOF(tokTypes, x);
+	PARSE_EXPR:
+	x = start;
+	u32 end = getEnd(tokTypes, x);
 	ASTBase *tree = genASTExprTree(lexer, file, x, end);
 	if(tree == nullptr){return false;};
 	table.push(tree);
@@ -1198,6 +1242,17 @@ namespace dbg {
 		__dumpNodesWithoutEndPadding(table[v], lexer, padding + 1);
 	    };
 	} break;
+	case ASTType::PROC_CALL:{
+	    ASTProcCall *pc = (ASTProcCall*)node;
+	    printf("proc_call");
+	    PAD;
+	    printf("name: %.*s", pc->name.len, pc->name.mem);
+	    PAD;
+	    for(u32 x=0; x<pc->args.count; x+=1){
+		ASTBase *arg = pc->args[x];
+		__dumpNodesWithoutEndPadding(arg, lexer, padding+1);
+	    };
+	}break;
 	case ASTType::TYPE:{
 	    AST_Type *type = (AST_Type*)node;
 	    printf("%d", type->type);
