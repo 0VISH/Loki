@@ -619,8 +619,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
 	    case ASTType::DECLERATION:{
-		ASTUniVar *var = (ASTUniVar*)node;
-		u32 id = procSE->varMap.getValue(var->name);
+		u32 id = proc->firstArgID + x;
 		const VariableEntity &entity = procSE->varEntities[id];
 		Reg regID = procBC.newReg(entity.type);
 		procBC.varToReg[id] = regID;

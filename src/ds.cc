@@ -163,10 +163,10 @@ public:
 	len = length;
 	count = 0;
 	char *mem = (char*)mem::alloc(length * (sizeof(String)+sizeof(u16)+sizeof(bool)));
-	keys = (String*)mem;
-	values = (u16*) ((char*)keys   + (length*sizeof(String)));
-	status = (bool*)  ((char*)values + (length*sizeof(u16)));
-	memset(status, false, sizeof(bool)*length);
+	keys = (String*)mem::alloc(length * sizeof(String));
+	values = (u16*)mem::alloc(length * sizeof(u16));
+	status = (bool*)mem::alloc(length * sizeof(bool));
+	memset(status, false, length*sizeof(bool));
     };
     void uninit() {
 	mem::free(keys);

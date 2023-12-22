@@ -108,7 +108,6 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
 	    write("%d%d(", id, bc);
 	};
 	s64 inCount = getConstIntAndUpdate(bytecodes, off);
-	printf("inCOUNT: %lld\n", inCount);
 	if(inCount != 0){
 	    while(inCount != 1){
 		Bytecode inputType = getBytecode(bytecodes, off);

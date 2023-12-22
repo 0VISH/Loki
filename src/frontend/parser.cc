@@ -94,6 +94,7 @@ struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> out;
     String name;
     ScopeEntities *se;
+    u32 firstArgID;
     u32 inCount;
     u32 tokenOff;
 };
@@ -829,9 +830,14 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    if(tokTypes[x] == (Token_Type)')'){goto END_PROC_INPUT_PARSING_LOOP;};
 		    while(true){
 			eatNewlines(tokTypes, x);
+			u32 argStart = x;
 			bool result = parseBlock(lexer, file, proc->body, x);
 			if(result == false){return false;};
-			ASTBase *base = proc->body[proc->body.count - 1];
+			ASTBase *arg = proc->body[proc->body.count - 1];
+			if(arg->type != ASTType::DECLERATION){
+			    lexer.emitErr(tokOffs[argStart].off, "Procedure defenition only takes declerations");
+			    return false;
+			};
 			switch(tokTypes[x]){
 			case (Token_Type)')':{
 			    goto END_PROC_INPUT_PARSING_LOOP;
@@ -840,7 +846,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			    x += 1;
 			}break;
 			default:
-			    printf("TYPE: %d", tokTypes[x]);
 			    lexer.emitErr(tokOffs[x].off, "Expected ','");
 			    return false;
 			};
@@ -944,7 +949,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    u32 i = x;
 	    x = start;
 	    ASTType type;
-	    u32 equalSignPos = 1;
+	    u32 equalSignPos = 0;
 	    u32 end = 0;
 	    while(true){
 		switch(tokTypes[i]){
@@ -977,7 +982,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    };
 	    EXIT_LOOP_MULTI_VAR:
 	    if(end == 0){
-		end = getEnd(tokTypes, equalSignPos);
+		end = getEnd(tokTypes, x);
 	    };
 	    Flag flag = 0;
 	    ASTMultiVarRHS *mvr = nullptr;

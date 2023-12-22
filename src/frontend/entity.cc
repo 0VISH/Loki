@@ -179,7 +179,7 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     return true;
 };
 
-ProcEntity *checkProcEntityPresentElseReg(String name, Flag flag, ScopeEntities *procSe, DynamicArray<ScopeEntities*> &see) {
+ProcEntity *checkProcEntityPresentElseReg(String name, Flag flag, DynamicArray<ScopeEntities*> &see) {
     if(getProcEntity(name, see) != nullptr){return nullptr;};
 
     ScopeEntities *se = see[see.count-1];
@@ -190,11 +190,12 @@ ProcEntity *checkProcEntityPresentElseReg(String name, Flag flag, ScopeEntities 
 	id = 0;
     };
     map.insertValue(name,id);
-    ProcEntity entity;
+    ProcEntity &entity = se->procEntities[id];
     entity.name = name;
     entity.flag = flag;
     entity.id   = id;
-    se->procEntities[id] = entity;
+    entity.argTypes.init();
+    entity.retTypes.init();
     return se->procEntities + id;
 };
 bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see){
@@ -390,9 +391,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    Type argType = pe->argTypes[x];
 	    if(isSameTypeRange(argTreeType, argType) == false){
 		lexer.emitErr(tokOffs[pc->argOffs[x]].off, "Type mismatch. They don't belong to the same range");
+		return false;
 	    };
-	    if(argTreeType > argType){
+	    if(argTreeType > argType && isCompNum(argTreeType) == false){
 		lexer.emitErr(tokOffs[pc->argOffs[x]].off, "Type of argument given is greater than defined. Explicit cast required");
+		return false;
 	    };
 	};
     }break;
@@ -402,12 +405,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	
 	ScopeEntities *procSE = allocScopeEntity(Scope::PROC);
 	proc->se = procSE;
-	ProcEntity *pe = checkProcEntityPresentElseReg(name, proc->flag, procSE, see);
+	ProcEntity *pe = checkProcEntityPresentElseReg(name, proc->flag, see);
 	if(pe == nullptr){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};
-	pe->retTypes.init();
 	for(u32 x=0; x<proc->out.count; x+=1){
 	    ASTBase *node = proc->out[x];
 	    if(node->type != ASTType::TYPE){
@@ -422,7 +424,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	see.push(procSE);
 	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
-	pe->argTypes.init();
+	printf("procSE:map:status: %p\n", procSE->varMap.status);
 	for(u32 x=0; x<proc->inCount; x+=1){
 	    ASTBase *arg = proc->body[x];
 	    switch(arg->type){
@@ -431,10 +433,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 		Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
 		pe->argTypes.push(type);
 	    }break;
-	    default:
-		lexer.emitErr("Procedure defenition only takes declerations");
-		return false;
 	    };
+	};
+	if(proc->inCount != 0){
+	    ASTUniVar *var = (ASTUniVar*)proc->body[0];
+	    proc->firstArgID = procSE->varMap.getValue(var->name);
 	};
     } break;
     case ASTType::INITIALIZATION_T_UNKNOWN:{
