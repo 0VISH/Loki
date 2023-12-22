@@ -385,7 +385,15 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	};
 	for(u32 x=0; x<pc->args.count; x+=1){
 	    if(checkExpression(pc->args[x], lexer, see) == false){return false;};
-	    //to be continued.....
+	    Flag flag;
+	    Type argTreeType = getTreeType(pc->args[x], flag, see, lexer);
+	    Type argType = pe->argTypes[x];
+	    if(isSameTypeRange(argTreeType, argType) == false){
+		lexer.emitErr(tokOffs[pc->argOffs[x]].off, "Type mismatch. They don't belong to the same range");
+	    };
+	    if(argTreeType > argType){
+		lexer.emitErr(tokOffs[pc->argOffs[x]].off, "Type of argument given is greater than defined. Explicit cast required");
+	    };
 	};
     }break;
     case ASTType::PROC_DEFENITION: {
@@ -399,16 +407,16 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
 	};
+	pe->retTypes.init();
 	for(u32 x=0; x<proc->out.count; x+=1){
 	    ASTBase *node = proc->out[x];
-	    switch(node->type){
-	    case ASTType::TYPE:{
-		checkType(node, lexer, see);
-	    }break;
-	    default:
-		lexer.emitErr(tokOffs[proc->tokenOff].off, "Invalid output statement for procedure defenition");
+	    if(node->type != ASTType::TYPE){
+		lexer.emitErr(tokOffs[proc->tokenOff].off, "Invalid output type for procedure defenition");
 		return false;
 	    };
+	    checkType(node, lexer, see);
+	    AST_Type *typeNode = (AST_Type*)node;
+	    pe->retTypes.push(typeNode->type);
 	};
 	//NOTE: checking body checks the input also
 	see.push(procSE);
@@ -418,17 +426,43 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	for(u32 x=0; x<proc->inCount; x+=1){
 	    ASTBase *arg = proc->body[x];
 	    switch(arg->type){
-	    case ASTType::INITIALIZATION_T_KNOWN:{
+	    case ASTType::DECLERATION:{
 		ASTUniVar *var = (ASTUniVar*)arg;
 		Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
 		pe->argTypes.push(type);
 	    }break;
 	    default:
-		//TODO:
+		lexer.emitErr("Procedure defenition only takes declerations");
 		return false;
 	    };
 	};
     } break;
+    case ASTType::INITIALIZATION_T_UNKNOWN:{
+	ASTUniVar *var = (ASTUniVar*)node;
+	Flag flag = var->flag;
+	if(IS_BIT(flag, Flags::UNINITIALIZED)){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Cannot keep the variable uninitialized since the type is unkown.");
+	    return false;
+	};
+	CHECK_TREE_AND_MERGE_FLAGS;
+	if(checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see) == false){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
+	    return false;
+	};
+    }break;
+    case ASTType::INITIALIZATION_T_KNOWN:{
+	ASTUniVar *var = (ASTUniVar*)node;
+	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see);
+	Flag flag = var->flag;
+	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
+	    CHECK_TREE_AND_MERGE_FLAGS;
+	    IS_EXPLICIT_CAST_REQUIRED;
+	};
+	if(checkVarEntityPresentInScopeElseReg(var->name, flag, type, see) == false){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
+	    return false;
+	};
+    }break;
     case ASTType::RETURN:{
 	//TODO: 
     }break;

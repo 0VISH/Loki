@@ -50,6 +50,7 @@ bool compile(char *fileName){
 	report::flushReports();
 	return false;
     };
+    ASSERT(Dep::compileStack.count != 0);
     os::startTimer(TimeSlot::MIDEND);
     DynamicArray<BytecodeContext> bca;
     bca.init(3);

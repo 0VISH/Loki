@@ -99,6 +99,7 @@ struct ASTProcDef : ASTBase {
 };
 struct ASTProcCall : ASTBase{
     DynamicArray<ASTBase*> args;
+    DynamicArray<u32>      argOffs;
     String name;
     u32 off;
 };
@@ -366,8 +367,10 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	    pc->name = makeStringFromTokOff(x, lexer);
 	    x += 2;
 	    pc->args.init();
+	    pc->argOffs.init();
 	    while(true){
 		u32 end = getEnd(tokTypes, x);
+		pc->argOffs.push(x);
 		ASTBase *arg = genASTExprTree(lexer, file, x, end);
 		if(arg == false){return nullptr;};
 		pc->args.push(arg);
@@ -916,13 +919,14 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		};
 	    }break;
 	    default: {
-		if (isType(tokTypes[x])) {
+		if (isType(tokTypes[x]) || tokTypes[x] == Token_Type::IDENTIFIER) {
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') {
 			uniVarType = ASTType::INITIALIZATION_T_KNOWN;
 			goto SINGLE_VARIABLE_ASSIGNMENT;
 		    };
 		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::DECLERATION, file);
+		    assign->typeTokenOff = x-1;
 		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    assign->flag = flag;
@@ -940,8 +944,8 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    u32 i = x;
 	    x = start;
 	    ASTType type;
-	    u32 equalSignPos = 0;
-	    u32 end = getEnd(tokTypes, equalSignPos);
+	    u32 equalSignPos = 1;
+	    u32 end = 0;
 	    while(true){
 		switch(tokTypes[i]){
 		case (Token_Type)':':{
@@ -972,6 +976,9 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		i += 1;
 	    };
 	    EXIT_LOOP_MULTI_VAR:
+	    if(end == 0){
+		end = getEnd(tokTypes, equalSignPos);
+	    };
 	    Flag flag = 0;
 	    ASTMultiVarRHS *mvr = nullptr;
 	    if(type != ASTType::DECLERATION){

@@ -24,8 +24,10 @@ template<typename T>
 struct Array {
     T *mem;
     u32 len;
+    u32 off;
 
     Array(u32 length){
+	off = 0;
 	len = length;
 	mem = (T*)mem::alloc(sizeof(T)*len);
     };
@@ -39,6 +41,10 @@ struct Array {
 	};
 #endif
 	return mem[index];
+    };
+    void push(const T &t){
+	mem[off] = t;
+	off += 1;
     };
 };
 

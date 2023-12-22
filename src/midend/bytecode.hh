@@ -35,6 +35,7 @@ enum class Bytecode : u16{
     PROC_END,
     ALLOC,
     GLOBAL,
+    CALL,
     _TEXT_STARTUP_START,
     _TEXT_STARTUP_END,
     NEXT_BUCKET,

@@ -201,7 +201,20 @@ struct BytecodeFile{
 	emit(type);
 	emitConstDec(num);
     };
-
+    void call(u32 id, DynamicArray<Type> &argTypes, Array<Reg> argRegs, DynamicArray<Type> &retTypes){
+	reserve(1 + 1 + 1 + retTypes.count + 1 + argTypes.count*2);
+	emit(Bytecode::CALL);
+	emit(id);
+	emit(retTypes.count);
+	for(u32 x=0; x<retTypes.count; x+=1){
+	    emit(retTypes[x]);
+	};
+	emit(argTypes.count);
+	for(u32 x=0; x<argTypes.count; x+=1){
+	    emit(argTypes[x]);
+	    emit(argRegs[x]);
+	};
+    };
 };
 
 static u16 labelID = 1;
@@ -412,6 +425,51 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 		bf.movConst(reg, (s64)0);
 	    };
 	};
+    }break;
+    case ASTType::INITIALIZATION_T_KNOWN:
+    case ASTType::INITIALIZATION_T_UNKNOWN:{
+	ASTUniVar *var = (ASTUniVar*)node;
+	u32 id = se->varMap.getValue(var->name);
+	const VariableEntity &entity = se->varEntities[id];
+	Flag flag = var->flag;
+	if(IS_BIT(flag, Flags::GLOBAL)){
+	    Reg reg = bc.newReg(entity.type) * -1;
+	    if(IS_BIT(flag, Flags::UNINITIALIZED)){
+		bf.gbl(reg, entity.type, (s64)0);
+	    }else if(var->rhs->type == ASTType::NUM_INTEGER){
+		ASTNumInt *numInt = (ASTNumInt*)var->rhs;
+		bf.gbl(reg, entity.type, numInt->num);
+	    }else if(var->rhs->type == ASTType::NUM_DECIMAL){
+		ASTNumDec *numDec = (ASTNumDec*)var->rhs;
+		bf.gbl(reg, entity.type, numDec->num);
+	    }else{
+		bf.gbl(reg, entity.type, (s64)0);
+		ASTGblVarInit *gvi = (ASTGblVarInit*)allocAST(sizeof(ASTGblVarInit), ASTType::GLOBAL_VAR_INIT, file);
+		gvi->reg = reg;
+		gvi->rhs = var->rhs;
+		gvi->type = entity.type;
+		bf.startupNodes.push(gvi);
+	    };
+	    bc.varToReg[id] = reg;
+	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
+	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
+	    Reg rhsReg = bc.newReg(entity.type);
+	    bf.alloc(entity.type, rhsReg);
+	    bc.varToReg[id] = rhsReg;
+	}else{
+	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
+	    bc.varToReg[id] = rhs.reg;
+	};
+    }break;
+    case ASTType::PROC_CALL:{
+	ASTProcCall *pc = (ASTProcCall*)node;
+	ProcEntity *pe = getProcEntity(pc->name, see);
+	Array<Reg> argRegs(pc->args.count);
+	for(u32 x=0; x<pc->args.count; x+=1){
+	    auto rhs = compileExprToBytecode(pc->args[x], see, bca, bf);
+	    argRegs.push(rhs.reg);
+	};
+	bf.call(pe->id, pe->argTypes, argRegs, pe->retTypes);
     }break;
     case ASTType::GLOBAL_VAR_INIT:{
 	ASTGblVarInit *gvi = (ASTGblVarInit*)node;
@@ -830,6 +888,22 @@ namespace dbg{
 		printf(" %lld", num);
 	    };
 	}break;
+	case Bytecode::CALL:{
+	    Bytecode id = getBytecode(buc, x);
+	    printf("call %d ", id);
+	    Bytecode retCount = getBytecode(buc, x);
+	    for(u32 x=0; x<(u32)retCount; x+=1){
+		DUMP_TYPE;
+	    };
+	    printf("(");
+	    Bytecode inCount = getBytecode(buc, x);
+	    for(u32 x=0; x<(u32)inCount; x+=1){
+		DUMP_TYPE;
+		DUMP_REG;
+		printf(", ");
+	    };
+	    printf(")");
+	};
 	case Bytecode::_TEXT_STARTUP_START:{
 	    printf("_TEXT_STARTUP_START:");
 	}break;

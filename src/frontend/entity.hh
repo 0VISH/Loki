@@ -16,6 +16,7 @@ struct VariableEntity : Entity{
 };
 struct ProcEntity : Entity{
     DynamicArray<Type> argTypes;
+    DynamicArray<Type> retTypes;
     Flag flag;
     u32 id;
 };
