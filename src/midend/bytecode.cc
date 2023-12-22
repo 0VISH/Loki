@@ -225,6 +225,7 @@ u16 newLabel(){
     return lbl;
 };
 
+//FIXME: we need another registerID only for constants of no use. Should not mix var registers and const registers
 struct BytecodeContext{
     Map   procToID;
     u32  *varToReg;
@@ -647,7 +648,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	break;
     };
 };
-void compileASTNodesToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+void compileASTFileToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     for(u32 x=0; x<file.nodes.count; x+=1){
 	ASTBase *node = file.nodes[x];
 	compileToBytecode(node, file, see, bca, bf);
@@ -663,7 +664,6 @@ void compileASTNodesToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see,
     };
     bf.emit(Bytecode::NONE);
 };
-
 #if(DBG)
 
 #define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(buc, x), pbuc, x);

@@ -11,6 +11,7 @@ struct Config{
     char *entryPoint;
     char *file;
     char *out;
+    s32   entryPointID;
 
     EndType end;
 };

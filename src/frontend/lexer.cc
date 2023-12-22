@@ -138,7 +138,6 @@ struct Lexer {
 	return true;
     };
     void uninit(){
-	mem::free(fileContent-1);
 	tokenTypes.uninit();
 	tokenOffsets.uninit();
     };

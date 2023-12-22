@@ -8,6 +8,7 @@ struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
     ScopeEntities *scope;
+    char *fileContent;
     s16 id;
     u16 pageBrim;
 
@@ -20,6 +21,7 @@ struct ASTFile{
 	nodes.init(10);
     };
     void uninit(){
+	mem::free(fileContent-1);
 	for(u32 x=0; x<nodes.count; x += 1){
 	    freeNodeInternal(nodes[x]);
 	};

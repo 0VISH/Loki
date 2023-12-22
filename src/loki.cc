@@ -33,6 +33,7 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     if(checkEntities(astFile.nodes, lexer, see) == false){
 	return nullptr;
     };
+    astFile.fileContent = lexer.fileContent;
     return fileScopeEntities;
 };
 bool compile(char *fileName){
@@ -70,8 +71,12 @@ bool compile(char *fileName){
 	BytecodeContext &bc = bca.newElem();
 	bc.init(fileScope->varMap.count, fileScope->procMap.count, 1);
 	see.push(fileScope);
-	compileASTNodesToBytecode(file, see, bca, bf);
+	compileASTFileToBytecode(file, see, bca, bf);
 	see.pop();
+	s32 id = bc.procToID.getValue({config.entryPoint, (u32)strlen(config.entryPoint)});
+	if(id != -1){
+	    config.entryPointID = id;
+	};
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
 	file.uninit();

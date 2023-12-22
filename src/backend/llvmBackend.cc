@@ -28,7 +28,8 @@ void writeReg(Bytecode bc, s16 id){
     };
     write("%%_%d%d", id, reg);
 };
-void translate(BytecodeBucket *buc, u32 &off, s16 id){
+
+void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
@@ -102,7 +103,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id){
 	};
 	Bytecode bc = getBytecode(bytecodes, off);
 	write("define %s @__", typeIDToName[(u16)outputType]);
-	if((u16)bc == 0){
+	if((s16)bc == config->entryPointID){
 	    write("main(");
 	}else{
 	    write("%d%d(", id, bc);
@@ -206,7 +207,7 @@ EXPORT void backendCompileStage1(BytecodeBucket *buc, s16 id, Config *config){
 	    off = 0;
 	    continue;
 	};
-	translate(curBucket, off, id);
+	translate(curBucket, off, id, config);
     };
     return;
 };
