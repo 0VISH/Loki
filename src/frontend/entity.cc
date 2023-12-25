@@ -421,7 +421,6 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	see.push(procSE);
 	if(checkEntities(proc->body, lexer, see) == false) { return false; };
 	see.pop();
-	printf("procSE:map:status: %p\n", procSE->varMap.status);
 	for(u32 x=0; x<proc->inCount; x+=1){
 	    ASTBase *arg = proc->body[x];
 	    switch(arg->type){

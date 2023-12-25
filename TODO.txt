@@ -1,4 +1,4 @@
-:: backend as dll with #if(WIN)
+:: frontend converts name to id's and frees file mem
 :: tracy
 :: Add struct
 :: Dependency system and include files

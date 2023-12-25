@@ -1,6 +1,13 @@
 #include "backend.cc"
 #include "../frontend/typeBasic.cc"
 
+/*
+  (dd): (bytecode file id, specific id)
+  register:  %_dd
+  global:    @_dd
+  procedure: @__dd
+ */
+
 char *typeIDToName[] = {
     "unkown",
     "void",
@@ -28,11 +35,73 @@ void writeReg(Bytecode bc, s16 id){
     };
     write("%%_%d%d", id, reg);
 };
+void writeType(Bytecode bc){
+    Type type = (Type)bc;
+    switch(type){
+    case Type::XE_VOID: write("void");break;
+    case Type::COMP_DECIMAL:
+    case Type::F_64:    write("double");break;
+    case Type::COMP_INTEGER:
+    case Type::U_64:
+    case Type::S_64:    write("i64");break;
+    case Type::U_32:
+    case Type::S_32:    write("i32");break;
+    case Type::U_16:
+    case Type::S_16:    write("i16");break;
+    case Type::U_8:
+    case Type::S_8:     write("i8");break;
+    default: UNREACHABLE;
+    };
+};
 
 void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
+    case Bytecode::CAST:{
+	Bytecode targetType = getBytecode(bytecodes, off);
+	Bytecode targetReg  = getBytecode(bytecodes, off);
+	Bytecode srcType    = getBytecode(bytecodes, off);
+	Bytecode srcReg     = getBytecode(bytecodes, off);
+	if(targetType < srcType){
+	    writeReg(targetReg, id);
+	    write(" = trunc ");
+	    writeType(srcType);
+	    write(" ");
+	    writeReg(srcReg, id);
+	    write(" to ");
+	    writeType(targetType);
+	};
+    }break;
+    case Bytecode::CALL:{
+	Bytecode procID = getBytecode(bytecodes, off);
+	write("call ");
+	s64 retCount = getConstIntAndUpdate(bytecodes, off);
+	if(retCount == 0){
+	    write("%s ", "void");
+	};
+	//FIXME: doesnt work in llvm api. work around?
+	while(retCount != 0){
+	    writeType(getBytecode(bytecodes, off));
+	    write(" ");
+	    retCount -= 1;
+	};
+	write("@__%d%d(", id, procID);
+	s64 inCount = getConstIntAndUpdate(bytecodes, off);
+	while(inCount > 1){
+	    writeType(getBytecode(bytecodes, off));
+	    write(" ");
+	    writeReg(getBytecode(bytecodes, off), id);
+	    write(", ");
+	    inCount -= 1;
+	};
+	if(inCount == 1){
+	    writeType(getBytecode(bytecodes, off));
+	    write(" ");
+	    writeReg(getBytecode(bytecodes, off), id);
+	};
+	write(")");
+    }break;
     case Bytecode::JMP:{
 	Bytecode label = getBytecode(bytecodes, off);
 	write("br label %%__%d%d", id, label);

@@ -202,14 +202,14 @@ struct BytecodeFile{
 	emitConstDec(num);
     };
     void call(u32 id, DynamicArray<Type> &argTypes, Array<Reg> argRegs, DynamicArray<Type> &retTypes){
-	reserve(1 + 1 + 1 + retTypes.count + 1 + argTypes.count*2);
+	reserve(1 + 1 + const_in_stream + retTypes.count + const_in_stream + argTypes.count*2);
 	emit(Bytecode::CALL);
 	emit(id);
-	emit(retTypes.count);
+	emitConstInt(retTypes.count);
 	for(u32 x=0; x<retTypes.count; x+=1){
 	    emit(retTypes[x]);
 	};
-	emit(argTypes.count);
+	emitConstInt(argTypes.count);
 	for(u32 x=0; x<argTypes.count; x+=1){
 	    emit(argTypes[x]);
 	    emit(argRegs[x]);
@@ -225,20 +225,19 @@ u16 newLabel(){
     return lbl;
 };
 
-//FIXME: we need another registerID only for constants of no use. Should not mix var registers and const registers
 struct BytecodeContext{
     Map   procToID;
     u32  *varToReg;
     Type *varTypes;
+    u16   varTypesMax;
     Reg   registerID;
 
     void init(u32 varCount, u32 procCount, Reg rgsID){
 	varToReg = nullptr;
 	registerID = rgsID;
-	if(varCount != 0){
-	    varToReg = (u32*)mem::alloc(sizeof(u32)*varCount);
-	    varTypes = (Type*)mem::alloc(sizeof(Type)*varCount);
-	};
+	varTypesMax = varCount + (u16)(varCount/2) +10;
+	varToReg = (u32*)mem::alloc(varTypesMax *sizeof(u32));
+	varTypes = (Type*)mem::alloc(varTypesMax*sizeof(Type));
 	procToID.len = 0;
 	if(procCount != 0){
 	    procToID.init(procCount);
@@ -252,6 +251,18 @@ struct BytecodeContext{
 	if(procToID.len != 0){procToID.uninit();};
     };
     Reg newReg(Type type){
+	if(registerID == varTypesMax){
+	    u16 varTypesMaxNew = varTypesMax + (u16)(varTypesMax/2) + 10;
+	    u32  *varToRegNew = (u32*)mem::alloc(varTypesMaxNew *sizeof(u32));
+	    Type *varTypesNew = (Type*)mem::alloc(varTypesMaxNew*sizeof(Type));
+	    memcpy(varToRegNew, varToReg, sizeof(u32)*varTypesMax);
+	    memcpy(varTypesNew, varTypes, sizeof(Type)*varTypesMax);
+	    mem::free(varToReg);
+	    mem::free(varTypes);
+	    varToReg = varToRegNew;
+	    varTypes = varTypesNew;
+	    varTypesMax = varTypesMaxNew;
+	};
 	Reg reg = registerID;
 	registerID += 1;
 	varTypes[reg] = type;
@@ -467,8 +478,11 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ProcEntity *pe = getProcEntity(pc->name, see);
 	Array<Reg> argRegs(pc->args.count);
 	for(u32 x=0; x<pc->args.count; x+=1){
+	    Type procExpectedType = pe->argTypes[x];
 	    auto rhs = compileExprToBytecode(pc->args[x], see, bca, bf);
-	    argRegs.push(rhs.reg);
+	    Reg argReg = bc.newReg(procExpectedType);
+	    bf.cast(procExpectedType, argReg, rhs.type, rhs.reg);
+	    argRegs.push(argReg);
 	};
 	bf.call(pe->id, pe->argTypes, argRegs, pe->retTypes);
     }break;
@@ -889,20 +903,20 @@ namespace dbg{
 	}break;
 	case Bytecode::CALL:{
 	    Bytecode id = getBytecode(buc, x);
-	    printf("call %d ", id);
-	    Bytecode retCount = getBytecode(buc, x);
-	    for(u32 x=0; x<(u32)retCount; x+=1){
+	    printf("call %d", id);
+	    s64 retCount = getConstIntAndUpdate(buc->bytecodes, x);
+	    for(u32 j=0; j<retCount; j+=1){
 		DUMP_TYPE;
 	    };
 	    printf("(");
-	    Bytecode inCount = getBytecode(buc, x);
-	    for(u32 x=0; x<(u32)inCount; x+=1){
+	    s64 inCount = getConstIntAndUpdate(buc->bytecodes, x);
+	    for(u32 j=0; j<inCount; j+=1){
 		DUMP_TYPE;
 		DUMP_REG;
 		printf(", ");
 	    };
 	    printf(")");
-	};
+	}break;
 	case Bytecode::_TEXT_STARTUP_START:{
 	    printf("_TEXT_STARTUP_START:");
 	}break;

@@ -1036,6 +1036,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	ASTBase *tree = genASTExprTree(lexer, file, x, end);
 	if(tree == nullptr){return false;};
 	table.push(tree);
+	return true;
     } break;
     };
     return false;

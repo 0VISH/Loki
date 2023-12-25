@@ -5,9 +5,9 @@
 #define REGISTER_COUNT      100
 
 /*
-  $d  global
-  %d  register
-  @d  proc
+  %d   register
+  $d   global
+  @d   proc
 */
 enum class Bytecode : u16{
     NONE = 0,
