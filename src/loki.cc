@@ -68,14 +68,10 @@ bool compile(char *fileName){
 	BytecodeFile &bf = bfs[x];
 	bf.init(0);
 	BytecodeContext &bc = bca.newElem();
-	bc.init(fileScope->varMap.count, fileScope->procMap.count, 1);
+	bc.init();
 	see.push(fileScope);
 	compileASTFileToBytecode(file, see, bca, bf);
 	see.pop();
-	s32 id = bc.procToID.getValue({config.entryPoint, (u32)strlen(config.entryPoint)});
-	if(id != -1){
-	    config.entryPointID = id;
-	};
 	bca.pop().uninit();
 	dbg::dumpBytecodeFile(bf);
 	file.uninit();

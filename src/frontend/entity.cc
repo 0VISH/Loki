@@ -85,19 +85,7 @@ s32 getVarEntityScopeOff(String name, DynamicArray<ScopeEntities*> &see){
     u32 x = see.count;
     while(x>0){
 	x -= 1;
-	ScopeEntities *se = see[x];
-	if(se->varMap.len != 0){
-	    s32 k = se->varMap.getValue(name);
-	    if(k != -1){return k;};
-	};
-	if(se->scope == Scope::PROC){
-	    ScopeEntities *globalScope = see[0];
-	    if(globalScope->varMap.len != 0){
-		s32 k = globalScope->varMap.getValue(name);
-		if(k != -1){return k;};
-	    };
-	    return -1;
-	};
+	
     };
     return -1;
 };
@@ -201,6 +189,12 @@ EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, Dyna
     entity.id   = idGiver.procID;
     ref.ent = &entity;
     ref.id  = idGiver.procID;
+
+    //entrypoint procedure
+    if(cmpString({config.entryPoint, (u32)strlen(config.entryPoint)}, name)){
+	config.entryPointID = ref.id;
+    };
+    
     return ref;
 };
 EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){

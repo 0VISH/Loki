@@ -13,10 +13,12 @@ struct BytecodeFile{
     DynamicArray<ASTBase*>    startupNodes;
     BytecodeBucket           *firstBucket;
     BytecodeBucket           *curBucket;
+    Reg                       registerID;
     u16                       cursor;
     u8                        id;
 
     void init(s16 fileID){
+	registerID = 0;
 	labels.init();
 	startupNodes.init();
 	cursor = 0;
@@ -215,6 +217,11 @@ struct BytecodeFile{
 	    emit(argRegs[x]);
 	};
     };
+    Reg newReg(){
+	Reg reg = registerID;
+	registerID += 1;
+	return reg;
+    };
 };
 
 static u16 labelID = 1;
@@ -226,47 +233,42 @@ u16 newLabel(){
 };
 
 struct BytecodeContext{
-    Map   procToID;
-    u32  *varToReg;
-    Type *varTypes;
-    u16   varTypesMax;
-    Reg   registerID;
+    hashmap *varIDToOff;  
+    Expr *varRegAndTypes;
+    u32   varLen;
+    u32   varCount;
 
-    void init(u32 varCount, u32 procCount, Reg rgsID){
-	varToReg = nullptr;
-	registerID = rgsID;
-	varTypesMax = varCount + (u16)(varCount/2) +10;
-	varToReg = (u32*)mem::alloc(varTypesMax *sizeof(u32));
-	varTypes = (Type*)mem::alloc(varTypesMax*sizeof(Type));
-	procToID.len = 0;
-	if(procCount != 0){
-	    procToID.init(procCount);
-	};
+    void init(u32 varlen = 10){
+	varLen = varlen;
+	varCount = 0;
+	varRegAndTypes = (Expr*)mem::alloc(sizeof(Expr)*varLen);
+	varIDToOff = hashmap_create();
     };
     void uninit(){
-	if(varToReg != nullptr){
-	    mem::free(varToReg);
-	    mem::free(varTypes);
-	};
-	if(procToID.len != 0){procToID.uninit();};
+	mem::free(varRegAndTypes);
+	hashmap_free(varIDToOff);
     };
-    Reg newReg(Type type){
-	if(registerID == varTypesMax){
-	    u16 varTypesMaxNew = varTypesMax + (u16)(varTypesMax/2) + 10;
-	    u32  *varToRegNew = (u32*)mem::alloc(varTypesMaxNew *sizeof(u32));
-	    Type *varTypesNew = (Type*)mem::alloc(varTypesMaxNew*sizeof(Type));
-	    memcpy(varToRegNew, varToReg, sizeof(u32)*varTypesMax);
-	    memcpy(varTypesNew, varTypes, sizeof(Type)*varTypesMax);
-	    mem::free(varToReg);
-	    mem::free(varTypes);
-	    varToReg = varToRegNew;
-	    varTypes = varTypesNew;
-	    varTypesMax = varTypesMaxNew;
+    void registerVar(Reg reg, Type type, u32 id){
+	if(varLen == varCount){
+	    varLen = varLen + varLen/2 + 10;
+	    Expr *varRegAndTypesNew = (Expr*)mem::alloc(sizeof(Expr)*varLen);
+	    memcpy(varRegAndTypesNew, varRegAndTypes, varCount);
+	    mem::free(varRegAndTypes);
+	    varRegAndTypes = varRegAndTypesNew;
 	};
-	Reg reg = registerID;
-	registerID += 1;
-	varTypes[reg] = type;
-	return reg;
+	u32 off;
+	if(hashmap_get(varIDToOff, &id, sizeof(id), (uintptr_t*)&off) == false){
+	    off = varCount;
+	};
+	hashmap_set(varIDToOff, &id, sizeof(id), off);
+	Expr &expr = varRegAndTypes[off];
+	expr.reg = reg;
+	expr.type = type;
+    };
+    Expr getVar(u32 id){
+	u32 off;
+	hashmap_get(varIDToOff, &id, sizeof(id), (uintptr_t*)&off);
+	return varRegAndTypes[off];
     };
 };
 Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf);
@@ -277,7 +279,7 @@ Expr emitBinOpBc(Bytecode binOp, ASTBase *node, DynamicArray<BytecodeContext> &b
     auto lhs = compileExprToBytecode(op->lhs, see, bca, bf);
     auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);
     Type ansType = greaterType(lhs.type, rhs.type);
-    Reg outputReg = bc.newReg(ansType);
+    Reg outputReg = bf.newReg();
     bf.binOp(binOp, ansType, outputReg, lhs.reg, rhs.reg);
     out.reg = outputReg;
     out.type = ansType;
@@ -324,7 +326,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     }break;
     case ASTType::NUM_INTEGER:{
 	const Type type = Type::COMP_INTEGER;
-	outputReg = bc.newReg(type);
+	outputReg = bf.newReg();
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	s64 num = numInt->num;
 	bf.movConst(outputReg, num);
@@ -334,7 +336,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     }break;
     case ASTType::NUM_DECIMAL:{
 	const Type type = Type::COMP_DECIMAL;
-	outputReg = bc.newReg(type);
+	outputReg = bf.newReg();
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	f64 num = numDec->num;
 	bf.movConst(outputReg, num);
@@ -344,13 +346,29 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
-	s32 off = getVarEntityScopeOff(var->name, see); //NOTE: we do not need to check if off == -1 as the checker would have raised a problem
-	ScopeEntities *se = see[off];
-	u32 id = se->varMap.getValue(var->name);
+	u32 id = var->entRef.id;
+	s32 off = 0;
+	//FIXME: DONT USE NAME!!!!
+	String name = var->name;
+	for(u32 x=see.count; x>0;){
+	    x -= 1;
+	    ScopeEntities *se = see[x];
+	    if(se->varMap.len != 0){
+		s32 off = se->varMap.getValue(name);
+		if(off != -1){break;};
+	    };
+	    if(se->scope == Scope::PROC){
+		ScopeEntities *globalScope = see[0];
+		if(globalScope->varMap.len != 0){
+		    s32 off = globalScope->varMap.getValue(name);
+		    if(off != -1){break;};
+		};
+		break;
+	    };
+	};
+	//NOTE: we do not need to check if off == -1 as the checker would have raised a problem
 	BytecodeContext &correctBC = bca[off];
-	out.reg = correctBC.varToReg[id];
-	out.type = correctBC.varTypes[id];
-	return out;
+	return correctBC.getVar(id);
     }break;
     case ASTType::BIN_ADD:{									
 	return emitBinOpBc(Bytecode::ADD, node, bca, bf, see);
@@ -379,7 +397,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	case ASTType::BIN_LSRE: set = Bytecode::SETLE; break;
 	case ASTType::BIN_EQU:  set = Bytecode::SETE;  break;
 	};
-	Reg cmpOutReg = bc.newReg(ansType);					
+	Reg cmpOutReg = bf.newReg();
 	bf.cmp(set, ansType, cmpOutReg, lhs.reg, rhs.reg);
 
 	out.reg = cmpOutReg;
@@ -391,9 +409,9 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	auto operand = compileExprToBytecode(uniOp->node, see, bca, bf);
 	Reg newReg;
 	if(isIntU(operand.type)){
-	    newReg = bc.newReg((Type)((u32)operand.type-1));
+	    newReg = bf.newReg();
 	}else{
-	    newReg = bc.newReg(operand.type);
+	    newReg = bf.newReg();
 	};
 	bf.neg(operand.type, newReg, operand.reg);
 
@@ -424,13 +442,12 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ASTUniVar *var = (ASTUniVar*)node;
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
+	Reg reg = bf.newReg();
 	//TODO: check which architecture we are building for
 	if(entity.type == Type::STRUCT){
 	    //TODO: allocate a new id for a new struct
-	    Reg reg = bc.newReg(Type::STRUCT);
 	    bf.alloc(Type::STRUCT, reg);
 	}else{
-	    Reg reg = bc.newReg(entity.type);
 	    if(isFloat(entity.type)){
 		bf.movConst(reg, (f64)0.0);
 	    }else{
@@ -444,8 +461,9 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	u32 id = se->varMap.getValue(var->name);
 	const VariableEntity &entity = se->varEntities[id];
 	Flag flag = var->flag;
+	Reg reg;
 	if(IS_BIT(flag, Flags::GLOBAL)){
-	    Reg reg = bc.newReg(entity.type) * -1;
+	    Reg reg = bf.newReg() * -1;
 	    if(IS_BIT(flag, Flags::UNINITIALIZED)){
 		bf.gbl(reg, entity.type, (s64)0);
 	    }else if(var->rhs->type == ASTType::NUM_INTEGER){
@@ -462,16 +480,15 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 		gvi->type = entity.type;
 		bf.startupNodes.push(gvi);
 	    };
-	    bc.varToReg[id] = reg;
 	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
-	    Reg rhsReg = bc.newReg(entity.type);
-	    bf.alloc(entity.type, rhsReg);
-	    bc.varToReg[id] = rhsReg;
+	    reg = bf.newReg();
+	    bf.alloc(entity.type, reg);
 	}else{
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
-	    bc.varToReg[id] = rhs.reg;
+	    reg = rhs.reg;
 	};
+	bc.registerVar(reg, entity.type, id);
     }break;
     case ASTType::PROC_CALL:{
 	ASTProcCall *pc = (ASTProcCall*)node;
@@ -480,7 +497,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	for(u32 x=0; x<pc->args.count; x+=1){
 	    Type procExpectedType = pe->argTypes[x];
 	    auto rhs = compileExprToBytecode(pc->args[x], see, bca, bf);
-	    Reg argReg = bc.newReg(procExpectedType);
+	    Reg argReg = bf.newReg();
 	    bf.cast(procExpectedType, argReg, rhs.type, rhs.reg);
 	    argRegs.push(argReg);
 	};
@@ -495,7 +512,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ASTFor *For = (ASTFor*)node;
 	ScopeEntities *ForSe = For->ForSe;
 	BytecodeContext &blockBC = bca.newElem();
-	blockBC.init(ForSe->varMap.count, ForSe->procMap.count, bc.registerID);
+	blockBC.init();
 	see.push(ForSe);
 	switch(For->loopType){
 	case ForType::FOR_EVER:{
@@ -530,11 +547,11 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 
 	    u16 incrementReg;
 	    if(For->increment == nullptr){
-		incrementReg = blockBC.newReg(ent.type);
+		incrementReg = bf.newReg();
 		bf.movConst(incrementReg, (s64)1);
 	    };
 	    compileToBytecode(For->body[0], file, see, bca, bf);
-	    Reg varRegPtr = blockBC.registerID-1;    //FIXME: 
+	    Reg varRegPtr = bf.registerID-1;    //FIXME: 
 	    bf.label(loopStartLbl);
 	    
 	    auto cond = compileExprToBytecode(For->end, see, bca, bf);
@@ -544,8 +561,8 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    }else{
 		setOp = Bytecode::SETL;
 	    };
-	    Reg cmpOutReg = blockBC.newReg(ent.type);
-	    Reg varVal1 = blockBC.newReg(ent.type);
+	    Reg cmpOutReg = bf.newReg();
+	    Reg varVal1 = bf.newReg();
 	    bf.load(ent.type, varVal1, varRegPtr);
 	    bf.cmp(setOp, ent.type, cmpOutReg, varVal1, cond.reg);
 	    bf.jmp(Bytecode::JMPS, cmpOutReg, loopBodyLbl, loopEndLbl);
@@ -558,8 +575,8 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    if(For->increment != nullptr){
 		incrementReg = compileExprToBytecode(For->increment, see, bca, bf).reg;
 	    };
-	    Reg tempRes = blockBC.newReg(ent.type);
-	    Reg varVal2  = blockBC.newReg(ent.type);
+	    Reg tempRes = bf.newReg();
+	    Reg varVal2  = bf.newReg();
 	    bf.load(ent.type, varVal2, varRegPtr);
 	    bf.binOp(Bytecode::ADD, ent.type, tempRes, varVal2, incrementReg);
 	    bf.store(ent.type, varRegPtr, tempRes);
@@ -579,7 +596,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	u32 exprID = compileExprToBytecode(If->expr, see, bca, bf).reg;
 	BytecodeContext &blockBC = bca.newElem();
 	ScopeEntities *IfSe = If->IfSe;
-	blockBC.init(IfSe->varMap.count, IfSe->procMap.count, bc.registerID);
+	blockBC.init();
 	see.push(IfSe);
 	u16 inIfLbl = newLabel();
 	u16 outIfLbl = newLabel();
@@ -601,7 +618,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    ScopeEntities *ElseSe = If->ElseSe;
 	    see.push(ElseSe);
 	    BytecodeContext &elseBC = bca.newElem();
-	    elseBC.init(ElseSe->varMap.count, ElseSe->procMap.count, bc.registerID);
+	    elseBC.init();
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
 		compileToBytecode(If->elseBody[x], file, see, bca, bf);
 	    };
@@ -616,10 +633,9 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ASTProcDef *proc = (ASTProcDef*)node;
 	ProcEntity *pe = getProcEntity(proc->name, see);
 	u32 procBytecodeID = pe->id;
-	bc.procToID.insertValue(proc->name, procBytecodeID);
 	ScopeEntities *procSE = proc->se;
 	BytecodeContext &procBC = bca.newElem();
-        procBC.init(procSE->varMap.count, procSE->procMap.count, bc.registerID);
+        procBC.init();
 	//        DEF    OUTPUT_COUNT         OUTPUT       ID     INPUT_COUNT     INPUT*(Type + Reg)
 	bf.reserve(1  + const_in_stream + proc->out.count + 1 + const_in_stream + (proc->inCount)*2);
 	bf.emit(Bytecode::DEF);
@@ -636,8 +652,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    case ASTType::DECLERATION:{
 		u32 id = proc->firstArgID + x;
 		const VariableEntity &entity = procSE->varEntities[id];
-		Reg regID = procBC.newReg(entity.type);
-		procBC.varToReg[id] = regID;
+		Reg regID = bf.newReg();
 		bf.emit(entity.type);
 		bf.emit(regID);
 		x += 1;
