@@ -38,6 +38,13 @@ enum class ForType{
     EXPR,
 };
 
+
+template <typename T>
+struct EntityRef{
+    T  *ent;
+    u32 id;
+};
+
 struct ScopeEntities;
 struct ASTBase {
     ASTType type;
@@ -66,7 +73,10 @@ struct ASTString : ASTBase{
     String str;
 };
 struct ASTUniVar : ASTBase{
-    String name;
+    union{
+	String name;
+	EntityRef<VariableEntity> entRef;
+    };
     ASTBase *rhs;
     u32 tokenOff;
     u32 typeTokenOff;
@@ -92,7 +102,10 @@ struct ASTIf : ASTBase{
 struct ASTProcDef : ASTBase {
     DynamicArray<ASTBase*> body;    //NOTE: also includes input
     DynamicArray<ASTBase*> out;
-    String name;
+    union{
+	String name;
+	EntityRef<ProcEntity> entRef;
+    };
     ScopeEntities *se;
     u32 firstArgID;
     u32 inCount;
@@ -101,11 +114,17 @@ struct ASTProcDef : ASTBase {
 struct ASTProcCall : ASTBase{
     DynamicArray<ASTBase*> args;
     DynamicArray<u32>      argOffs;
-    String name;
+    union{
+	String name;
+	EntityRef<ProcEntity> entRef;
+    };
     u32 off;
 };
 struct ASTVariable : ASTBase{
-    String name;
+    union{
+	String name;
+	EntityRef<VariableEntity> entRef;
+    };
     u32 tokenOff;
 };
 struct ASTModifier : ASTBase{
@@ -133,7 +152,10 @@ struct ASTFor : ASTBase{
 };
 struct ASTStructDef : ASTBase{
     DynamicArray<ASTBase*> body;
-    String name;
+    union{
+	String name;
+	u64    id;
+    };
     u32 tokenOff;
     u32 memberCount;
 };

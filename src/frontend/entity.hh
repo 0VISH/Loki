@@ -7,7 +7,7 @@ enum class Scope{
 };
 struct ScopeEntities;
 struct Entity{
-    String name;
+    u32  id;
     Flag flag;
 };
 struct VariableEntity : Entity{

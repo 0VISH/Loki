@@ -139,7 +139,10 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
     case ASTType::NUM_DECIMAL: break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
-	if(getVarEntity(var->name, see) == nullptr){return false;};
+	VariableEntity *ent = getVarEntity(var->name, see);
+	if(ent == nullptr){return false;};
+	var->entRef.ent = ent;
+	var->entRef.id  = ent->id;
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *op = (ASTUniOp*)node;
@@ -179,36 +182,47 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     return true;
 };
 
-ProcEntity *checkProcEntityPresentElseReg(String name, Flag flag, DynamicArray<ScopeEntities*> &see) {
-    if(getProcEntity(name, see) != nullptr){return nullptr;};
+EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
+    EntityRef<ProcEntity> ref;
+    if(getProcEntity(name, see) != nullptr){
+	ref.ent = nullptr;
+	return ref;
+    };
 
     ScopeEntities *se = see[see.count-1];
     Map &map = se->procMap;
 
-    u32 id = map.count;
-    map.insertValue(name,id);
-    ProcEntity &entity = se->procEntities[id];
-    entity.name = name;
-    entity.flag = flag;
-    entity.id   = id;
+    u32 localID = map.count;
+    map.insertValue(name, localID);
+    ProcEntity &entity = se->procEntities[localID];
     entity.argTypes.init();
     entity.retTypes.init();
-    return se->procEntities + id;
+    entity.flag = flag;
+    entity.id   = idGiver.procID;
+    ref.ent = &entity;
+    ref.id  = idGiver.procID;
+    return ref;
 };
-bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see){
-    if(getVarEntity(name, see) != nullptr){return false;};
+EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
+    EntityRef<VariableEntity> ref;
+    if(getVarEntity(name, see) != nullptr){
+	ref.ent = nullptr;
+	return ref;
+    };
     
     ScopeEntities *se = see[see.count - 1];
     Map &map = se->varMap;
     
-    u32 id = map.count;
-    map.insertValue(name,id);
-    VariableEntity entity;
-    entity.name = name;
+    u32 localID = map.count;
+    map.insertValue(name, localID);
+    VariableEntity &entity = se->varEntities[localID];
     entity.type = type;
     entity.flag = flag;
-    se->varEntities[id] = entity;
-    return true;
+    ref.ent = &entity;
+    ref.id = idGiver.varID;
+    entity.id = idGiver.varID;
+    idGiver.varID += 1;
+    return ref;
 };
 
 #define CHECK_TREE_AND_MERGE_FLAGS					\
@@ -227,8 +241,8 @@ bool checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, Dyna
 	return false;							\
     };									\
 
-bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see);
-bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver);
+bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
     BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1]; //current scope
     switch (node->type) {
@@ -246,7 +260,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	u64 size = 0;
 	ScopeEntities *StructSe = allocScopeEntity(Scope::BLOCK);
 	see.push(StructSe);
-	if(checkEntities(Struct->body, lexer, see) == false){return false;};
+	if(checkEntities(Struct->body, lexer, see, idGiver) == false){return false;};
 	for(u32 x=0; x<Struct->body.count; x+=1){
 	    if(Struct->body[x]->type == ASTType::DECLERATION){
 		ASTUniVar *var = (ASTUniVar*)Struct->body[x];
@@ -270,10 +284,12 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
 	if(type == Type::UNKOWN){return false;};
 	SET_BIT(var->flag, Flags::CONSTANT);
-	if(checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see) == false){
+	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see, idGiver);
+	if(entRef.ent == nullptr){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
 	    return false;
 	};
+	var->entRef = entRef;
     }break;
     case ASTType::MULTI_VAR_RHS:{
 	ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)node;
@@ -290,7 +306,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    ScopeEntities *ForSe = allocScopeEntity(Scope::BLOCK);
 	    see.push(ForSe);
 	    For->ForSe = ForSe;
-	    if(checkEntities(For->body, lexer, see) == false){return false;};
+	    if(checkEntities(For->body, lexer, see, idGiver) == false){return false;};
 	    see.pop();
 	}break;
 	case ForType::EXPR:{
@@ -298,7 +314,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    ScopeEntities *ForSe = allocScopeEntity(Scope::BLOCK);
 	    see.push(ForSe);
 	    For->ForSe = ForSe;
-	    if(checkEntities(For->body, lexer, see) == false){return false;};
+	    if(checkEntities(For->body, lexer, see, idGiver) == false){return false;};
 	    see.pop();
 	}break;
 	case ForType::C_LES:
@@ -323,7 +339,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    ScopeEntities *ForSe = allocScopeEntity(Scope::BLOCK);
 	    For->ForSe = ForSe;
 	    see.push(ForSe);
-	    if(checkEntities(For->body, lexer, see) == false){return false;};
+	    if(checkEntities(For->body, lexer, see, idGiver) == false){return false;};
 	    see.pop();
 	    ASTUniVar *var = (ASTUniVar*)For->body[0];
 	    u32 id = ForSe->varMap.getValue(var->name);
@@ -361,18 +377,20 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
         ScopeEntities *IfSe = allocScopeEntity(Scope::BLOCK);
 	If->IfSe = IfSe;
 	see.push(IfSe);
-	if(checkEntities(If->body, lexer, see) == false) { return false; };
+	if(checkEntities(If->body, lexer, see, idGiver) == false) { return false; };
 	see.pop();
 	if(If->elseBody.count == 0){break;};
 	ScopeEntities *ElseSe = allocScopeEntity(Scope::BLOCK);
 	If->ElseSe = ElseSe;
 	see.push(ElseSe);
-	if(checkEntities(If->elseBody, lexer, see) == false) { return false; };
+	if(checkEntities(If->elseBody, lexer, see, idGiver) == false) { return false; };
 	see.pop();
     }break;
     case ASTType::PROC_CALL:{
 	ASTProcCall *pc = (ASTProcCall*)node;
 	ProcEntity *pe = getProcEntity(pc->name, see);
+	pc->entRef.ent = pe;
+	pc->entRef.id  = pe->id;
 	if(pe == nullptr){
 	    lexer.emitErr(tokOffs[pc->off].off, "Procedure not defined: %.*s", pc->name.len, pc->name.mem);
 	    return false;
@@ -402,7 +420,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	
 	ScopeEntities *procSE = allocScopeEntity(Scope::PROC);
 	proc->se = procSE;
-	ProcEntity *pe = checkProcEntityPresentElseReg(name, proc->flag, see);
+	EntityRef<ProcEntity> entRef = checkProcEntityPresentElseReg(name, proc->flag, see, idGiver);
+	proc->entRef = entRef;
+	ProcEntity *pe = entRef.ent;
 	if(pe == nullptr){
 	    lexer.emitErr(tokOffs[proc->tokenOff].off, "Procedure redecleration");
 	    return false;
@@ -419,7 +439,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	};
 	//NOTE: checking body checks the input also
 	see.push(procSE);
-	if(checkEntities(proc->body, lexer, see) == false) { return false; };
+	if(checkEntities(proc->body, lexer, see, idGiver) == false) { return false; };
 	see.pop();
 	for(u32 x=0; x<proc->inCount; x+=1){
 	    ASTBase *arg = proc->body[x];
@@ -444,20 +464,26 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
 	    return false;
 	};
 	CHECK_TREE_AND_MERGE_FLAGS;
-	if(checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see) == false){
+	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see, idGiver);
+	if(entRef.ent == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
 	    return false;
 	};
+	var->entRef = entRef;
     }break;
     case ASTType::INITIALIZATION_T_KNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	Type type = tokenKeywordToType(var->tokenOff + 2, lexer, see);
 	Flag flag = var->flag;
+	VariableEntity *ent;
 	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
 	    CHECK_TREE_AND_MERGE_FLAGS;
 	    IS_EXPLICIT_CAST_REQUIRED;
+	    EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see, idGiver);
+	    var->entRef = entRef;
+	    ent = entRef.ent;
 	};
-	if(checkVarEntityPresentInScopeElseReg(var->name, flag, type, see) == false){
+	if(ent == nullptr){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
 	    return false;
 	};
@@ -471,13 +497,13 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see)
     };
     return true;
 };
-bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
+bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
     BRING_TOKENS_TO_SCOPE;
     ScopeEntities *se = see[see.count-1];
     goThroughEntitiesAndInitScope(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
-	if(checkEntity(node, lexer, see) == false){return false;};
+	if(checkEntity(node, lexer, see, idGiver) == false){return false;};
     };
     return true;
 };

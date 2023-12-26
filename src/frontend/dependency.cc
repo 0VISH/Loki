@@ -3,17 +3,22 @@
 #define AST_PAGE_SIZE 1024
 
 struct ASTBase;
-
+struct IDGiver{
+    u32 procID;
+    u32 varID;
+    u32 structID;
+};
 struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
+    IDGiver idGiver;
     ScopeEntities *scope;
-    char *fileContent;
     s16 id;
     u16 pageBrim;
 
     void init(s16 fileID){
 	id = fileID;
+	idGiver = {0};
 	pageBrim = 0;
 	memPages.init(2);
 	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
@@ -21,7 +26,6 @@ struct ASTFile{
 	nodes.init(10);
     };
     void uninit(){
-	mem::free(fileContent-1);
 	for(u32 x=0; x<nodes.count; x += 1){
 	    freeNodeInternal(nodes[x]);
 	};

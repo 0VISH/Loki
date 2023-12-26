@@ -30,10 +30,9 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     ScopeEntities *fileScopeEntities = allocScopeEntity(Scope::GLOBAL);
     astFile.scope = fileScopeEntities;
     see.push(fileScopeEntities);
-    if(checkEntities(astFile.nodes, lexer, see) == false){
+    if(checkEntities(astFile.nodes, lexer, see, astFile.idGiver) == false){
 	return nullptr;
     };
-    astFile.fileContent = lexer.fileContent;
     return fileScopeEntities;
 };
 bool compile(char *fileName){
