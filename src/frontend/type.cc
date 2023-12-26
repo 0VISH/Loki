@@ -56,22 +56,7 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
     }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)base;
-	Type type = Type::UNKOWN;
-	for(u32 x=see.count; x>0; x-=1){
-	    ScopeEntities *se = see[x-1];
-	    s32 id = se->varMap.getValue(var->name);
-	    if(id != -1){
-		const VariableEntity &e = se->varEntities[id];
-		type = e.type;
-		flag &= e.flag;
-		break;
-	    };
-	};
-	if(type == Type::UNKOWN){
-	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable not defined");
-	    return (TypeID)0;
-	};
-	SET_BIT(id, (u32)type);
+	SET_BIT(id, (u32)var->entRef.ent->type);
 	return id;
     }break;
     };

@@ -235,10 +235,12 @@ u16 newLabel(){
 struct BytecodeContext{
     hashmap *varIDToOff;  
     Expr *varRegAndTypes;
+    Scope scope;
     u32   varLen;
     u32   varCount;
 
-    void init(u32 varlen = 10){
+    void init(Scope scopeOfContext, u32 varlen = 10){
+	scope = scopeOfContext;
 	varLen = varlen;
 	varCount = 0;
 	varRegAndTypes = (Expr*)mem::alloc(sizeof(Expr)*varLen);
@@ -257,10 +259,12 @@ struct BytecodeContext{
 	    varRegAndTypes = varRegAndTypesNew;
 	};
 	u32 off;
-	if(hashmap_get(varIDToOff, &id, sizeof(id), (uintptr_t*)&off) == false){
+	u32 ids[] = {id};
+	if(hashmap_get(varIDToOff, hashmap_static_arr(ids), (uintptr_t*)&off) == false){
 	    off = varCount;
+	    varCount += 1;
 	};
-	hashmap_set(varIDToOff, &id, sizeof(id), off);
+	hashmap_set(varIDToOff, hashmap_static_arr(ids), off);
 	Expr &expr = varRegAndTypes[off];
 	expr.reg = reg;
 	expr.type = type;
@@ -348,20 +352,19 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	ASTVariable *var = (ASTVariable*)node;
 	u32 id = var->entRef.id;
 	s32 off = 0;
-	//FIXME: DONT USE NAME!!!!
-	String name = var->name;
-	for(u32 x=see.count; x>0;){
+	u32 ids[] = {id};
+	for(u32 x=bca.count; x>0;){
 	    x -= 1;
-	    ScopeEntities *se = see[x];
-	    if(se->varMap.len != 0){
-		s32 off = se->varMap.getValue(name);
-		if(off != -1){break;};
+	    BytecodeContext &bcont = bca[x];
+	    if(bcont.varCount != 0){
+		bool res = hashmap_get(bcont.varIDToOff, hashmap_static_arr(ids), (uintptr_t*)&off);
+		if(res){break;};
 	    };
-	    if(se->scope == Scope::PROC){
-		ScopeEntities *globalScope = see[0];
-		if(globalScope->varMap.len != 0){
-		    s32 off = globalScope->varMap.getValue(name);
-		    if(off != -1){break;};
+	    if(bcont.scope == Scope::PROC){
+		BytecodeContext &globalScope = bca[0];
+		if(globalScope.varCount != 0){
+		    bool res = hashmap_get(globalScope.varIDToOff, hashmap_static_arr(ids), (uintptr_t*)&off);
+		    if(res){break;};
 		};
 		break;
 	    };
@@ -440,59 +443,63 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     }break;
     case ASTType::DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	u32 id = se->varMap.getValue(var->name);
-	const VariableEntity &entity = se->varEntities[id];
+	u32 id = var->entRef.id;
+	VariableEntity *entity = var->entRef.ent;
 	Reg reg = bf.newReg();
+	Type type = entity->type;
 	//TODO: check which architecture we are building for
-	if(entity.type == Type::STRUCT){
+	if(type == Type::STRUCT){
 	    //TODO: allocate a new id for a new struct
 	    bf.alloc(Type::STRUCT, reg);
 	}else{
-	    if(isFloat(entity.type)){
+	    if(isFloat(type)){
 		bf.movConst(reg, (f64)0.0);
 	    }else{
 		bf.movConst(reg, (s64)0);
 	    };
 	};
+	bc.registerVar(reg, type, id);
     }break;
     case ASTType::INITIALIZATION_T_KNOWN:
     case ASTType::INITIALIZATION_T_UNKNOWN:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	u32 id = se->varMap.getValue(var->name);
-	const VariableEntity &entity = se->varEntities[id];
+	u32 id = var->entRef.id;
+	VariableEntity *entity = var->entRef.ent;
+	Type type = entity->type;
 	Flag flag = var->flag;
 	Reg reg;
 	if(IS_BIT(flag, Flags::GLOBAL)){
 	    Reg reg = bf.newReg() * -1;
 	    if(IS_BIT(flag, Flags::UNINITIALIZED)){
-		bf.gbl(reg, entity.type, (s64)0);
+		bf.gbl(reg, type, (s64)0);
 	    }else if(var->rhs->type == ASTType::NUM_INTEGER){
 		ASTNumInt *numInt = (ASTNumInt*)var->rhs;
-		bf.gbl(reg, entity.type, numInt->num);
+		bf.gbl(reg, type, numInt->num);
 	    }else if(var->rhs->type == ASTType::NUM_DECIMAL){
 		ASTNumDec *numDec = (ASTNumDec*)var->rhs;
-		bf.gbl(reg, entity.type, numDec->num);
+		bf.gbl(reg, type, numDec->num);
 	    }else{
-		bf.gbl(reg, entity.type, (s64)0);
+		bf.gbl(reg, type, (s64)0);
 		ASTGblVarInit *gvi = (ASTGblVarInit*)allocAST(sizeof(ASTGblVarInit), ASTType::GLOBAL_VAR_INIT, file);
 		gvi->reg = reg;
 		gvi->rhs = var->rhs;
-		gvi->type = entity.type;
+		gvi->type = type;
 		bf.startupNodes.push(gvi);
 	    };
 	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    reg = bf.newReg();
-	    bf.alloc(entity.type, reg);
+	    bf.alloc(type, reg);
 	}else{
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
 	    reg = rhs.reg;
 	};
-	bc.registerVar(reg, entity.type, id);
+	bc.registerVar(reg, type, id);
     }break;
     case ASTType::PROC_CALL:{
 	ASTProcCall *pc = (ASTProcCall*)node;
-	ProcEntity *pe = getProcEntity(pc->name, see);
+	ProcEntity *pe = pc->entRef.ent;
+	u32 procID = pc->entRef.id;
 	Array<Reg> argRegs(pc->args.count);
 	for(u32 x=0; x<pc->args.count; x+=1){
 	    Type procExpectedType = pe->argTypes[x];
@@ -500,8 +507,9 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    Reg argReg = bf.newReg();
 	    bf.cast(procExpectedType, argReg, rhs.type, rhs.reg);
 	    argRegs.push(argReg);
+	    
 	};
-	bf.call(pe->id, pe->argTypes, argRegs, pe->retTypes);
+	bf.call(procID, pe->argTypes, argRegs, pe->retTypes);
     }break;
     case ASTType::GLOBAL_VAR_INIT:{
 	ASTGblVarInit *gvi = (ASTGblVarInit*)node;
@@ -512,7 +520,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ASTFor *For = (ASTFor*)node;
 	ScopeEntities *ForSe = For->ForSe;
 	BytecodeContext &blockBC = bca.newElem();
-	blockBC.init();
+	blockBC.init(Scope::BLOCK);
 	see.push(ForSe);
 	switch(For->loopType){
 	case ForType::FOR_EVER:{
@@ -596,7 +604,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	u32 exprID = compileExprToBytecode(If->expr, see, bca, bf).reg;
 	BytecodeContext &blockBC = bca.newElem();
 	ScopeEntities *IfSe = If->IfSe;
-	blockBC.init();
+	blockBC.init(Scope::BLOCK);
 	see.push(IfSe);
 	u16 inIfLbl = newLabel();
 	u16 outIfLbl = newLabel();
@@ -618,7 +626,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    ScopeEntities *ElseSe = If->ElseSe;
 	    see.push(ElseSe);
 	    BytecodeContext &elseBC = bca.newElem();
-	    elseBC.init();
+	    elseBC.init(Scope::BLOCK);
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
 		compileToBytecode(If->elseBody[x], file, see, bca, bf);
 	    };
@@ -631,11 +639,11 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     }break;
     case ASTType::PROC_DEFENITION:{
 	ASTProcDef *proc = (ASTProcDef*)node;
-	ProcEntity *pe = getProcEntity(proc->name, see);
-	u32 procBytecodeID = pe->id;
+	ProcEntity *pe = proc->entRef.ent;
+	u32 procBytecodeID = proc->entRef.id;
 	ScopeEntities *procSE = proc->se;
 	BytecodeContext &procBC = bca.newElem();
-        procBC.init();
+        procBC.init(Scope::PROC);
 	//        DEF    OUTPUT_COUNT         OUTPUT       ID     INPUT_COUNT     INPUT*(Type + Reg)
 	bf.reserve(1  + const_in_stream + proc->out.count + 1 + const_in_stream + (proc->inCount)*2);
 	bf.emit(Bytecode::DEF);
@@ -650,11 +658,13 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    ASTBase *node = proc->body[x];
 	    switch(node->type){
 	    case ASTType::DECLERATION:{
-		u32 id = proc->firstArgID + x;
-		const VariableEntity &entity = procSE->varEntities[id];
-		Reg regID = bf.newReg();
-		bf.emit(entity.type);
-		bf.emit(regID);
+		ASTUniVar *var = (ASTUniVar*)node;
+		u32 id = var->entRef.id;
+		VariableEntity *entity = var->entRef.ent;
+		Reg reg = bf.newReg();
+		bf.emit(entity->type);
+		bf.emit(reg);
+		procBC.registerVar(reg, entity->type, id);
 		x += 1;
 	    }break;
 	    };

@@ -25,7 +25,10 @@ struct StructEntity : Entity{
     u64 size;
 };
 struct ScopeEntities{
-    Map varMap;
+    union{
+	Map varMap;
+	
+    };
     Map procMap;
     Map structMap;
     VariableEntity* varEntities;

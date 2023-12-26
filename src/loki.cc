@@ -68,7 +68,7 @@ bool compile(char *fileName){
 	BytecodeFile &bf = bfs[x];
 	bf.init(0);
 	BytecodeContext &bc = bca.newElem();
-	bc.init();
+	bc.init(Scope::GLOBAL);
 	see.push(fileScope);
 	compileASTFileToBytecode(file, see, bca, bf);
 	see.pop();

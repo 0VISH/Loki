@@ -497,6 +497,7 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
     goThroughEntitiesAndInitScope(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
+	printf("count: %d %d\n", entities.count, x);
 	if(checkEntity(node, lexer, see, idGiver) == false){return false;};
     };
     return true;

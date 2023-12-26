@@ -37,6 +37,7 @@ u16 getSwitchLen(char *arg, u32 argLen){
     };
     return off;
 };
+
 s32 main(s32 argc, char **argv) {
     SEH_EXCEPTION_BLOCK_START;
 
