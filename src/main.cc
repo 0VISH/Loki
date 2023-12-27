@@ -21,6 +21,7 @@ enum class ArgType{
     FILE,
     OUTNAME,
     END,
+    HELP,
     COUNT,
 };
 struct ArgData{
@@ -46,10 +47,12 @@ s32 main(s32 argc, char **argv) {
 	{"file", ArgType::FILE, "main file(file which is read first by the compiler)"},
 	{"out", ArgType::OUTNAME, "name of output file"},
 	{"end", ArgType::END, "end goal\n             1: exe\n             2: dll\n             3: check"},
+	{"help", ArgType::HELP, "print all the switches available"}
     };
 
     
     if(argc < 2) {
+    PRINT_HELP_AND_QUIT:
 	printf("----------switches----------\n");
 	for(u32 x=0; x<(u16)ArgType::COUNT; x+=1){
 	    printf("%s: %s\n", argsData[x].arg, argsData[x].help);
@@ -84,6 +87,9 @@ s32 main(s32 argc, char **argv) {
 	    return EXIT_SUCCESS;
 	};
 	switch((ArgType)type){
+	case ArgType::HELP:{
+	    goto PRINT_HELP_AND_QUIT;
+	}break;
 	case ArgType::ENTRYPOINT:{
 	    config.entryPoint = arg + len + 1;
 	}break;

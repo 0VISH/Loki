@@ -250,22 +250,19 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	map.insertValue(Struct->name, id);
 
 	StructEntity entity;
-	entity.varToOff.init(Struct->memberCount);
+	entity.varToOff.init(Struct->body.count);
 	u64 size = 0;
 	ScopeEntities *StructSe = allocScopeEntity(Scope::BLOCK);
 	see.push(StructSe);
 	if(checkEntities(Struct->body, lexer, see, idGiver) == false){return false;};
 	for(u32 x=0; x<Struct->body.count; x+=1){
-	    if(Struct->body[x]->type == ASTType::DECLERATION){
-		ASTUniVar *var = (ASTUniVar*)Struct->body[x];
-		if(entity.varToOff.getValue(var->name) != -1){
-		    lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
-		    return false;
-		};
-		entity.varToOff.insertValue(var->name, size);
-	    }else{
-		//TODO: 
+	    //NOTE: we dont have to check if node type is decleration, cuz parser does it for us
+	    ASTUniVar *var = (ASTUniVar*)Struct->body[x];
+	    if(entity.varToOff.getValue(var->name) != -1){
+		lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
+		return false;
 	    };
+	    entity.varToOff.insertValue(var->name, size);
 	};
 	see.pop();
 	StructSe->uninit();

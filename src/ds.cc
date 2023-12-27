@@ -199,3 +199,157 @@ public:
 	return h;
     }
 };
+struct HashmapStr{
+    String *keys;
+    u32    *values;
+    bool   *status;
+    u32     count;
+    u32     len;
+    
+    void init(u32 initialCapacity=10){
+	len = initialCapacity;
+	count = 0;
+	keys = (String*)mem::alloc(sizeof(String)*len);
+	values = (u32*)mem::alloc(sizeof(u32)*len);
+	status = (bool*)mem::alloc(sizeof(bool)*len);
+	memset(status, false, sizeof(bool)*len);
+    };
+    void uninit(){
+	mem::free(keys);
+	mem::free(values);
+	mem::free(status);
+    };
+    u32 hashFunc(String &key){
+	//fnv_hash_1a_32
+	u32 h = 0x811c9dc5;
+	for(u32 i=0; i<key.len; i+=1){h = (h^key.mem[i]) * 0x01000193;};
+	return h;
+    };
+    bool getValue(String &key, u32 &value){
+	u32 startHash = hashFunc(key) % len;
+	u32 hash = startHash;
+	while(status[hash] == true){
+	    if(cmpString(key, keys[hash])){
+		value = values[hash];
+		return true;
+	    };
+	    hash += 1;
+	    if(hash >= len){hash = 0;};
+	    if (hash == startHash){ return false; };
+	};
+	return false;
+    };
+    bool _insert_value(String &key, u32 value, u32 length, bool *statusArr, String *keysArr, u32 *valuesArr){
+	u32 hash = hashFunc(key) % length;
+	while(statusArr[hash]){
+	    hash += 1;
+	    if(hash >= length){hash = 0;};
+	};
+	statusArr[hash] = true;
+	keysArr[hash] = key;
+	valuesArr[hash] = value;
+	return true;
+    };
+    bool insertValue(String key, u32 value){
+	if(count == len){
+	    u32 newLen = len + (u32)(len/2) + 10;
+	    String *newKeys = (String*)mem::alloc(sizeof(String)*newLen);
+	    u32 *newValues = (u32*)mem::alloc(sizeof(u32)*newLen);
+	    bool *newStatus = (bool*)mem::alloc(sizeof(bool)*newLen);
+	    memset(newStatus, false, sizeof(bool)*newLen);
+	    for(u32 x=0; x<len; x+=1){
+		String tempKey = keys[x];
+		u32 val;
+		getValue(tempKey, val);
+		_insert_value(tempKey, val, newLen, newStatus, newKeys, newValues);
+	    };
+	    len = newLen;
+	    keys = newKeys;
+	    values = newValues;
+	    status = newStatus;
+	};
+	if(_insert_value(key, value, len, status, keys, values)){
+	    count += 1;
+	    return true;
+	};
+	return false;
+    };
+};
+//NOTE: only for int types
+template <typename T>
+struct Hashmap{
+    T    *keys;
+    u32  *values;
+    bool *status;
+    u32   count;
+    u32   len;
+    
+    void init(u32 initialCapacity=10){
+	len = initialCapacity;
+	count = 0;
+	keys = (T*)mem::alloc(sizeof(T)*len);
+	values = (u32*)mem::alloc(sizeof(u32)*len);
+	status = (bool*)mem::alloc(sizeof(bool)*len);
+	memset(status, false, sizeof(bool)*len);
+    };
+    void uninit(){
+	mem::free(keys);
+	mem::free(values);
+	mem::free(status);
+    };
+    u32 hashFunc(char *key){
+	//fnv_hash_1a_32
+	u32 h = 0x811c9dc5;
+	for(u32 i=0; i<sizeof(T); i+=1){h = (h^key[i]) * 0x01000193;};
+	return h;
+    };
+    bool getValue(T key, u32 &value){
+	u32 startHash = hashFunc((char*)&key) % len;
+	u32 hash = startHash;
+	while(status[hash] == true){
+	    if(key == keys[hash]){
+		value = values[hash];
+		return true;
+	    };
+	    hash += 1;
+	    if(hash >= len){hash = 0;};
+	    if (hash == startHash){ return false; };
+	};
+	return false;
+    };
+    bool _insert_value(T key, u32 value, u32 length, bool *statusArr, T *keysArr, u32 *valuesArr){
+	u32 hash = hashFunc((char*)&key) % length;
+	while(statusArr[hash]){
+	    hash += 1;
+	    if(hash >= length){hash = 0;};
+	};
+	statusArr[hash] = true;
+	keysArr[hash] = key;
+	valuesArr[hash] = value;
+	return true;
+    };
+    bool insertValue(T key, u32 value){
+	if(count == len){
+	    u32 newLen = len + (u32)(len/2) + 10;
+	    T *newKeys = (T*)mem::alloc(sizeof(T)*newLen);
+	    u32 *newValues = (u32*)mem::alloc(sizeof(u32)*newLen);
+	    bool *newStatus = (bool*)mem::alloc(sizeof(bool)*newLen);
+	    memset(newStatus, false, sizeof(bool)*newLen);
+	    for(u32 x=0; x<len; x+=1){
+		T tempKey = keys[x];
+		u32 val;
+		getValue(tempKey, val);
+		_insert_value(tempKey, val, newLen, newStatus, newKeys, newValues);
+	    };
+	    len = newLen;
+	    keys = newKeys;
+	    values = newValues;
+	    status = newStatus;
+	};
+	if(_insert_value(key, value, len, status, keys, values)){
+	    count += 1;
+	    return true;
+	};
+	return false;
+    };
+};

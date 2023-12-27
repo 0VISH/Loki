@@ -128,7 +128,10 @@ struct ASTVariable : ASTBase{
     u32 tokenOff;
 };
 struct ASTModifier : ASTBase{
-    String name;
+    union{
+	String name;
+	EntityRef<VariableEntity> entRef;
+    };
     ASTBase *child;
     u32 tokenOff;
 };
@@ -157,7 +160,6 @@ struct ASTStructDef : ASTBase{
 	u64    id;
     };
     u32 tokenOff;
-    u32 memberCount;
 };
 struct ASTReturn : ASTBase{
     ASTBase *expr;
@@ -828,7 +830,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			};
 			eatNewlines(tokTypes, x);
 		    };
-		    Struct->memberCount = Struct->body.count;  //TODO: remove??
 		    x += 1;
 		    table.push(Struct);
 		    return true;
@@ -1304,8 +1305,6 @@ namespace dbg {
 	    PAD;
 	    ASTStructDef *Struct = (ASTStructDef*)node;
 	    printf("name: %.*s", Struct->name.len, Struct->name.mem);
-	    PAD;
-	    printf("member_count: %d", Struct->memberCount);
 	    PAD;
 	    printf("BODY");
 	    for (u32 v=0; v < Struct->body.count; v += 1) {
