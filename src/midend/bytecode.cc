@@ -233,7 +233,7 @@ u16 newLabel(){
 };
 
 struct BytecodeContext{
-    hashmap *varIDToOff;  
+    Hashmap<u32, u32> varIDToOff;  
     Expr *varRegAndTypes;
     Scope scope;
     u32   varLen;
@@ -244,11 +244,11 @@ struct BytecodeContext{
 	varLen = varlen;
 	varCount = 0;
 	varRegAndTypes = (Expr*)mem::alloc(sizeof(Expr)*varLen);
-	varIDToOff = hashmap_create();
+	varIDToOff.init();
     };
     void uninit(){
 	mem::free(varRegAndTypes);
-	hashmap_free(varIDToOff);
+	varIDToOff.init();
     };
     void registerVar(Reg reg, Type type, u32 id){
 	if(varLen == varCount){
@@ -259,19 +259,18 @@ struct BytecodeContext{
 	    varRegAndTypes = varRegAndTypesNew;
 	};
 	u32 off;
-	u32 ids[] = {id};
-	if(hashmap_get(varIDToOff, hashmap_static_arr(ids), (uintptr_t*)&off) == false){
+	if(varIDToOff.getValue(id, &off) == false){
 	    off = varCount;
 	    varCount += 1;
 	};
-	hashmap_set(varIDToOff, hashmap_static_arr(ids), off);
+	varIDToOff.insertValue(id, off);
 	Expr &expr = varRegAndTypes[off];
 	expr.reg = reg;
 	expr.type = type;
     };
     Expr getVar(u32 id){
 	u32 off;
-	hashmap_get(varIDToOff, &id, sizeof(id), (uintptr_t*)&off);
+	varIDToOff.getValue(id, &off);
 	return varRegAndTypes[off];
     };
 };
@@ -351,27 +350,30 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
 	u32 id = var->entRef.id;
-	s32 off = 0;
-	u32 ids[] = {id};
-	for(u32 x=bca.count; x>0;){
-	    x -= 1;
-	    BytecodeContext &bcont = bca[x];
+	u32 bcOff = bca.count;
+	while(bcOff>0){
+	    bcOff -= 1;
+	    BytecodeContext &bcont = bca[bcOff];
+	    u32 temp;
+	    u32 off;
 	    if(bcont.varCount != 0){
-		bool res = hashmap_get(bcont.varIDToOff, hashmap_static_arr(ids), (uintptr_t*)&off);
-		if(res){break;};
+		bool res = bcont.varIDToOff.getValue(id, &off);
+		if(res){
+		    return bcont.varRegAndTypes[off];
+		};
 	    };
 	    if(bcont.scope == Scope::PROC){
 		BytecodeContext &globalScope = bca[0];
 		if(globalScope.varCount != 0){
-		    bool res = hashmap_get(globalScope.varIDToOff, hashmap_static_arr(ids), (uintptr_t*)&off);
-		    if(res){break;};
+		    bool res = globalScope.varIDToOff.getValue(id, &off);
+		    if(res){
+			return bcont.varRegAndTypes[off];
+		    };
 		};
 		break;
 	    };
 	};
 	//NOTE: we do not need to check if off == -1 as the checker would have raised a problem
-	BytecodeContext &correctBC = bca[off];
-	return correctBC.getVar(id);
     }break;
     case ASTType::BIN_ADD:{									
 	return emitBinOpBc(Bytecode::ADD, node, bca, bf, see);
@@ -547,7 +549,8 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	case ForType::C_LES:
 	case ForType::C_EQU:{
 	    ASTUniVar *var = (ASTUniVar*)For->body[0];
-	    u32 id = ForSe->varMap.getValue(var->name);
+	    u32 id;
+	    ForSe->varMap.getValue(var->name, &id);
 	    VariableEntity &ent = ForSe->varEntities[id];
 	    u16 loopStartLbl = newLabel();
 	    u16 loopBodyLbl = newLabel();

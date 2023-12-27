@@ -68,7 +68,7 @@ s32 main(s32 argc, char **argv) {
     config.out          = "out";
     config.end          = EndType::EXECUTABLE;
     
-    Map argMap;
+    HashmapStr argMap;
     argMap.init((u16)ArgType::COUNT);
     for(u32 i=0; i<(u16)ArgType::COUNT; i+=1){
 	argMap.insertValue({(char*)argsData[i].arg, (u32)strlen(argsData[i].arg) }, (u16)argsData[i].type);
@@ -80,8 +80,8 @@ s32 main(s32 argc, char **argv) {
 	u32 argLen = strlen(arg);
 	u32 len = getSwitchLen(arg, argLen);
 	
-	s32 type = argMap.getValue({arg, len});
-	if(type == -1){
+	u32 type;
+	if(argMap.getValue({arg, len}, &type) == false){
 	    printf("unkown arg: %.*s", len, arg);
 	    argMap.uninit();
 	    return EXIT_SUCCESS;

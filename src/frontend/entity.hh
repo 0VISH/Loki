@@ -21,16 +21,13 @@ struct ProcEntity : Entity{
     u32 id;
 };
 struct StructEntity : Entity{
-    Map varToOff;
+    HashmapStr varToOff;
     u64 size;
 };
 struct ScopeEntities{
-    union{
-	Map varMap;
-	
-    };
-    Map procMap;
-    Map structMap;
+    HashmapStr varMap;
+    HashmapStr procMap;
+    HashmapStr structMap;
     VariableEntity* varEntities;
     ProcEntity* procEntities;
     StructEntity *structEntities;

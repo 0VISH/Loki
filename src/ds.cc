@@ -132,73 +132,6 @@ struct DynamicArray {
 #endif
 };
 
-//hash map
-struct Map{
-public:
-    s32 insertValue(String str, u16 value){
-	if(isFull()){return -1;};
-	u32 hash = hashFunc(str) % len;
-	while(status[hash] == true){
-	    hash += 1;   //TODO: check if reprobing by someother value than 1 is faster
-	    if(hash >= len){hash = 0;};
-	};
-	status[hash] = true;
-	count += 1;
-	keys[hash] = str;
-	values[hash] = value;
-	return hash;
-    };
-    s32 getValue(String str){
-	u32 startHash = hashFunc(str) % len;
-	u32 hash = startHash;
-	while(status[hash] == true){
-	    if(cmpString(str, keys[hash]) == true) { return values[hash]; };
-	    hash += 1;
-	    if(hash >= len){hash = 0;};
-	    if (hash == startHash){ return -1; };
-	};
-	return -1;
-    };
-    void init(u32 length) {
-	len = length;
-	count = 0;
-	char *mem = (char*)mem::alloc(length * (sizeof(String)+sizeof(u16)+sizeof(bool)));
-	keys = (String*)mem::alloc(length * sizeof(String));
-	values = (u16*)mem::alloc(length * sizeof(u16));
-	status = (bool*)mem::alloc(length * sizeof(bool));
-	memset(status, false, length*sizeof(bool));
-    };
-    void uninit() {
-	mem::free(keys);
-    };
-    bool isFull() { return count == len; };
-#if(DBG)
-    void dumpMap(){
-	for(u32 x=0; x<len; x+=1){
-	    printf("%d: ", x);
-	    if(status[x] == false){printf("---\n");}
-	    else{
-		printf("\n  KEY: %.*s", keys[x].len, keys[x].mem);
-		printf("\n  VAL: %d\n", values[x]);
-	    };
-	};
-    };
-#endif
-public:
-    String *keys;
-    u16 *values;
-    bool *status;
-    u32 count;
-    u32 len;
-    u32 hashFunc(String &str){
-	//fnv_hash_1a_32
-	char *key = str.mem;
-	u32 len = str.len;
-	u32 h = 0x811c9dc5;
-	for(u32 i=0; i<len; i+=1){h = (h^key[i]) * 0x01000193;};
-	return h;
-    }
-};
 struct HashmapStr{
     String *keys;
     u32    *values;
@@ -219,18 +152,18 @@ struct HashmapStr{
 	mem::free(values);
 	mem::free(status);
     };
-    u32 hashFunc(String &key){
+    u32 hashFunc(const String &key){
 	//fnv_hash_1a_32
 	u32 h = 0x811c9dc5;
 	for(u32 i=0; i<key.len; i+=1){h = (h^key.mem[i]) * 0x01000193;};
 	return h;
     };
-    bool getValue(String &key, u32 &value){
+    bool getValue(const String &key, u32 *value){
 	u32 startHash = hashFunc(key) % len;
 	u32 hash = startHash;
 	while(status[hash] == true){
 	    if(cmpString(key, keys[hash])){
-		value = values[hash];
+		*value = values[hash];
 		return true;
 	    };
 	    hash += 1;
@@ -260,7 +193,7 @@ struct HashmapStr{
 	    for(u32 x=0; x<len; x+=1){
 		String tempKey = keys[x];
 		u32 val;
-		getValue(tempKey, val);
+		getValue(tempKey, &val);
 		_insert_value(tempKey, val, newLen, newStatus, newKeys, newValues);
 	    };
 	    len = newLen;
@@ -276,10 +209,10 @@ struct HashmapStr{
     };
 };
 //NOTE: only for int types
-template <typename T>
+template <typename T, typename J>
 struct Hashmap{
     T    *keys;
-    u32  *values;
+    J    *values;
     bool *status;
     u32   count;
     u32   len;
@@ -288,7 +221,7 @@ struct Hashmap{
 	len = initialCapacity;
 	count = 0;
 	keys = (T*)mem::alloc(sizeof(T)*len);
-	values = (u32*)mem::alloc(sizeof(u32)*len);
+	values = (J*)mem::alloc(sizeof(J)*len);
 	status = (bool*)mem::alloc(sizeof(bool)*len);
 	memset(status, false, sizeof(bool)*len);
     };
@@ -303,12 +236,12 @@ struct Hashmap{
 	for(u32 i=0; i<sizeof(T); i+=1){h = (h^key[i]) * 0x01000193;};
 	return h;
     };
-    bool getValue(T key, u32 &value){
+    bool getValue(T key, J *value){
 	u32 startHash = hashFunc((char*)&key) % len;
 	u32 hash = startHash;
 	while(status[hash] == true){
 	    if(key == keys[hash]){
-		value = values[hash];
+		*value = values[hash];
 		return true;
 	    };
 	    hash += 1;
@@ -317,7 +250,7 @@ struct Hashmap{
 	};
 	return false;
     };
-    bool _insert_value(T key, u32 value, u32 length, bool *statusArr, T *keysArr, u32 *valuesArr){
+    bool _insert_value(T key, J value, u32 length, bool *statusArr, T *keysArr, u32 *valuesArr){
 	u32 hash = hashFunc((char*)&key) % length;
 	while(statusArr[hash]){
 	    hash += 1;
@@ -328,17 +261,17 @@ struct Hashmap{
 	valuesArr[hash] = value;
 	return true;
     };
-    bool insertValue(T key, u32 value){
+    bool insertValue(T key, J value){
 	if(count == len){
 	    u32 newLen = len + (u32)(len/2) + 10;
 	    T *newKeys = (T*)mem::alloc(sizeof(T)*newLen);
-	    u32 *newValues = (u32*)mem::alloc(sizeof(u32)*newLen);
+	    J *newValues = (J*)mem::alloc(sizeof(u32)*newLen);
 	    bool *newStatus = (bool*)mem::alloc(sizeof(bool)*newLen);
 	    memset(newStatus, false, sizeof(bool)*newLen);
 	    for(u32 x=0; x<len; x+=1){
 		T tempKey = keys[x];
-		u32 val;
-		getValue(tempKey, val);
+		J val;
+		getValue(tempKey, &val);
 		_insert_value(tempKey, val, newLen, newStatus, newKeys, newValues);
 	    };
 	    len = newLen;

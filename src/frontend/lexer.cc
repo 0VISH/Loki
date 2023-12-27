@@ -67,25 +67,19 @@ namespace Word{
     WordData poundwordsData[] = {
 	{"import", Token_Type::P_IMPORT},
     };
-    Map keywords;
-    Map poundwords;
+    HashmapStr keywords;
+    HashmapStr poundwords;
     const u8 keywordCount = (u32)Token_Type::K_END - (u32)Token_Type::K_START - 1;
     const u8 poundwordCount = (u32)Token_Type::P_END - (u32)Token_Type::P_START - 1;
 
-    void init(Map &map, WordData *data, u8 count) {
+    void init(HashmapStr &map, WordData *data, u8 count) {
 	map.init(count);
     
 	for (u8 i = 0; i < count; i += 1) {
-	    s32 k = map.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
-#if(DBG)
-	    if (k == -1) {
-		printf("\n[LEXER] Could not register word\n");
-		return;
-	    };
-#endif
+	    map.insertValue({(char*)data[i].str, (u32)strlen(data[i].str) }, (u16)data[i].type);
 	};
     };
-    void uninit(Map &map) { map.uninit(); };
+    void uninit(HashmapStr &map) { map.uninit(); };
 };
 
 bool isKeyword(Token_Type type) { return type > Token_Type::K_START && type < Token_Type::K_END; };
@@ -169,8 +163,8 @@ struct Lexer {
 		while(isAlpha(src[x])){
 		    x += 1;
 		};
-		s32 type = Word::poundwords.getValue({src+start, (u32)(x-start)});
-		if(type == -1){
+		u32 type;
+		if(Word::poundwords.getValue({src+start, (u32)(x-start)}, &type) == false){
 		    emitErr(start, "Unkown poundword");
 		    return false;
 		};
@@ -212,9 +206,9 @@ struct Lexer {
 		    u64 start = x;
 		    x += 1;
 		    while (isAlpha(src[x]) || src[x] == '_' || isNum(src[x])) { x += 1; };
-		    s32 type = Word::keywords.getValue({src+start, (u32)(x-start)});
-		    if (type != -1) { tokenTypes.push((Token_Type)type); }
-		    else { tokenTypes.push(Token_Type::IDENTIFIER); };
+		    u32 type;
+		    if(Word::keywords.getValue({src+start, (u32)(x-start)}, &type) != false){ tokenTypes.push((Token_Type)type);}
+		    else{tokenTypes.push(Token_Type::IDENTIFIER);};
 		    TokenOffset offset;
 		    offset.off = start;
 		    offset.len = (u16)(x-start);

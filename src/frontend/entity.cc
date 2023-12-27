@@ -60,25 +60,25 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
     se->init(varCount, procCount, structCount);
 };
 
-#define GET_ENTITY_TEMPLATE(MAP, ENTITIES)			\
-    u32 x=see.count;						\
-    while(x>0){							\
-	x -= 1;							\
-	ScopeEntities *se = see[x];				\
-	if(se->MAP.len != 0){					\
-	    s32 k = se->MAP.getValue(name);			\
-	    if(k != -1){return se->ENTITIES+k;};		\
-	};							\
-	if(se->scope == Scope::PROC){				\
-	    ScopeEntities *globalScope = see[0];		\
-	    if(globalScope->MAP.len != 0){			\
-		s32 k = globalScope->MAP.getValue(name);	\
-		if(k != -1){return globalScope->ENTITIES+k;};	\
-	    };							\
-	    return nullptr;					\
-	};							\
-    };								\
-    return nullptr;						\
+#define GET_ENTITY_TEMPLATE(MAP, ENTITIES)				\
+    u32 x=see.count;							\
+    while(x>0){								\
+	x -= 1;								\
+	ScopeEntities *se = see[x];					\
+	if(se->MAP.len != 0){						\
+	    u32 k;							\
+	    if(se->MAP.getValue(name, &k) != false){return se->ENTITIES+k;}; \
+	};								\
+	if(se->scope == Scope::PROC){					\
+	    ScopeEntities *globalScope = see[0];			\
+	    if(globalScope->MAP.len != 0){				\
+		u32 k;							\
+		if(globalScope->MAP.getValue(name, &k) != false){return globalScope->ENTITIES+k;}; \
+	    };								\
+	    return nullptr;						\
+	};								\
+    };									\
+    return nullptr;							\
 
 
 s32 getVarEntityScopeOff(String name, DynamicArray<ScopeEntities*> &see){
@@ -178,7 +178,7 @@ EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, Dyna
     };
 
     ScopeEntities *se = see[see.count-1];
-    Map &map = se->procMap;
+    HashmapStr &map = se->procMap;
 
     u32 localID = map.count;
     map.insertValue(name, localID);
@@ -205,7 +205,7 @@ EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(String name, Flag 
     };
     
     ScopeEntities *se = see[see.count - 1];
-    Map &map = se->varMap;
+    HashmapStr &map = se->varMap;
     
     u32 localID = map.count;
     map.insertValue(name, localID);
@@ -245,7 +245,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	if(getStructEntity(Struct->name, see) != nullptr){
 	    lexer.emitErr(tokOffs[Struct->tokenOff].off, "Struct redefenition");
 	};
-	Map &map = se->structMap;
+	HashmapStr &map = se->structMap;
 	u32 id = map.count;
 	map.insertValue(Struct->name, id);
 
@@ -258,7 +258,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	for(u32 x=0; x<Struct->body.count; x+=1){
 	    //NOTE: we dont have to check if node type is decleration, cuz parser does it for us
 	    ASTUniVar *var = (ASTUniVar*)Struct->body[x];
-	    if(entity.varToOff.getValue(var->name) != -1){
+	    u32 temp;
+	    if(entity.varToOff.getValue(var->name, &temp) != false){
 		lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
 		return false;
 	    };
@@ -333,7 +334,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    if(checkEntities(For->body, lexer, see, idGiver) == false){return false;};
 	    see.pop();
 	    ASTUniVar *var = (ASTUniVar*)For->body[0];
-	    u32 id = ForSe->varMap.getValue(var->name);
+	    u32 id;
+	    ForSe->varMap.getValue(var->name, &id);
 	    VariableEntity &ent = ForSe->varEntities[id];
 	    if(ent.type == Type::UNKOWN){
 		ent.type = endTreeType;
@@ -444,7 +446,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	};
 	if(proc->inCount != 0){
 	    ASTUniVar *var = (ASTUniVar*)proc->body[0];
-	    proc->firstArgID = procSE->varMap.getValue(var->name);
+	    procSE->varMap.getValue(var->name, &proc->firstArgID);
 	};
     } break;
     case ASTType::INITIALIZATION_T_UNKNOWN:{
