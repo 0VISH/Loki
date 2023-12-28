@@ -157,7 +157,7 @@ struct ASTStructDef : ASTBase{
     DynamicArray<ASTBase*> body;
     union{
 	String name;
-	u64    id;
+	EntityRef<StructEntity> entRef;
     };
     u32 tokenOff;
 };
@@ -180,6 +180,11 @@ void freeNodeInternal(ASTBase *base){
 	ASTProcDef *proc = (ASTProcDef*)base;
         freeBody(proc->body);
 	if(proc->out.len != 0){proc->out.uninit();};
+    }break;
+    case ASTType::PROC_CALL:{
+	ASTProcCall *pc = (ASTProcCall*)base;
+	freeBody(pc->args);
+	pc->argOffs.uninit();
     }break;
     case ASTType::STRUCT_DEFENITION:{
 	ASTStructDef *Struct = (ASTStructDef*)base;

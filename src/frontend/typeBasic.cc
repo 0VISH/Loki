@@ -1,7 +1,3 @@
-Type greaterType(Type t1, Type t2){
-    if(t1 < t2){return t1;};
-    return t2;
-};
 bool isTypeNum(Type type){return (type > Type::XE_VOID) && (type <= Type::COMP_INTEGER);};
 bool isFloat(Type type){
     return (type == Type::F_64 || type == Type::F_32 || type == Type::COMP_DECIMAL);
@@ -15,6 +11,17 @@ bool isIntU(Type type){
 bool isCompNum(Type type){
     return type == Type::COMP_DECIMAL || type == Type::COMP_INTEGER;
 };
+Type greaterType(Type t1, Type t2){
+    if(isCompNum(t1) && isCompNum(t2)){
+	if(t1 > t2){return t1;};
+	return t2;
+    };
+    if(isCompNum(t1)){return t2;};
+    if(isCompNum(t2)){return t1;};
+    if(t1 > t2){return t1;};
+    return t2;
+};
+
 bool isSameTypeRange(Type type1, Type type2){
     if(type1 == Type::COMP_INTEGER || type1 == Type::COMP_DECIMAL){
 	if(isFloat(type2)){

@@ -204,17 +204,26 @@ struct BytecodeFile{
 	emitConstDec(num);
     };
     void call(u32 id, DynamicArray<Type> &argTypes, Array<Reg> argRegs, DynamicArray<Type> &retTypes){
-	reserve(1 + 1 + const_in_stream + retTypes.count + const_in_stream + argTypes.count*2);
+	reserve(1 + 1 + 1 + retTypes.count + 1 + argTypes.count*2);
 	emit(Bytecode::CALL);
 	emit(id);
-	emitConstInt(retTypes.count);
+	emit(retTypes.count);
 	for(u32 x=0; x<retTypes.count; x+=1){
 	    emit(retTypes[x]);
 	};
-	emitConstInt(argTypes.count);
+	emit(argTypes.count);
 	for(u32 x=0; x<argTypes.count; x+=1){
 	    emit(argTypes[x]);
 	    emit(argRegs[x]);
+	};
+    };
+    void structure(u32 id, Array<Type> &types){
+	reserve(1 + 1 + 1 + types.count);
+	emit(Bytecode::STRUCT);
+	emit(id);
+	emit(types.count);
+	for(u32 x=0; x<types.count; x+=1){
+	    emit(types[x]);
 	};
     };
     Reg newReg(){
@@ -279,10 +288,20 @@ Expr emitBinOpBc(Bytecode binOp, ASTBase *node, DynamicArray<BytecodeContext> &b
     Expr out;
     ASTBinOp *op = (ASTBinOp*)node;
     BytecodeContext &bc = bca[bca.count-1];
-    auto lhs = compileExprToBytecode(op->lhs, see, bca, bf);
-    auto rhs = compileExprToBytecode(op->rhs, see, bca, bf);
+    Expr lhs = compileExprToBytecode(op->lhs, see, bca, bf);
+    Expr rhs = compileExprToBytecode(op->rhs, see, bca, bf);
     Type ansType = greaterType(lhs.type, rhs.type);
     Reg outputReg = bf.newReg();
+    if(lhs.type != rhs.type){
+	Reg casted = bf.newReg();
+	if(ansType == lhs.type){
+	    bf.cast(ansType, casted, rhs.type, rhs.reg);
+	    rhs.reg = casted;
+	}else{
+	    bf.cast(ansType, casted, lhs.type, lhs.reg);
+	    lhs.reg = casted;
+	};
+    };
     bf.binOp(binOp, ansType, outputReg, lhs.reg, rhs.reg);
     out.reg = outputReg;
     out.type = ansType;
@@ -682,7 +701,15 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	bf.procEnd();
 	bca.pop().uninit();
     }break;
-    case ASTType::STRUCT_DEFENITION:
+    case ASTType::STRUCT_DEFENITION:{
+	ASTStructDef *Struct = (ASTStructDef*)node;
+	Array<Type> types(Struct->body.count);
+	for(u32 x=0; x<Struct->body.count; x+=1){
+	    ASTUniVar *var = (ASTUniVar*)Struct->body[x];
+	    types.push(var->entRef.ent->type);
+	};
+	bf.structure(Struct->entRef.id, types);
+    }break;
     case ASTType::IMPORT: break;
     default:
 	printf("BYTECODE: %d\n", type);
@@ -932,18 +959,28 @@ namespace dbg{
 	case Bytecode::CALL:{
 	    Bytecode id = getBytecode(buc, x);
 	    printf("call %d", id);
-	    s64 retCount = getConstIntAndUpdate(buc->bytecodes, x);
-	    for(u32 j=0; j<retCount; j+=1){
+	    Bytecode retCount = getBytecode(buc, x);
+	    for(u32 j=0; j<(u32)retCount; j+=1){
 		DUMP_TYPE;
 	    };
 	    printf("(");
-	    s64 inCount = getConstIntAndUpdate(buc->bytecodes, x);
-	    for(u32 j=0; j<inCount; j+=1){
+	    Bytecode inCount = getBytecode(buc, x);
+	    for(u32 j=0; j<(u32)inCount; j+=1){
 		DUMP_TYPE;
 		DUMP_REG;
 		printf(", ");
 	    };
 	    printf(")");
+	}break;
+	case Bytecode::STRUCT:{
+	    Bytecode id = getBytecode(buc, x);
+	    Bytecode count = getBytecode(buc, x);
+	    printf("%d struct{", id);
+	    for(u32 j=0; j<(u32)count; j+=1){
+		DUMP_TYPE;
+		printf(",");
+	    };
+	    printf("}");
 	}break;
 	case Bytecode::_TEXT_STARTUP_START:{
 	    printf("_TEXT_STARTUP_START:");

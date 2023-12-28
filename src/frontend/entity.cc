@@ -113,9 +113,11 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
     case ASTType::BIN_ADD:{
 	ASTBinOp *op = (ASTBinOp*)node;
 	Flag flag;
+	if(checkExpression(op->lhs, lexer, see) == false){return false;};
 	Type lhsType = getTreeType(op->lhs, flag, see, lexer);
 	if(lhsType == Type::UNKOWN){return false;};
 	if(isTypeNum(lhsType) == false){return false;};
+	if(checkExpression(op->rhs, lexer, see) == false){return false;};
 	Type rhsType = getTreeType(op->rhs, flag, see, lexer);
 	if(rhsType == Type::UNKOWN){return false;};
 	if(isTypeNum(rhsType) == false){return false;};
@@ -189,6 +191,7 @@ EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, Dyna
     entity.id   = idGiver.procID;
     ref.ent = &entity;
     ref.id  = idGiver.procID;
+    idGiver.procID += 1;
 
     //entrypoint procedure
     if(cmpString({config.entryPoint, (u32)strlen(config.entryPoint)}, name)){
@@ -249,9 +252,10 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	u32 id = map.count;
 	map.insertValue(Struct->name, id);
 
-	StructEntity entity;
+	StructEntity &entity = se->structEntities[id];
 	entity.varToOff.init(Struct->body.count);
-	u64 size = 0;
+	Struct->entRef.ent = &entity;
+	Struct->entRef.id = id;
 	ScopeEntities *StructSe = allocScopeEntity(Scope::BLOCK);
 	see.push(StructSe);
 	if(checkEntities(Struct->body, lexer, see, idGiver) == false){return false;};
@@ -263,13 +267,11 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 		lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
 		return false;
 	    };
-	    entity.varToOff.insertValue(var->name, size);
+	    entity.varToOff.insertValue(var->name, x);
 	};
 	see.pop();
 	StructSe->uninit();
 	mem::free(StructSe);
-	entity.size = size;
-	se->structEntities[id] = entity;
     }break;
     case ASTType::DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
@@ -496,7 +498,6 @@ bool checkEntities(DynamicArray<ASTBase*> &entities, Lexer &lexer, DynamicArray<
     goThroughEntitiesAndInitScope(entities, se);
     for (u32 x=0; x<entities.count; x+=1) {
 	ASTBase *node = entities[x];
-	printf("count: %d %d\n", entities.count, x);
 	if(checkEntity(node, lexer, see, idGiver) == false){return false;};
     };
     return true;

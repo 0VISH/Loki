@@ -22,7 +22,6 @@ struct ProcEntity : Entity{
 };
 struct StructEntity : Entity{
     HashmapStr varToOff;
-    u64 size;
 };
 struct ScopeEntities{
     HashmapStr varMap;

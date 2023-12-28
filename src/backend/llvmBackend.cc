@@ -4,6 +4,7 @@
 /*
   (dd): (bytecode file id, specific id)
   register:  %_dd
+  struct:    %_struct.dd
   global:    @_dd
   procedure: @__dd
  */
@@ -58,6 +59,17 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
     switch(bytecodes[off-1]){
+    case Bytecode::STRUCT:{
+	Bytecode structID = getBytecode(bytecodes, off);
+	Bytecode count    = getBytecode(bytecodes, off);
+	write("%%_struct.%d%d = type{", id, structID);
+	for(u32 x=0; x<(u32)count - 1; x+=1){
+	    writeType(getBytecode(bytecodes, off));
+	    write(", ");
+	};
+	writeType(getBytecode(bytecodes, off));
+	write("}");
+    }break;
     case Bytecode::CAST:{
 	Bytecode targetType = getBytecode(bytecodes, off);
 	Bytecode targetReg  = getBytecode(bytecodes, off);
@@ -76,7 +88,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     case Bytecode::CALL:{
 	Bytecode procID = getBytecode(bytecodes, off);
 	write("call ");
-	s64 retCount = getConstIntAndUpdate(bytecodes, off);
+	u32 retCount = (u32)getBytecode(bytecodes, off);
 	if(retCount == 0){
 	    write("%s ", "void");
 	};
@@ -87,7 +99,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	    retCount -= 1;
 	};
 	write("@__%d%d(", id, procID);
-	s64 inCount = getConstIntAndUpdate(bytecodes, off);
+	u32 inCount = (u32)getBytecode(bytecodes, off);
 	while(inCount > 1){
 	    writeType(getBytecode(bytecodes, off));
 	    write(" ");
