@@ -18,7 +18,9 @@ struct ASTFile{
 
     void init(s16 fileID){
 	id = fileID;
-	idGiver = {0};
+	idGiver.procID = 0;
+	idGiver.varID = 0;
+	idGiver.structID = (u32)(Type::TYPE_COUNT) + 1;
 	pageBrim = 0;
 	memPages.init(2);
 	char *page = (char*)mem::alloc(AST_PAGE_SIZE);

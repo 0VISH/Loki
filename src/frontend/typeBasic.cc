@@ -8,6 +8,9 @@ bool isIntS(Type type){
 bool isIntU(Type type){
     return (type == Type::U_64 || type == Type::U_32 || type == Type::U_16 || type == Type::U_8 || type == Type::COMP_INTEGER);
 };
+bool isInt(Type type){
+    return isIntS(type) || isIntU(type);
+};
 bool isCompNum(Type type){
     return type == Type::COMP_DECIMAL || type == Type::COMP_INTEGER;
 };

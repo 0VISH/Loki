@@ -15,6 +15,7 @@ void ScopeEntities::init(u32 varCount, u32 procCount, u32 structCount){
     };
     if(structCount != 0){
 	structMap.init(structCount);
+	structIDMap.init(structCount);
 	structEntities = (StructEntity*)mem::alloc(sizeof(StructEntity) * structCount);
     };
 };
@@ -28,6 +29,7 @@ void ScopeEntities::uninit(){
         mem::free(procEntities);
     };
     if(structMap.len != 0){
+	structIDMap.uninit();
 	structMap.uninit();
 	for(u32 x=0; x<structMap.count; x+=1){
 	    StructEntity *entity = structEntities + x;
@@ -60,20 +62,20 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
     se->init(varCount, procCount, structCount);
 };
 
-#define GET_ENTITY_TEMPLATE(MAP, ENTITIES)				\
+#define GET_ENTITY_TEMPLATE(KEY, MAP, ENTITIES)				\
     u32 x=see.count;							\
     while(x>0){								\
 	x -= 1;								\
 	ScopeEntities *se = see[x];					\
 	if(se->MAP.len != 0){						\
 	    u32 k;							\
-	    if(se->MAP.getValue(name, &k) != false){return se->ENTITIES+k;}; \
+	    if(se->MAP.getValue(KEY, &k) != false){return se->ENTITIES+k;}; \
 	};								\
 	if(se->scope == Scope::PROC){					\
 	    ScopeEntities *globalScope = see[0];			\
 	    if(globalScope->MAP.len != 0){				\
 		u32 k;							\
-		if(globalScope->MAP.getValue(name, &k) != false){return globalScope->ENTITIES+k;}; \
+		if(globalScope->MAP.getValue(KEY, &k) != false){return globalScope->ENTITIES+k;}; \
 	    };								\
 	    return nullptr;						\
 	};								\
@@ -90,13 +92,16 @@ s32 getVarEntityScopeOff(String name, DynamicArray<ScopeEntities*> &see){
     return -1;
 };
 ProcEntity *getProcEntity(String name, DynamicArray<ScopeEntities*> &see){
-    GET_ENTITY_TEMPLATE(procMap, procEntities);
+    GET_ENTITY_TEMPLATE(name, procMap, procEntities);
 };
 VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
-    GET_ENTITY_TEMPLATE(varMap, varEntities);
+    GET_ENTITY_TEMPLATE(name, varMap, varEntities);
+};
+StructEntity *getStructEntity(u32 id, DynamicArray<ScopeEntities*> &see){
+    GET_ENTITY_TEMPLATE(id, structIDMap, structEntities);
 };
 StructEntity *getStructEntity(String name, DynamicArray<ScopeEntities*> &see){
-    GET_ENTITY_TEMPLATE(structMap, structEntities);
+    GET_ENTITY_TEMPLATE(name, structMap, structEntities);
 };
 
 bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
@@ -248,20 +253,21 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	if(getStructEntity(Struct->name, see) != nullptr){
 	    lexer.emitErr(tokOffs[Struct->tokenOff].off, "Struct redefenition");
 	};
+	u32 id = idGiver.structID;
 	HashmapStr &map = se->structMap;
-	u32 id = map.count;
-	map.insertValue(Struct->name, id);
+	u32 localID = map.count;
+	map.insertValue(Struct->name, localID);
+	se->structIDMap.insertValue(id, localID);
 
-	StructEntity &entity = se->structEntities[id];
-	entity.varToOff.init(Struct->body.count);
+	StructEntity &entity = se->structEntities[localID];
+	entity.varToOff.init(Struct->members.count);
 	Struct->entRef.ent = &entity;
 	Struct->entRef.id = id;
-	ScopeEntities *StructSe = allocScopeEntity(Scope::BLOCK);
-	see.push(StructSe);
-	if(checkEntities(Struct->body, lexer, see, idGiver) == false){return false;};
-	for(u32 x=0; x<Struct->body.count; x+=1){
+	entity.id = id;
+	idGiver.structID += 1;
+	for(u32 x=0; x<Struct->members.count; x+=1){
 	    //NOTE: we dont have to check if node type is decleration, cuz parser does it for us
-	    ASTUniVar *var = (ASTUniVar*)Struct->body[x];
+	    ASTUniVar *var = (ASTUniVar*)Struct->members[x];
 	    u32 temp;
 	    if(entity.varToOff.getValue(var->name, &temp) != false){
 		lexer.emitErr(tokOffs[var->tokenOff].off, "Member name already in use");
@@ -269,15 +275,12 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    };
 	    entity.varToOff.insertValue(var->name, x);
 	};
-	see.pop();
-	StructSe->uninit();
-	mem::free(StructSe);
     }break;
     case ASTType::MODIFIER:{
 	ASTModifier *mod = (ASTModifier*)node;
-	StructEntity *strEnt = getStructEntity(mod->name, see);
-	if(strEnt == nullptr){
-	    lexer.emitErr(tokOffs[mod->tokenOff].off, "Struct not defined: %.*s", mod->name.len, mod->name.mem);
+	VariableEntity *varEnt = getVarEntity(mod->name, see);
+	if(varEnt == nullptr){
+	    lexer.emitErr(tokOffs[mod->tokenOff].off, "\"%.*s\" is not defined", mod->name.len, mod->name.mem);
 	    return false;
 	};
 	if(mod->child->type != ASTType::VARIABLE){
@@ -285,8 +288,9 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    return true;
 	};
 	ASTVariable *var = (ASTVariable*)mod->child;
+	StructEntity *structEnt = getStructEntity((u32)varEnt->type, see);
 	u32 temp;
-	if(strEnt->varToOff.getValue(var->name, &temp) == false){
+	if(structEnt->varToOff.getValue(var->name, &temp) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Member not defined: %.*s", var->name.len, var->name.mem);
 	    return false;
 	};

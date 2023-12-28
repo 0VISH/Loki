@@ -24,13 +24,14 @@ struct StructEntity : Entity{
     HashmapStr varToOff;
 };
 struct ScopeEntities{
-    HashmapStr varMap;
-    HashmapStr procMap;
-    HashmapStr structMap;
-    VariableEntity* varEntities;
-    ProcEntity* procEntities;
-    StructEntity *structEntities;
-    Scope scope;
+    HashmapStr         varMap;
+    HashmapStr         procMap;
+    HashmapStr         structMap;
+    Hashmap<u32, u32>  structIDMap;
+    VariableEntity    *varEntities;
+    ProcEntity        *procEntities;
+    StructEntity      *structEntities;
+    Scope              scope;
 
     void init(u32 varCount, u32 procCount, u32 structCount);
     void uninit();

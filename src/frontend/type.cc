@@ -85,7 +85,7 @@ Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see
 	    lexer.emitErr(tokOffs[off].off, "Unkown type");
 	    return Type::UNKOWN;
 	};
-	return Type::STRUCT;
+	return (Type)entity->id;
     };
     return Type::UNKOWN;
 };

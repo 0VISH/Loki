@@ -12,7 +12,6 @@
 char *typeIDToName[] = {
     "unkown",
     "void",
-    "struct",
     "string",
     "double",
     "i64",
@@ -163,15 +162,13 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	off += 1;
     }break;
     case Bytecode::MOV_CONST:{
+	Type type = (Type)getBytecode(bytecodes, off);
 	Bytecode bc = getBytecode(bytecodes, off);
-	if(bc == (Bytecode)Type::COMP_INTEGER){
-	    bc = getBytecode(bytecodes, off);
-	    writeReg(bc, id);
-	    write(" = add i64 0, %lld", getConstIntAndUpdate(bytecodes, off));
+	writeReg(bc, id);
+	if(isInt(type)){
+	    write(" = add %s 0, %lld", typeIDToName[(u16)type], getConstIntAndUpdate(bytecodes, off));
 	}else{
-	    bc = getBytecode(bytecodes, off);
-	    writeReg(bc, id);
-	    write(" = add double 0, %f", getConstDecAndUpdate(bytecodes, off));
+	    write(" = add %s 0, %f", typeIDToName[(u16)type], getConstDecAndUpdate(bytecodes, off));
 	};
     }break;
     case Bytecode::DEF:{

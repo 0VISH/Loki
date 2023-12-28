@@ -140,17 +140,17 @@ struct BytecodeFile{
 	emit(dest);
 	emit(src);
     };
-    void movConst(Reg reg, s64 num){
+    void movConst(Type type, Reg reg, s64 num){
 	reserve(1 + 1 + 1 + const_in_stream);
 	emit(Bytecode::MOV_CONST);
-	emit(Type::COMP_INTEGER);
+	emit(type);
 	emit(reg);
 	emitConstInt(num);
     };
-    void movConst(Reg outputReg, f64 num){
+    void movConst(Type type, Reg outputReg, f64 num){
 	reserve(1 + 1 + 1 + const_in_stream);
 	emit(Bytecode::MOV_CONST);
-	emit(Type::COMP_DECIMAL);
+	emit(type);
 	emit(outputReg);
 	emitConstDec(num);
     };
@@ -351,7 +351,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	outputReg = bf.newReg();
 	ASTNumInt *numInt = (ASTNumInt*)node;
 	s64 num = numInt->num;
-	bf.movConst(outputReg, num);
+	bf.movConst(type, outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
 	return out;
@@ -361,7 +361,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	outputReg = bf.newReg();
 	ASTNumDec *numDec = (ASTNumDec*)node;
 	f64 num = numDec->num;
-	bf.movConst(outputReg, num);
+	bf.movConst(type, outputReg, num);
 	out.reg = outputReg;
 	out.type = type;
 	return out;
@@ -468,16 +468,15 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	VariableEntity *entity = var->entRef.ent;
 	Reg reg = bf.newReg();
 	Type type = entity->type;
-	//TODO: check which architecture we are building for
-	if(type == Type::STRUCT){
-	    //TODO: allocate a new id for a new struct
-	    bf.alloc(Type::STRUCT, reg);
-	}else{
+	bf.alloc(type, reg);
+	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
+	    Reg init = bf.newReg();
 	    if(isFloat(type)){
-		bf.movConst(reg, (f64)0.0);
-	    }else{
-		bf.movConst(reg, (s64)0);
+		bf.movConst(type, init, (f64)0.0);
+	    }else if(isInt(type)){
+		bf.movConst(type, init, (s64)0);
 	    };
+	    bf.store(type, reg, init);
 	};
 	bc.registerVar(reg, type, id);
     }break;
@@ -512,8 +511,15 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    reg = bf.newReg();
 	    bf.alloc(type, reg);
 	}else{
+	    reg = bf.newReg();
+	    bf.alloc(type, reg);
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
-	    reg = rhs.reg;
+	    if(type != rhs.type){
+		Reg castedReg = bf.newReg();
+		bf.cast(type, castedReg, rhs.type, rhs.reg);
+		rhs.reg = castedReg;
+	    };
+	    bf.store(type, reg, rhs.reg);
 	};
 	bc.registerVar(reg, type, id);
     }break;
@@ -578,7 +584,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    u16 incrementReg;
 	    if(For->increment == nullptr){
 		incrementReg = bf.newReg();
-		bf.movConst(incrementReg, (s64)1);
+		bf.movConst(Type::S_64, incrementReg, (s64)1);
 	    };
 	    compileToBytecode(For->body[0], file, see, bca, bf);
 	    Reg varRegPtr = bf.registerID-1;    //FIXME: 
@@ -703,9 +709,9 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     }break;
     case ASTType::STRUCT_DEFENITION:{
 	ASTStructDef *Struct = (ASTStructDef*)node;
-	Array<Type> types(Struct->body.count);
-	for(u32 x=0; x<Struct->body.count; x+=1){
-	    ASTUniVar *var = (ASTUniVar*)Struct->body[x];
+	Array<Type> types(Struct->members.count);
+	for(u32 x=0; x<Struct->members.count; x+=1){
+	    ASTUniVar *var = (ASTUniVar*)Struct->members[x];
 	    types.push(var->entRef.ent->type);
 	};
 	bf.structure(Struct->entRef.id, types);

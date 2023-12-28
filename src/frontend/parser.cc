@@ -159,7 +159,7 @@ struct ASTFor : ASTBase{
     ForType  loopType;
 };
 struct ASTStructDef : ASTBase{
-    DynamicArray<ASTBase*> body;
+    DynamicArray<ASTBase*> members;
     union{
 	String name;
 	EntityRef<StructEntity> entRef;
@@ -193,7 +193,7 @@ void freeNodeInternal(ASTBase *base){
     }break;
     case ASTType::STRUCT_DEFENITION:{
 	ASTStructDef *Struct = (ASTStructDef*)base;
-	freeBody(Struct->body);
+	Struct->members.uninit();
     }break;
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)base;
@@ -838,14 +838,14 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    eatNewlines(tokTypes, x);
 		    ASTStructDef *Struct = (ASTStructDef*)allocAST(sizeof(ASTStructDef), ASTType::STRUCT_DEFENITION, file);
 		    Struct->name = makeStringFromTokOff(start, lexer);
-		    Struct->body.init();
+		    Struct->members.init();
 		    Struct->tokenOff = start;
 		    while (tokTypes[x] != (Token_Type)'}') {
 			//parse body
 			u32 start = x;
-			bool result = parseBlock(lexer, file, Struct->body, x);
+			bool result = parseBlock(lexer, file, Struct->members, x);
 			if(result == false) {return false;};
-			ASTBase *node = Struct->body[Struct->body.count - 1];
+			ASTBase *node = Struct->members[Struct->members.count - 1];
 			switch(node->type){
 			case ASTType::DECLERATION: break;
 			default:
@@ -1340,9 +1340,9 @@ namespace dbg {
 	    ASTStructDef *Struct = (ASTStructDef*)node;
 	    printf("name: %.*s", Struct->name.len, Struct->name.mem);
 	    PAD;
-	    printf("BODY");
-	    for (u32 v=0; v < Struct->body.count; v += 1) {
-		__dumpNodesWithoutEndPadding(Struct->body[v], lexer, padding + 1);
+	    printf("MEMBERS");
+	    for (u32 v=0; v < Struct->members.count; v += 1) {
+		__dumpNodesWithoutEndPadding(Struct->members[v], lexer, padding + 1);
 	    };
 	}break;
 	case ASTType::IMPORT:{
