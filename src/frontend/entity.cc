@@ -136,8 +136,8 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
 	ASTVariable *var = (ASTVariable*)node;
 	VariableEntity *ent = getVarEntity(var->name, see);
 	if(ent == nullptr){return false;};
-	var->entRef.ent = ent;
-	var->entRef.id  = ent->id;
+	var->varEntRef.ent = ent;
+	var->varEntRef.id  = ent->id;
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *op = (ASTUniOp*)node;
@@ -261,6 +261,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 
 	StructEntity &entity = se->structEntities[localID];
 	entity.varToOff.init(Struct->members.count);
+	entity.varToType = (Type*)mem::alloc(sizeof(Type)*Struct->members.count);
 	Struct->entRef.ent = &entity;
 	Struct->entRef.id = id;
 	entity.id = id;
@@ -274,26 +275,43 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 		return false;
 	    };
 	    entity.varToOff.insertValue(var->name, x);
+	    Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
+	    if(type == Type::UNKOWN){return false;};
+	    entity.varToType[x] = type;
 	};
     }break;
     case ASTType::MODIFIER:{
 	ASTModifier *mod = (ASTModifier*)node;
 	VariableEntity *varEnt = getVarEntity(mod->name, see);
 	if(varEnt == nullptr){
-	    lexer.emitErr(tokOffs[mod->tokenOff].off, "\"%.*s\" is not defined", mod->name.len, mod->name.mem);
+	    lexer.emitErr(tokOffs[mod->tokenOff].off, "Variable is not defined: %.*s", mod->name.len, mod->name.mem);
 	    return false;
 	};
-	if(mod->child->type != ASTType::VARIABLE){
-	    if(checkEntity(mod->child, lexer, see, idGiver) == false){return false;};
-	    return true;
+	mod->varEntRef.ent = varEnt;
+	mod->varEntRef.id  = varEnt->id;
+	Type type = varEnt->type;
+	while(mod->child->type != ASTType::VARIABLE){
+	    ASTModifier *modc = (ASTModifier*)mod->child;
+	    StructEntity *structEnt = getStructEntity((u32)type, see);
+	    u32 off;
+	    if(structEnt->varToOff.getValue(modc->name, &off) == false){
+		lexer.emitErr(tokOffs[modc->tokenOff].off, "Member not defined: %.*s", modc->name.len, modc->name.mem);
+		return false;
+	    };
+	    modc->structEntRef.ent = structEnt;
+	    modc->structEntRef.id  = off;
+	    mod = modc;
+	    type = structEnt->varToType[off];
 	};
 	ASTVariable *var = (ASTVariable*)mod->child;
-	StructEntity *structEnt = getStructEntity((u32)varEnt->type, see);
-	u32 temp;
-	if(structEnt->varToOff.getValue(var->name, &temp) == false){
+	StructEntity *structEnt = getStructEntity((u32)type, see);
+	u32 off;
+	if(structEnt->varToOff.getValue(var->name, &off) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Member not defined: %.*s", var->name.len, var->name.mem);
 	    return false;
 	};
+	var->structEntRef.ent = structEnt;
+	var->structEntRef.id  = off;
     }break;
     case ASTType::ASSIGNMENT:{
 	ASTAssignment *ass = (ASTAssignment*)node;

@@ -37,6 +37,7 @@ enum class Bytecode : u16{
     GLOBAL,
     CALL,
     STRUCT,
+    GET_MEMBER,
     _TEXT_STARTUP_START,
     _TEXT_STARTUP_END,
     NEXT_BUCKET,

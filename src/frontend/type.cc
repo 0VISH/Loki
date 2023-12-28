@@ -56,7 +56,7 @@ TypeID getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &se
     }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)base;
-	SET_BIT(id, (u32)var->entRef.ent->type);
+	SET_BIT(id, (u32)var->varEntRef.ent->type);
 	return id;
     }break;
     };

@@ -22,6 +22,7 @@ struct ProcEntity : Entity{
 };
 struct StructEntity : Entity{
     HashmapStr varToOff;
+    Type *varToType;
 };
 struct ScopeEntities{
     HashmapStr         varMap;

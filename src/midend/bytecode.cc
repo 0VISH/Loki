@@ -226,6 +226,14 @@ struct BytecodeFile{
 	    emit(types[x]);
 	};
     };
+    void getMember(Reg dest, Reg src, u32 id, u32 off){
+	reserve(1 + 1 + 1 + 1 + 1);
+	emit(Bytecode::GET_MEMBER);
+	emit(id);
+	emit(dest);
+	emit(src);
+	emit(off);
+    };
     Reg newReg(){
 	Reg reg = registerID;
 	registerID += 1;
@@ -320,6 +328,34 @@ Bytecode *getPointer(Bytecode *page){
     Bytecode *mem = (Bytecode*)page;
     return mem;
 };
+Expr getVarExprFromID(u32 id, DynamicArray<BytecodeContext> &bca){
+    u32 bcOff = bca.count;
+    while(bcOff>0){
+	bcOff -= 1;
+	BytecodeContext &bcont = bca[bcOff];
+	u32 temp;
+	u32 off;
+	if(bcont.varCount != 0){
+	    bool res = bcont.varIDToOff.getValue(id, &off);
+	    if(res){
+		return bcont.varRegAndTypes[off];
+	    };
+	};
+	if(bcont.scope == Scope::PROC){
+	    BytecodeContext &globalScope = bca[0];
+	    if(globalScope.varCount != 0){
+		bool res = globalScope.varIDToOff.getValue(id, &off);
+		if(res){
+		    return bcont.varRegAndTypes[off];
+		};
+	    };
+	    break;
+	};
+    };
+    Expr expr;
+    expr.type = Type::UNKOWN;
+    return expr;
+};
 Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
     Expr out = {};
     if(IS_BIT(node->flag, Flags::GLOBAL) && node->type != ASTType::PROC_DEFENITION && node->type != ASTType::DECLERATION && node->type != ASTType::INITIALIZATION_T_KNOWN && node->type != ASTType::INITIALIZATION_T_UNKNOWN){
@@ -366,32 +402,31 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	out.type = type;
 	return out;
     }break;
+    case ASTType::MODIFIER:{
+	ASTModifier *mod = (ASTModifier*)node;
+	EntityRef<VariableEntity> &ent = mod->varEntRef;
+	Expr varExpr = getVarExprFromID(ent.id, bca);
+	u32 rootReg = varExpr.reg;
+	while(mod->child->type != ASTType::VARIABLE){
+	    ASTModifier *modc = (ASTModifier*)mod->child;
+	    StructEntity *structEnt = modc->structEntRef.ent;
+	    u32 id  = structEnt->id;
+	    u32 off = modc->structEntRef.id;
+	    Reg memberReg = bf.newReg();
+	    bf.getMember(memberReg, rootReg, id, off);
+	    mod = modc;
+	};
+	Reg memberReg = bf.newReg();
+	ASTVariable *var = (ASTVariable*)mod->child;
+	StructEntity *structEnt = var->structEntRef.ent;
+	u32 id  = structEnt->id;
+	u32 off = var->structEntRef.id;
+	bf.getMember(memberReg, rootReg, id, off);
+    }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
-	u32 id = var->entRef.id;
-	u32 bcOff = bca.count;
-	while(bcOff>0){
-	    bcOff -= 1;
-	    BytecodeContext &bcont = bca[bcOff];
-	    u32 temp;
-	    u32 off;
-	    if(bcont.varCount != 0){
-		bool res = bcont.varIDToOff.getValue(id, &off);
-		if(res){
-		    return bcont.varRegAndTypes[off];
-		};
-	    };
-	    if(bcont.scope == Scope::PROC){
-		BytecodeContext &globalScope = bca[0];
-		if(globalScope.varCount != 0){
-		    bool res = globalScope.varIDToOff.getValue(id, &off);
-		    if(res){
-			return bcont.varRegAndTypes[off];
-		    };
-		};
-		break;
-	    };
-	};
+	u32 id = var->varEntRef.id;
+	return getVarExprFromID(id, bca);
 	//NOTE: we do not need to check if off == -1 as the checker would have raised a problem
     }break;
     case ASTType::BIN_ADD:{									

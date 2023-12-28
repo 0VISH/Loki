@@ -128,14 +128,16 @@ struct ASTProcCall : ASTBase{
 struct ASTVariable : ASTBase{
     union{
 	String name;
-	EntityRef<VariableEntity> entRef;
+	EntityRef<VariableEntity> varEntRef;
+	EntityRef<StructEntity>   structEntRef;
     };
     u32 tokenOff;
 };
 struct ASTModifier : ASTBase{
     union{
 	String name;
-	EntityRef<VariableEntity> entRef;
+	EntityRef<VariableEntity> varEntRef;
+	EntityRef<StructEntity>   structEntRef;
     };
     ASTBase *child;
     u32 tokenOff;
