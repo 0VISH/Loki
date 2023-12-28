@@ -320,6 +320,7 @@ ASTBase *genVariable(u32 &x, Lexer &lexer, ASTFile &file){
 	    mod->tokenOff = x;
 	    childReq = true;
 	    if(root == nullptr){root = mod;};
+	    if(lastMod){lastMod->child = mod;};
 	    lastMod = mod;
 	    x += 2;
 	}else{
@@ -328,7 +329,7 @@ ASTBase *genVariable(u32 &x, Lexer &lexer, ASTFile &file){
 	    var->tokenOff = x;
 	    childReq = false;
 	    if(root == nullptr){root = var;};
-	    if(lastMod != nullptr){lastMod->child = var;};
+	    if(lastMod){lastMod->child = var;};
 	    x += 1;
 	};
     };
@@ -797,6 +798,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    x += 1;
 	    u32 end = getEnd(tokTypes, x);
 	    ASTBase *rhs = genASTExprTree(lexer, file, x, end);
+	    if(rhs == nullptr){return false;};
 	    ASTAssignment *ass= (ASTAssignment*)allocAST(sizeof(ASTAssignment), ASTType::ASSIGNMENT, file);
 	    ass->lhs = lhs;
 	    ass->rhs = rhs;

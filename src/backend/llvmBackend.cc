@@ -8,25 +8,6 @@
   global:    @_dd
   procedure: @__dd
  */
-
-char *typeIDToName[] = {
-    "unkown",
-    "void",
-    "string",
-    "double",
-    "i64",
-    "i64",
-    "float",
-    "i32",
-    "i32",
-    "i16",
-    "i16",
-    "i8",
-    "i8",
-    "double",
-    "i64",
-};
-
 void writeReg(Bytecode bc, s16 id){
     Reg reg = (Reg)bc;
     if(reg < 0){
@@ -35,7 +16,7 @@ void writeReg(Bytecode bc, s16 id){
     };
     write("%%_%d%d", id, reg);
 };
-void writeType(Bytecode bc){
+void writeType(Bytecode bc, s16 id){
     Type type = (Type)bc;
     switch(type){
     case Type::XE_VOID: write("void");break;
@@ -50,7 +31,7 @@ void writeType(Bytecode bc){
     case Type::S_16:    write("i16");break;
     case Type::U_8:
     case Type::S_8:     write("i8");break;
-    default: UNREACHABLE;
+    default: write("%%_struct.%d%d", id, bc);break;
     };
 };
 
@@ -63,10 +44,10 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	Bytecode count    = getBytecode(bytecodes, off);
 	write("%%_struct.%d%d = type{", id, structID);
 	for(u32 x=0; x<(u32)count - 1; x+=1){
-	    writeType(getBytecode(bytecodes, off));
+	    writeType(getBytecode(bytecodes, off), id);
 	    write(", ");
 	};
-	writeType(getBytecode(bytecodes, off));
+	writeType(getBytecode(bytecodes, off), id);
 	write("}");
     }break;
     case Bytecode::CAST:{
@@ -77,11 +58,11 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	if(targetType < srcType){
 	    writeReg(targetReg, id);
 	    write(" = trunc ");
-	    writeType(srcType);
+	    writeType(srcType, id);
 	    write(" ");
 	    writeReg(srcReg, id);
 	    write(" to ");
-	    writeType(targetType);
+	    writeType(targetType, id);
 	};
     }break;
     case Bytecode::CALL:{
@@ -93,21 +74,21 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	};
 	//FIXME: doesnt work in llvm api. work around?
 	while(retCount != 0){
-	    writeType(getBytecode(bytecodes, off));
+	    writeType(getBytecode(bytecodes, off), id);
 	    write(" ");
 	    retCount -= 1;
 	};
 	write("@__%d%d(", id, procID);
 	u32 inCount = (u32)getBytecode(bytecodes, off);
 	while(inCount > 1){
-	    writeType(getBytecode(bytecodes, off));
+	    writeType(getBytecode(bytecodes, off), id);
 	    write(" ");
 	    writeReg(getBytecode(bytecodes, off), id);
 	    write(", ");
 	    inCount -= 1;
 	};
 	if(inCount == 1){
-	    writeType(getBytecode(bytecodes, off));
+	    writeType(getBytecode(bytecodes, off), id);
 	    write(" ");
 	    writeReg(getBytecode(bytecodes, off), id);
 	};
@@ -120,7 +101,9 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     case Bytecode::ADD:{
 	Bytecode type = getBytecode(bytecodes, off);
 	writeReg(getBytecode(bytecodes, off), id);
-	write(" = add %s ", typeIDToName[(u16)type]);
+	write(" = add ");
+	writeType(type, id);
+	write(" ");
 	writeReg(getBytecode(bytecodes, off), id);
 	write(", ");
 	writeReg(getBytecode(bytecodes, off), id);
@@ -129,10 +112,13 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	Bytecode type = getBytecode(bytecodes, off);
 	Bytecode dst = getBytecode(bytecodes, off);
 	Bytecode src = getBytecode(bytecodes, off);
-	char *typeName = typeIDToName[(u16)type];
-	write("store %s ", typeName);
+	write("store ");
+	writeType(type, id);
+	write(" ");
 	writeReg(src, id);
-	write(", %s* ", typeName);
+	write(", ");
+	writeType(type, id);
+	write("* ");
 	writeReg(dst, id);
     }break;
     case Bytecode::JMPS:{
@@ -146,8 +132,11 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     case Bytecode::LOAD:{
 	Bytecode type = getBytecode(bytecodes, off);
 	writeReg(getBytecode(bytecodes, off), id);
-	char *typeName = typeIDToName[(u16)type];
-	write(" = load %s, %s* ", typeName, typeName);
+	write(" = load ");
+	writeType(type, id);
+	write(", ");
+	writeType(type, id);
+	write("* ");
 	writeReg(getBytecode(bytecodes, off), id);
     }break;
     case Bytecode::RET:{
@@ -162,13 +151,16 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	off += 1;
     }break;
     case Bytecode::MOV_CONST:{
-	Type type = (Type)getBytecode(bytecodes, off);
+	Bytecode type = getBytecode(bytecodes, off);
 	Bytecode bc = getBytecode(bytecodes, off);
 	writeReg(bc, id);
-	if(isInt(type)){
-	    write(" = add %s 0, %lld", typeIDToName[(u16)type], getConstIntAndUpdate(bytecodes, off));
+	write(" = add ");
+	writeType(type, id);
+	write(" 0, ");
+	if(isInt((Type)type)){
+	    write("%lld", getConstIntAndUpdate(bytecodes, off));
 	}else{
-	    write(" = add %s 0, %f", typeIDToName[(u16)type], getConstDecAndUpdate(bytecodes, off));
+	    write("%f", getConstDecAndUpdate(bytecodes, off));
 	};
     }break;
     case Bytecode::DEF:{
@@ -180,7 +172,9 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	    outputType = getBytecode(bytecodes, off);
 	};
 	Bytecode bc = getBytecode(bytecodes, off);
-	write("define %s @__", typeIDToName[(u16)outputType]);
+	write("define ");
+	writeType(outputType, id);
+	write(" @__");
 	if((s16)bc == config->entryPointID){
 	    write("main(");
 	}else{
@@ -191,14 +185,16 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	    while(inCount != 1){
 		Bytecode inputType = getBytecode(bytecodes, off);
 		bc = getBytecode(bytecodes, off);
-		write("%s ", typeIDToName[(u16)inputType]);
+		writeType(inputType, id);
+		write(" ");
 		writeReg(bc, id);
 		write(", ");
 		inCount -= 1;
 	    };
 	    Bytecode inputType = getBytecode(bytecodes, off);
 	    bc = getBytecode(bytecodes, off);
-	    write("%s ", typeIDToName[(u16)inputType]);
+	    writeType(inputType, id);
+	    write(" ");
 	    writeReg(bc, id);
 	};
 	write("){");
@@ -213,7 +209,9 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     case Bytecode::GLOBAL:{
 	Bytecode reg = getBytecode(bytecodes, off);
 	Bytecode type = getBytecode(bytecodes, off);
-	write("@_%d%d = global %s ", id, ((Reg)reg)*-1, typeIDToName[(u16)type]);
+	write("@_%d%d = global ", id, ((Reg)reg)*-1);
+	writeType(type, id);
+	write(" ");
 	if(isFloat((Type)type)){
 	    f64 num = getConstDecAndUpdate(bytecodes, off);
 	    write("%f", num);
@@ -251,7 +249,9 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	Bytecode rhs  = getBytecode(bytecodes, off);
 
 	writeReg(dest, id);
-	write(" = %s %c%s %s ", cmp, type, cmpMethod, typeIDToName[(u16)bc]);
+	write(" = %s %c%s ", cmp, type, cmpMethod);
+	writeType(bc, id);
+	write(" ");
 	writeReg(lhs, id);
 	write(", ");
 	writeReg(rhs, id);
@@ -260,7 +260,22 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	Bytecode type = getBytecode(bytecodes, off);
 	Bytecode reg = getBytecode(bytecodes, off);
 	writeReg(reg, id);
-	write(" = alloca %s", typeIDToName[(u16)type]);
+	write(" = alloca ");
+	writeType(type, id);
+    }break;
+    case Bytecode::GET_MEMBER:{
+	Bytecode structID = getBytecode(bytecodes, off);
+	Bytecode dest = getBytecode(bytecodes, off);
+	Bytecode src  = getBytecode(bytecodes, off);
+	Bytecode offset  = getBytecode(bytecodes, off);
+	writeReg(dest, id);
+	write(" = getelementptr inbounds ");
+	writeType(structID, id);
+	write(", ");
+	writeType(structID, id);
+	write("* ");
+	writeReg(src, id);
+	write(", i32 0, i32 %d", offset);
     }break;
     case Bytecode::_TEXT_STARTUP_START:{
 	write("define internal void @_GLOBAL__sub_I_%d() section \".text.startup\" {", id);

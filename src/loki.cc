@@ -12,12 +12,8 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     };
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	bool result = parseBlock(lexer, astFile, astFile.nodes, off);
-	if(result == false){break;};
+	if(result == false){return nullptr;};
 	eatNewlines(lexer.tokenTypes, off);
-    };
-    if(report::errorOff != 0){
-	report::flushReports();
-	return nullptr;
     };
     for(u32 x=0; x<astFile.nodes.count; x+=1){
 	ASTBase *base = astFile.nodes[x];

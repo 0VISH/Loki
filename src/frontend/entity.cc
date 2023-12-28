@@ -5,6 +5,7 @@ void ScopeEntities::init(u32 varCount, u32 procCount, u32 structCount){
     structMap.count = 0;
     varMap.count = 0;
     procMap.count = 0;
+    structIDMap.len = 0;
     if(varCount != 0){
 	varMap.init(varCount);
 	varEntities = (VariableEntity*)mem::alloc(sizeof(VariableEntity) * varCount);
@@ -97,11 +98,11 @@ ProcEntity *getProcEntity(String name, DynamicArray<ScopeEntities*> &see){
 VariableEntity *getVarEntity(String name, DynamicArray<ScopeEntities*> &see){
     GET_ENTITY_TEMPLATE(name, varMap, varEntities);
 };
-StructEntity *getStructEntity(u32 id, DynamicArray<ScopeEntities*> &see){
-    GET_ENTITY_TEMPLATE(id, structIDMap, structEntities);
-};
 StructEntity *getStructEntity(String name, DynamicArray<ScopeEntities*> &see){
     GET_ENTITY_TEMPLATE(name, structMap, structEntities);
+};
+StructEntity *getStructEntity(u32 id, DynamicArray<ScopeEntities*> &see){
+    GET_ENTITY_TEMPLATE(id, structIDMap, structEntities);
 };
 
 bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
@@ -305,6 +306,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	};
 	ASTVariable *var = (ASTVariable*)mod->child;
 	StructEntity *structEnt = getStructEntity((u32)type, see);
+	ASSERT(structEnt != nullptr);
 	u32 off;
 	if(structEnt->varToOff.getValue(var->name, &off) == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Member not defined: %.*s", var->name.len, var->name.mem);

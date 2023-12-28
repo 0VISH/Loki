@@ -422,6 +422,9 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	u32 id  = structEnt->id;
 	u32 off = var->structEntRef.id;
 	bf.getMember(memberReg, rootReg, id, off);
+	out.reg = memberReg;
+	out.type = structEnt->varToType[off];
+	return out;
     }break;
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
@@ -488,6 +491,17 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
+    case ASTType::ASSIGNMENT:{
+	ASTAssignment *ass = (ASTAssignment*)node;
+	Expr lhs = compileExprToBytecode(ass->lhs, see, bca, bf);
+	Expr rhs = compileExprToBytecode(ass->rhs, see, bca, bf);
+	if(lhs.type != rhs.type){
+	    Reg castedReg = bf.newReg();
+	    bf.cast(lhs.type, castedReg, rhs.type, rhs.reg);
+	    rhs.reg = castedReg;
+	};
+	bf.store(lhs.type, lhs.reg, rhs.reg);
+    }break;
     case ASTType::RETURN:{
 	ASTReturn *ret = (ASTReturn*)node;
 	if(ret->expr == nullptr){
@@ -505,13 +519,15 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	Type type = entity->type;
 	bf.alloc(type, reg);
 	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
-	    Reg init = bf.newReg();
 	    if(isFloat(type)){
+		Reg init = bf.newReg();
 		bf.movConst(type, init, (f64)0.0);
+		bf.store(type, reg, init);
 	    }else if(isInt(type)){
+		Reg init = bf.newReg();
 		bf.movConst(type, init, (s64)0);
+		bf.store(type, reg, init);
 	    };
-	    bf.store(type, reg, init);
 	};
 	bc.registerVar(reg, type, id);
     }break;
@@ -744,11 +760,10 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     }break;
     case ASTType::STRUCT_DEFENITION:{
 	ASTStructDef *Struct = (ASTStructDef*)node;
+	StructEntity *structEnt = Struct->entRef.ent;
 	Array<Type> types(Struct->members.count);
-	for(u32 x=0; x<Struct->members.count; x+=1){
-	    ASTUniVar *var = (ASTUniVar*)Struct->members[x];
-	    types.push(var->entRef.ent->type);
-	};
+	types.mem = structEnt->varToType;
+	types.count = Struct->members.count;
 	bf.structure(Struct->entRef.id, types);
     }break;
     case ASTType::IMPORT: break;
@@ -809,8 +824,8 @@ namespace dbg{
 	case Type::COMP_INTEGER: printf("comp_int");break;
 	case Type::COMP_DECIMAL: printf("comp_dec");break;
 	default:
-	    UNREACHABLE;
-	    return Type::UNKOWN;
+	    printf("struct(%d)", type);
+	    return (Type)type;
 	};
 	return type;
     };
@@ -1022,6 +1037,13 @@ namespace dbg{
 		printf(",");
 	    };
 	    printf("}");
+	}break;
+	case Bytecode::GET_MEMBER:{
+	    Bytecode id = getBytecode(buc, x);
+	    Bytecode dest = getBytecode(buc, x);
+	    Bytecode src  = getBytecode(buc, x);
+	    Bytecode off  = getBytecode(buc, x);
+	    printf("%%%d = get_member type:%d, src:%%%d, off:%d", dest, id, src, off);
 	}break;
 	case Bytecode::_TEXT_STARTUP_START:{
 	    printf("_TEXT_STARTUP_START:");
