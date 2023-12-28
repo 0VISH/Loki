@@ -273,6 +273,29 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	StructSe->uninit();
 	mem::free(StructSe);
     }break;
+    case ASTType::MODIFIER:{
+	ASTModifier *mod = (ASTModifier*)node;
+	StructEntity *strEnt = getStructEntity(mod->name, see);
+	if(strEnt == nullptr){
+	    lexer.emitErr(tokOffs[mod->tokenOff].off, "Struct not defined: %.*s", mod->name.len, mod->name.mem);
+	    return false;
+	};
+	if(mod->child->type != ASTType::VARIABLE){
+	    if(checkEntity(mod->child, lexer, see, idGiver) == false){return false;};
+	    return true;
+	};
+	ASTVariable *var = (ASTVariable*)mod->child;
+	u32 temp;
+	if(strEnt->varToOff.getValue(var->name, &temp) == false){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Member not defined: %.*s", var->name.len, var->name.mem);
+	    return false;
+	};
+    }break;
+    case ASTType::ASSIGNMENT:{
+	ASTAssignment *ass = (ASTAssignment*)node;
+	if(checkEntity(ass->lhs, lexer, see, idGiver) == false){return false;};
+	if(checkExpression(ass->rhs, lexer, see) == false){return false;};
+    }break;
     case ASTType::DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
 	Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);

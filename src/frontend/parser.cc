@@ -29,7 +29,8 @@ enum class ASTType {
     GLOBAL_VAR_INIT,
     MULTI_VAR_RHS,
     PROC_CALL,
-    RETURN
+    RETURN,
+    ASSIGNMENT,
 };
 enum class ForType{
     FOR_EVER,
@@ -71,6 +72,10 @@ struct ASTNumDec : ASTBase{
 struct ASTString : ASTBase{
     u32 tokenOff;
     String str;
+};
+struct ASTAssignment : ASTBase{
+    ASTBase *lhs;
+    ASTBase *rhs;
 };
 struct ASTUniVar : ASTBase{
     union{
@@ -416,11 +421,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	    x += 1;
 	    return (ASTBase*)pc;
 	}else{
-	    ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
-	    var->name = makeStringFromTokOff(x, lexer);
-	    var->tokenOff = x;
-	    x += 1;
-	    return (ASTBase*)var;
+	    return genVariable(x, lexer, file);
 	};
     }break;
     default:
@@ -781,7 +782,25 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
     }break;
     case Token_Type::IDENTIFIER: {
 	x += 1;
+	ASTBase *lhs = nullptr;
 	switch (tokTypes[x]) {
+	case (Token_Type)'.':
+	case (Token_Type)'=':{
+	    x = start;
+	    ASTBase *lhs = genVariable(x, lexer, file);
+	    if(tokTypes[x] != (Token_Type)'='){
+		lexer.emitErr(tokOffs[x].off, "Expected '='");
+		return false;
+	    };
+	    x += 1;
+	    u32 end = getEnd(tokTypes, x);
+	    ASTBase *rhs = genASTExprTree(lexer, file, x, end);
+	    ASTAssignment *ass= (ASTAssignment*)allocAST(sizeof(ASTAssignment), ASTType::ASSIGNMENT, file);
+	    ass->lhs = lhs;
+	    ass->rhs = rhs;
+	    table.push(ass);
+	    return true;
+	}break;
 	case (Token_Type)':': {
 	    x += 1;
 	    ASTType uniVarType = ASTType::INITIALIZATION_T_UNKNOWN; 
@@ -1115,6 +1134,16 @@ namespace dbg {
 	    ASTReturn *ret = (ASTReturn*)node;
 	    if(ret->expr == nullptr){printf("void");}
 	    else{__dumpNodesWithoutEndPadding(ret->expr, lexer, padding + 1);};
+	}break;
+	case ASTType::ASSIGNMENT:{
+	    ASTAssignment *ass = (ASTAssignment*)node;
+	    printf("assignemnt");
+	    PAD;
+	    printf("LHS");
+	    __dumpNodesWithoutEndPadding(ass->lhs, lexer, padding+1);
+	    PAD;
+	    printf("RHS");
+	    __dumpNodesWithoutEndPadding(ass->rhs, lexer, padding+1); 
 	}break;
 	case ASTType::IF:{
 	    printf("if");
