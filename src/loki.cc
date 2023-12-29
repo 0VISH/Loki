@@ -5,6 +5,7 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     if(lexer.genTokens() == false) {
 	return nullptr;
     };
+    bool wasEntryPointKnown = (config.entryPointFileID != -1);
     u32 off = 0;
     eatNewlines(lexer.tokenTypes, off);
     if(lexer.tokenTypes[off] == Token_Type::END_OF_FILE) {
@@ -28,6 +29,9 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     see.push(fileScopeEntities);
     if(checkEntities(astFile.nodes, lexer, see, astFile.idGiver) == false){
 	return nullptr;
+    };
+    if(config.entryPointProcID != -1 && (wasEntryPointKnown == false)){
+	config.entryPointFileID = astFile.id;
     };
     return fileScopeEntities;
 };
@@ -62,7 +66,7 @@ bool compile(char *fileName){
 	ASTFile &file = Dep::astFiles[fileID];
 	ScopeEntities *fileScope = file.scope;
 	BytecodeFile &bf = bfs[x];
-	bf.init(0);
+	bf.init(file.id);
 	BytecodeContext &bc = bca.newElem();
 	bc.init(Scope::GLOBAL);
 	see.push(fileScope);

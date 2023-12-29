@@ -175,7 +175,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	write("define ");
 	writeType(outputType, id);
 	write(" @__");
-	if((s16)bc == config->entryPointID){
+	if((s16)bc == config->entryPointProcID && id == config->entryPointFileID){
 	    write("main(");
 	}else{
 	    write("%d%d(", id, bc);

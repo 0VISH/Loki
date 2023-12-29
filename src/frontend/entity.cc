@@ -200,10 +200,11 @@ EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, Dyna
     idGiver.procID += 1;
 
     //entrypoint procedure
-    if(cmpString({config.entryPoint, (u32)strlen(config.entryPoint)}, name)){
-	config.entryPointID = ref.id;
-    };
-    
+    if(config.entryPointProcID == -1){
+	if(cmpString({config.entryPoint, (u32)strlen(config.entryPoint)}, name) && see.count == 1){
+	    config.entryPointProcID = ref.id;
+	};
+    };    
     return ref;
 };
 EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
