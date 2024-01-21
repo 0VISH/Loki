@@ -174,7 +174,7 @@ bool checkType(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &see){
     case Token_Type::K_F32: type = Type::F_32; break;
     default: return false;
     };
-    typeNode->type = type;
+    typeNode->varType = type;
     return true;
 };
 
@@ -260,7 +260,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	u32 localID = map.count;
 	map.insertValue(Struct->name, localID);
 	se->structIDMap.insertValue(id, localID);
-
+ 
 	StructEntity &entity = se->structEntities[localID];
 	entity.varToOff.init(Struct->members.count);
 	entity.varToType = (Type*)mem::alloc(sizeof(Type)*Struct->members.count);
@@ -277,7 +277,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 		return false;
 	    };
 	    entity.varToOff.insertValue(var->name, x);
-	    Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
+	    Type type = tokenKeywordToType(var->varType.tokenOff, lexer, see);
 	    if(type == Type::UNKOWN){return false;};
 	    entity.varToType[x] = type;
 	};
@@ -323,7 +323,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
     }break;
     case ASTType::DECLERATION:{
 	ASTUniVar *var = (ASTUniVar*)node;
-	Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
+	Type type = tokenKeywordToType(var->varType.tokenOff, lexer, see);
 	if(type == Type::UNKOWN){return false;};
 	SET_BIT(var->flag, Flags::CONSTANT);
 	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see, idGiver);
@@ -446,7 +446,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    if(checkExpression(pc->args[x], lexer, see) == false){return false;};
 	    Flag flag;
 	    Type argTreeType = getTreeType(pc->args[x], flag, see, lexer);
-	    Type argType = pe->argTypes[x];
+	    Type argType = pe->argTypes[x]->varType;
 	    if(isSameTypeRange(argTreeType, argType) == false){
 		lexer.emitErr(tokOffs[pc->argOffs[x]].off, "Type mismatch. They don't belong to the same range");
 		return false;
@@ -477,8 +477,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 		return false;
 	    };
 	    checkType(node, lexer, see);
-	    AST_Type *typeNode = (AST_Type*)node;
-	    pe->retTypes.push(typeNode->type);
+	    pe->retTypes.push((AST_Type*)node);
 	};
 	//NOTE: checking body checks the input also
 	see.push(procSE);
@@ -489,8 +488,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    switch(arg->type){
 	    case ASTType::DECLERATION:{
 		ASTUniVar *var = (ASTUniVar*)arg;
-		Type type = tokenKeywordToType(var->typeTokenOff, lexer, see);
-		pe->argTypes.push(type);
+		var->varType.varType = tokenKeywordToType(var->varType.tokenOff, lexer, see);
+		pe->argTypes.push(&var->varType);
 	    }break;
 	    };
 	};

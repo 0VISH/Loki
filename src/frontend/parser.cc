@@ -58,7 +58,7 @@ struct ASTMultiVarRHS : ASTBase{
 struct ASTGblVarInit : ASTBase{
     s16 reg;
     ASTBase *rhs;
-    Type type;
+    Type varType;
 };
 struct ASTImport : ASTBase{
     char *fileName;
@@ -77,6 +77,12 @@ struct ASTAssignment : ASTBase{
     ASTBase *lhs;
     ASTBase *rhs;
 };
+struct AST_Type : ASTBase{
+    union{
+	u32 tokenOff;
+	Type varType;
+    };
+};
 struct ASTUniVar : ASTBase{
     union{
 	String name;
@@ -84,7 +90,7 @@ struct ASTUniVar : ASTBase{
     };
     ASTBase *rhs;
     u32 tokenOff;
-    u32 typeTokenOff;
+    AST_Type varType;
 };
 struct ASTBinOp : ASTBase{
     ASTBase *lhs;
@@ -141,12 +147,6 @@ struct ASTModifier : ASTBase{
     };
     ASTBase *child;
     u32 tokenOff;
-};
-struct AST_Type : ASTBase{
-    union{
-	u32 tokenOff;
-	Type type;
-    };
 };
 struct ASTFor : ASTBase{
     DynamicArray<ASTBase*> body;
@@ -608,7 +608,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		goto PARSE_FOR_EXPR;
 	    };
 	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::INITIALIZATION_T_UNKNOWN, file);
-	    var->typeTokenOff = 0;
+	    var->varType.tokenOff = 0;
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
 	    var->flag = 0;
@@ -617,7 +617,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    For->increment = nullptr;
 	    x += 2;
 	    if(tokTypes[x] == Token_Type::IDENTIFIER || isKeyword(tokTypes[x])){
-		var->typeTokenOff = x;
+		var->varType.tokenOff = x;
 		var->type = ASTType::INITIALIZATION_T_KNOWN;
 		x += 1;
 	    };
@@ -982,7 +982,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			goto SINGLE_VARIABLE_ASSIGNMENT;
 		    };
 		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::DECLERATION, file);
-		    assign->typeTokenOff = x-1;
+		    assign->varType.tokenOff = x-1;
 		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    assign->flag = flag;
@@ -1057,7 +1057,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    uv->flag = flag;
 		    uv->rhs = mvr;
 		    uv->name = makeStringFromTokOff(x, lexer);
-		    uv->typeTokenOff = i;
+		    uv->varType.tokenOff = i;
 		    table.push(uv);
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected an identifier");
@@ -1220,7 +1220,7 @@ namespace dbg {
 	}break;
 	case ASTType::DECLERATION: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
-	    u32 x = decl->typeTokenOff;
+	    u32 x = decl->varType.tokenOff;
 	    printf("decleration");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);
@@ -1236,7 +1236,7 @@ namespace dbg {
 	}break;
 	case ASTType::INITIALIZATION_T_KNOWN: {
 	    ASTUniVar *decl = (ASTUniVar*)node;
-	    u32 x = decl->typeTokenOff;
+	    u32 x = decl->varType.tokenOff;
 	    printf("initialization_t_unkown");
 	    PAD;
 	    printf("type: %.*s", lexer.tokenOffsets[x].len, lexer.fileContent + lexer.tokenOffsets[x].off);

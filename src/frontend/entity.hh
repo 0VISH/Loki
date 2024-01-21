@@ -14,9 +14,10 @@ struct VariableEntity : Entity{
     u64 size;
     Type type;
 };
+struct AST_Type;
 struct ProcEntity : Entity{
-    DynamicArray<Type> argTypes;
-    DynamicArray<Type> retTypes;
+    DynamicArray<AST_Type*> argTypes;
+    DynamicArray<AST_Type*> retTypes;
     Flag flag;
     u32 id;
 };

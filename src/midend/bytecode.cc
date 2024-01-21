@@ -203,17 +203,17 @@ struct BytecodeFile{
 	emit(type);
 	emitConstDec(num);
     };
-    void call(u32 id, DynamicArray<Type> &argTypes, Array<Reg> argRegs, DynamicArray<Type> &retTypes){
+    void call(u32 id, DynamicArray<AST_Type*> &argTypes, Array<Reg> argRegs, DynamicArray<AST_Type*> &retTypes){
 	reserve(1 + 1 + 1 + retTypes.count + 1 + argTypes.count*2);
 	emit(Bytecode::CALL);
 	emit(id);
 	emit(retTypes.count);
 	for(u32 x=0; x<retTypes.count; x+=1){
-	    emit(retTypes[x]);
+	    emit(retTypes[x]->varType);
 	};
 	emit(argTypes.count);
 	for(u32 x=0; x<argTypes.count; x+=1){
-	    emit(argTypes[x]);
+	    emit(argTypes[x]->varType);
 	    emit(argRegs[x]);
 	};
     };
@@ -554,7 +554,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 		ASTGblVarInit *gvi = (ASTGblVarInit*)allocAST(sizeof(ASTGblVarInit), ASTType::GLOBAL_VAR_INIT, file);
 		gvi->reg = reg;
 		gvi->rhs = var->rhs;
-		gvi->type = type;
+		gvi->varType = type;
 		bf.startupNodes.push(gvi);
 	    };
 	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
@@ -580,7 +580,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	u32 procID = pc->entRef.id;
 	Array<Reg> argRegs(pc->args.count);
 	for(u32 x=0; x<pc->args.count; x+=1){
-	    Type procExpectedType = pe->argTypes[x];
+	    Type procExpectedType = pe->argTypes[x]->varType;
 	    auto rhs = compileExprToBytecode(pc->args[x], see, bca, bf);
 	    Reg argReg = bf.newReg();
 	    bf.cast(procExpectedType, argReg, rhs.type, rhs.reg);
@@ -592,7 +592,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     case ASTType::GLOBAL_VAR_INIT:{
 	ASTGblVarInit *gvi = (ASTGblVarInit*)node;
 	auto rhs = compileExprToBytecode(gvi->rhs, see, bca, bf);
-	bf.store(gvi->type, gvi->reg, rhs.reg);
+	bf.store(gvi->varType, gvi->reg, rhs.reg);
     }break;
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
@@ -729,7 +729,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	bf.emitConstInt(proc->out.count);
 	for(u32 x=0; x<proc->out.count; x+=1){
 	    AST_Type *type = (AST_Type*)proc->out[x];
-	    bf.emit(type->type);
+	    bf.emit(type->varType);
 	};
 	bf.emit((Bytecode)procBytecodeID);
 	bf.emitConstInt(proc->inCount);
