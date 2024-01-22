@@ -33,6 +33,10 @@ AST_Type getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &
 	Type rhsType = typeID2Type(rhsTypeID);
 	if(isSameTypeRange(lhsType, rhsType) == false){
 	    lexer.emitErr(tokOffs[node->tokenOff].off, "LHS type and RHS type are not in the same type range");
+	    return type;
+	};
+	if(lhsTypeNode.pointerDepth != rhsTypeNode.pointerDepth){
+	    lexer.emitWarning(tokOffs[node->tokenOff].off, "LHS pointer depth(%d) != RHS pointer depth(%d)", lhsTypeNode.pointerDepth, rhsTypeNode.pointerDepth);
 	};
 	type.id = (TypeID)((u32)lhsTypeID | (u32)rhsTypeID);
 	return type;

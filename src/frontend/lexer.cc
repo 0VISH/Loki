@@ -151,8 +151,8 @@ struct Lexer {
     };
     void emitWarning(u64 off, char *fmt, ...) {
 	if (report::errorOff == MAX_ERRORS) { return; };
-	report::Report &rep = report::errors[report::errorOff];
-	report::errorOff += 1;
+	report::Report &rep = report::warnings[report::warnOff];
+	report::warnOff += 1;
 	rep.fileName = fileName;
 	rep.off = off;
 	rep.fileContent = fileContent;

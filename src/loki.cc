@@ -46,8 +46,8 @@ bool compile(char *fileName){
 	Dep::pushToCompileStack(file.id);
     };
     os::endTimer(TimeSlot::FRONTEND);
+    report::flushReports();
     if(report::errorOff != 0){
-	report::flushReports();
 	return false;
     };
     ASSERT(Dep::compileStack.count != 0);

@@ -31,7 +31,15 @@ void writeType(Bytecode bc, s16 id){
     case Type::S_16:    write("i16");break;
     case Type::U_8:
     case Type::S_8:     write("i8");break;
+    case Type::PTR:     write("ptr");break;
     default: write("%%_struct.%d%d", id, bc);break;
+    };
+};
+void writePointerDepth(Bytecode pd){
+    u32 pointerDepth = (u32)pd;
+    while(pointerDepth != 0){
+	write("*");
+	pointerDepth -= 1;
     };
 };
 

@@ -619,7 +619,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		goto PARSE_FOR_EXPR;
 	    };
 	    ASTUniVar *var = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::INITIALIZATION_T_UNKNOWN, file);
-	    var->varType.tokenOff = 0;
+	    var->varType = {};
 	    var->tokenOff = x;
 	    var->name = makeStringFromTokOff(x, lexer);
 	    var->flag = 0;
@@ -826,6 +826,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), uniVarType, file);
 		assign->tokenOff = start;
 		assign->name = makeStringFromTokOff(start, lexer);
+		assign->varType.pointerDepth = 0;
 		x += 1;
 		u32 end = getEnd(tokTypes, x);
 		if(tokTypes[x] == Token_Type::TDOT){

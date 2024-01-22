@@ -517,7 +517,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	VariableEntity *entity = var->entRef.ent;
 	Reg reg = bf.newReg();
 	Type type = entity->type;
-	bf.alloc(type, reg);
+	bf.alloc((entity->pointerDepth==0)?type:Type::PTR, reg);
 	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
 	    if(isFloat(type)){
 		Reg init = bf.newReg();
@@ -560,10 +560,10 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	}else if(IS_BIT(flag, Flags::UNINITIALIZED) || IS_BIT(flag, Flags::ALLOC)){
 	    //NOTE: UNI_ASSIGNMENT_T_UNKOWN wont reach here as checking stage would have raised an error
 	    reg = bf.newReg();
-	    bf.alloc(type, reg);
+	    bf.alloc((entity->pointerDepth==0)?type:Type::PTR, reg);
 	}else{
 	    reg = bf.newReg();
-	    bf.alloc(type, reg);
+	    bf.alloc((entity->pointerDepth==0)?type:Type::PTR, reg);
 	    auto rhs = compileExprToBytecode(var->rhs, see, bca, bf);
 	    if(type != rhs.type){
 		Reg castedReg = bf.newReg();
@@ -792,9 +792,7 @@ void compileASTFileToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see, 
 #if(DBG)
 
 #define DUMP_NEXT_BYTECODE dumpBytecode(getBytecode(buc, x), pbuc, x);
-
 #define DUMP_REG dumpReg((Reg)getBytecode(buc, x));
-
 #define DUMP_TYPE dumpType((Type)getBytecode(buc, x));
 
 namespace dbg{
@@ -810,6 +808,7 @@ namespace dbg{
     Type dumpType(Type type){
 	printf(" ");
 	switch(type){
+	case Type::PTR:  printf("ptr");break;
 	case Type::XE_VOID: printf("void");break;
 	case Type::S_64: printf("s64");break;
 	case Type::U_64: printf("u64");break;

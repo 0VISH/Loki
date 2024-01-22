@@ -106,12 +106,12 @@ namespace report{
 	if(warnOff != 0){
 	    flush(warnOff, warnings, os::printWarningInYellow);
 	};
-	printf("\n");
 	if(errorOff != 0){
-	    printf("error: %d\n", errorOff);
+	    printf("\nerror: %d", errorOff);
 	};
 	if(warnOff != 0){
-	    printf("warning: %d\n", warnOff);
+	    printf("\nwarning: %d", warnOff);
 	};
+	if(errorOff | warnOff != 0){printf("\n");};
     };
 }

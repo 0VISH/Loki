@@ -3,6 +3,7 @@
 enum class Type : u16{
     UNKOWN = 0,
     XE_VOID = 1,
+    PTR,
     STRING,
     F_64,
     S_64,
