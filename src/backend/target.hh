@@ -1,0 +1,10 @@
+#pragma once
+
+enum class Arch{
+    x86,
+    x64,
+};
+enum class OS{
+    WINDOWS,
+    LINUX,
+};

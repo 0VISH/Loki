@@ -21,6 +21,8 @@ enum class ArgType{
     FILE,
     OUTNAME,
     END,
+    ARCH,
+    OS,
     HELP,
     COUNT,
 };
@@ -45,8 +47,10 @@ s32 main(s32 argc, char **argv) {
     ArgData argsData[] = {
 	{"entrypoint", ArgType::ENTRYPOINT, "execution begins from this function"},
 	{"file", ArgType::FILE, "main file(file which is read first by the compiler)"},
-	{"out", ArgType::OUTNAME, "name of output file"},
-	{"end", ArgType::END, "end goal\n             1: exe\n             2: dll\n             3: check"},
+	{"arch", ArgType::ARCH, "target architecture\n             1: x86_64\n             2: x86"},
+	{"os",   ArgType::OS,   "target os\n             1: win\n             2: lin"},
+	{"out",  ArgType::OUTNAME, "name of output file"},
+	{"end",  ArgType::END, "end goal\n             1: exe\n             2: dll\n             3: check"},
 	{"help", ArgType::HELP, "print all the switches available"}
     };
 
@@ -67,6 +71,8 @@ s32 main(s32 argc, char **argv) {
     config.file         = "main.loki";
     config.out          = "out";
     config.end          = EndType::EXECUTABLE;
+    config.arch         = Arch::x64;
+    config.os           = OS::WINDOWS;
     
     HashmapStr argMap;
     argMap.init((u16)ArgType::COUNT);

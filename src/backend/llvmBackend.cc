@@ -1,5 +1,7 @@
 #include "backend.cc"
 #include "../frontend/typeBasic.cc"
+#define MICROSOFT_CRAZINESS_IMPLEMENTATION
+#include "microsoft_craziness.h"
 
 /*
   (dd): (bytecode file id, specific id)
@@ -310,22 +312,48 @@ EXPORT void initLLVMBackend(){
 EXPORT void uninitLLVMBackend(){
     uninitBackend();
 };
-EXPORT void backendCompileStage2(Config *config){
-    char buff[1024];
+EXPORT bool backendCompileStage2(Config *config){
+    char buff[100];
+    char targetBuff[100];
 
+    u32 off = 0;
+    switch(config->arch){
+    case Arch::x64:{
+	off = sprintf(targetBuff, "x86_64");
+    }break;
+    case Arch::x86:{
+	off = sprintf(targetBuff, "x86");
+    }break;
+    };
+    switch(config->os){
+    case OS::WINDOWS:{
+	Find_Result res = find_visual_studio_and_windows_sdk();
+	if(res.windows_sdk_version == 0){
+	    printf("\n[ERROR] cannot find windows sdk\n");
+	    return false;
+	};
+	sprintf(targetBuff+off, "-pc-windows-msvc%d.0.0", res.windows_sdk_version);
+	free_resources(&res);
+    }break;
+    };
+    
     sprintf(buff, "%s.ll", config->out);
     FILE *f = fopen(buff, "w");
+    off = sprintf(buff, "target triple = \"%s\"\n", targetBuff);
+    fwrite(buff, 1, off, f);
     for(u32 x=0; x<pages.count; x+=1){
 	Page &pg = pages[x];
 	fwrite(pg.mem, 1, pg.watermark, f);
     };
     fclose(f);
-    
-    sprintf(buff, "clang %s.ll -c -o %s.obj", config->out, config->out);
+
+    sprintf(buff, "clang -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
     printf("\n[LLVM] %s\n", buff);
-    if(system(buff) != 0){return;};
-    if(config->end == EndType::STATIC){return;};
+    if(system(buff) != 0){return false;};
+    if(config->end == EndType::STATIC){return true;};
     sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__main %s.obj /OUT:%s.%s", config->out, config->out, (config->end==EndType::EXECUTABLE)?"exe":"dll");
     printf("[LINKER] %s\n", buff);
     system(buff);
+
+    return true;
 };

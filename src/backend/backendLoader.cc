@@ -3,7 +3,7 @@ enum class BackendType{
 };
 
 typedef void(*backendCompileStage1Type)(BytecodeBucket *buc, s16 id, Config *config);
-typedef void(*backendCompileStage2Type)(Config *config);
+typedef bool(*backendCompileStage2Type)(Config *config);
 typedef void(*initializeBackendType)();
 typedef void(*startStopBackendType)();
 

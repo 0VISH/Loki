@@ -1,5 +1,7 @@
 #pragma once
 
+#include "backend/target.hh"
+
 enum class EndType{
     EXECUTABLE,
     STATIC,
@@ -14,5 +16,7 @@ struct Config{
     s32   entryPointProcID;
     s32   entryPointFileID;
 
+    Arch arch;
+    OS os;
     EndType end;
 };
