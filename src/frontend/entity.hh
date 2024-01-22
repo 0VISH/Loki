@@ -13,6 +13,7 @@ struct Entity{
 struct VariableEntity : Entity{
     u64 size;
     Type type;
+    u8   pointerDepth;
 };
 struct AST_Type;
 struct ProcEntity : Entity{

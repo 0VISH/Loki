@@ -1,4 +1,5 @@
 #define MAX_ERRORS 10
+#define MAX_WARNINGS 10
 
 #if(MSVC_COMPILER && SIMD)
 #define __builtin_popcount __popcnt
@@ -6,15 +7,17 @@
 
 namespace report{
 
-    struct Error {
+    struct Report {
 	u64   off;
 	char *fileName;
 	char *msg;
 	char *fileContent;
     };
 
-    Error errors[MAX_ERRORS];
+    Report errors[MAX_ERRORS];
     u8 errorOff = 0;
+    Report warnings[MAX_WARNINGS];
+    u8 warnOff = 0;
     char reportBuff[1024];
     u32 reportBuffTop = 0;
 
@@ -52,13 +55,11 @@ namespace report{
 #endif
     };
 
-    void flushReports() {
-	os::setPrintColorToWhite();
-	if (errorOff == 0) { return; };
+    void flush(u32 offset, Report *reports, void(*setCol)()){
 	//printf in FILO so that the usr can see first report first in the terminal
-	for (u8 i = errorOff; i != 0;) {
+	for (u8 i = offset; i != 0;) {
 	    i -= 1;
-	    Error &rep = errors[i];
+	    Report &rep = reports[i];
 	    u32 line = 1;
 	    u32 off = 1;
 	    char *beg = getLineAndOff(rep.fileContent, rep.off, line, off);
@@ -75,7 +76,7 @@ namespace report{
 		printDots = true;
 	    }
 	    printf("\n%s: ", rep.fileName);
-	    os::printErrorInRed();
+	    setCol();
 	    printf(" %s\n", rep.msg);
 	    printf("  %d| ", line);
 	    if(printDots){
@@ -96,6 +97,21 @@ namespace report{
 	    };
 	    printf("^\n");
 	};
-	printf("\nflushed %d error%c\n", errorOff, (errorOff == 1)?' ':'s');
+    };
+    void flushReports() {
+	os::setPrintColorToWhite();
+	if(errorOff != 0){
+	    flush(errorOff, errors, os::printErrorInRed);
+	};
+	if(warnOff != 0){
+	    flush(warnOff, warnings, os::printWarningInYellow);
+	};
+	printf("\n");
+	if(errorOff != 0){
+	    printf("error: %d\n", errorOff);
+	};
+	if(warnOff != 0){
+	    printf("warning: %d\n", warnOff);
+	};
     };
 }

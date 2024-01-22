@@ -81,7 +81,9 @@ struct AST_Type : ASTBase{
     union{
 	u32 tokenOff;
 	Type varType;
+	TypeID id; //only for the checker
     };
+    u8 pointerDepth;
 };
 struct ASTUniVar : ASTBase{
     union{
@@ -510,11 +512,20 @@ ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 end) {
     };
     return (ASTBase*)lhs;
 };
-ASTBase* parseType(u32 x, Lexer &lexer, ASTFile &file){
+bool parseType(AST_Type *type, u32 &x, Lexer &lexer, ASTFile &file){
     BRING_TOKENS_TO_SCOPE;
-    AST_Type *type = (AST_Type*)allocAST(sizeof(AST_Type), ASTType::TYPE, file);
+    u32 pointerDepth = 0;
+    while(tokTypes[x] == (Token_Type)'^'){
+	pointerDepth += 1;
+	x += 1;
+    };
+    if(isType(tokTypes[x]) == false && tokTypes[x] != Token_Type::IDENTIFIER){
+	lexer.emitErr(tokOffs[x].off, "Expected a type");
+	return false;
+    };
     type->tokenOff = x;
-    return (ASTBase*)type;
+    type->pointerDepth = pointerDepth;
+    return true;
 };
 s32 getTokenOffInLine(Token_Type tok, Lexer &lexer, u32 cur){
     BRING_TOKENS_TO_SCOPE;
@@ -919,8 +930,8 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			//parse output
 			while (true) {
 			    eatNewlines(tokTypes, x);
-			    ASTBase *typeNode = parseType(x, lexer, file);
-			    if(typeNode == nullptr){return false;};
+			    ASTBase *typeNode = allocAST(sizeof(AST_Type), ASTType::TYPE, file);
+			    if(parseType((AST_Type*)typeNode, x, lexer, file) == false){return false;};
 			    x += 1;
 			    proc->out.push(typeNode);
 			    if(tokTypes[x] == (Token_Type)','){
@@ -966,6 +977,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			if (result == false) {
 			    return false;
 			};
+			
 			eatNewlines(tokTypes, x);
 		    };
 		    x += 1;
@@ -975,14 +987,14 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		};
 	    }break;
 	    default: {
-		if (isType(tokTypes[x]) || tokTypes[x] == Token_Type::IDENTIFIER) {
+		if (isType(tokTypes[x]) || tokTypes[x] == Token_Type::IDENTIFIER || tokTypes[x] == (Token_Type)'^') {
+		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::DECLERATION, file);
+		    if(parseType(&assign->varType, x, lexer, file) == false){return false;};
 		    x += 1;
 		    if (tokTypes[x] == (Token_Type)'=') {
 			uniVarType = ASTType::INITIALIZATION_T_KNOWN;
 			goto SINGLE_VARIABLE_ASSIGNMENT;
 		    };
-		    ASTUniVar *assign = (ASTUniVar*)allocAST(sizeof(ASTUniVar), ASTType::DECLERATION, file);
-		    assign->varType.tokenOff = x-1;
 		    assign->tokenOff = start;
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    assign->flag = flag;

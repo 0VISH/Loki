@@ -26,6 +26,12 @@ namespace os{
 	printf("ERROR");
 	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
     };
+    void printWarningInYellow() {
+	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN);
+	printf("WARNING");
+	SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN);
+    };
 
     void initTimer(){
 	memset(times, 0, sizeof(times)*(u16)TimeSlot::COUNT);

@@ -78,7 +78,10 @@ bool compile(char *fileName){
     };
     os::endTimer(TimeSlot::MIDEND);
     os::startTimer(TimeSlot::BACKEND);
-    BackendRef &backRef = loadRef(BackendType::LLVM);
+    BackendRef backRef = loadRef(BackendType::LLVM);
+    if(!backRef.code){
+	return false;
+    };
     backRef.initBackend();
     for(u32 x=Dep::compileStack.count; x>0;){
 	x -= 1;

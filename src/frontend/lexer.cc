@@ -138,7 +138,20 @@ struct Lexer {
     };
     void emitErr(u64 off, char *fmt, ...) {
 	if (report::errorOff == MAX_ERRORS) { return; };
-	report::Error &rep = report::errors[report::errorOff];
+	report::Report &rep = report::errors[report::errorOff];
+	report::errorOff += 1;
+	rep.fileName = fileName;
+	rep.off = off;
+	rep.fileContent = fileContent;
+	if (fmt != nullptr) { rep.msg = report::reportBuff + report::reportBuffTop; };
+	va_list args;
+	va_start(args, fmt);
+	report::reportBuffTop += vsprintf(report::reportBuff, fmt, args);
+	va_end(args);
+    };
+    void emitWarning(u64 off, char *fmt, ...) {
+	if (report::errorOff == MAX_ERRORS) { return; };
+	report::Report &rep = report::errors[report::errorOff];
 	report::errorOff += 1;
 	rep.fileName = fileName;
 	rep.off = off;

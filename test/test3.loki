@@ -1,0 +1,12 @@
+//loops
+
+main :: proc(){
+     for i : 0...5{
+     	 x := 3
+     }
+
+     for i : u32 0...5{
+     	 x := 3
+     }
+     return
+}

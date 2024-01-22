@@ -207,9 +207,9 @@ EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, Dyna
     };    
     return ref;
 };
-EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(String name, Flag flag, Type type, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
+EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(ASTUniVar *var, Flag flag, Type type, DynamicArray<ScopeEntities*> &see, IDGiver &idGiver){
     EntityRef<VariableEntity> ref;
-    if(getVarEntity(name, see) != nullptr){
+    if(getVarEntity(var->name, see) != nullptr){
 	ref.ent = nullptr;
 	return ref;
     };
@@ -218,10 +218,11 @@ EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(String name, Flag 
     HashmapStr &map = se->varMap;
     
     u32 localID = map.count;
-    map.insertValue(name, localID);
+    map.insertValue(var->name, localID);
     VariableEntity &entity = se->varEntities[localID];
     entity.type = type;
-    entity.flag = flag;
+    entity.flag = var->flag;
+    entity.pointerDepth = var->varType.pointerDepth;
     ref.ent = &entity;
     ref.id = idGiver.varID;
     entity.id = idGiver.varID;
@@ -326,7 +327,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	Type type = tokenKeywordToType(var->varType.tokenOff, lexer, see);
 	if(type == Type::UNKOWN){return false;};
 	SET_BIT(var->flag, Flags::CONSTANT);
-	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, var->flag, type, see, idGiver);
+	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var, var->flag, type, see, idGiver);
 	if(entRef.ent == nullptr){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redecleration");
 	    return false;
@@ -506,7 +507,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    return false;
 	};
 	CHECK_TREE_AND_MERGE_FLAGS;
-	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see, idGiver);
+	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var, flag, treeType, see, idGiver);
 	if(entRef.ent == false){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
 	    return false;
@@ -521,7 +522,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	if(!IS_BIT(flag, Flags::UNINITIALIZED)){
 	    CHECK_TREE_AND_MERGE_FLAGS;
 	    IS_EXPLICIT_CAST_REQUIRED;
-	    EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var->name, flag, treeType, see, idGiver);
+	    EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var, flag, treeType, see, idGiver);
 	    var->entRef = entRef;
 	    ent = entRef.ent;
 	};

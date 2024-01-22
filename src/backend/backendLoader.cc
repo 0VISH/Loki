@@ -32,6 +32,10 @@ BackendRef loadRef(BackendType type){
 	char *path = "llvmBackend.dll";
 #endif
 	ref.code = LoadLibrary(path);
+	if(!ref.code){
+	    printf("\n[ERROR]: Couldn't find backend file %s", path);
+	    return ref;
+	};
 	ref.initBackend = (startStopBackendType)GetProcAddress(ref.code, "initLLVMBackend");
 	ref.uninitBackend = (startStopBackendType)GetProcAddress(ref.code, "uninitLLVMBackend");
 	ref.backendCompileStage1 = (backendCompileStage1Type)GetProcAddress(ref.code, "backendCompileStage1");

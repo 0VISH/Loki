@@ -26,3 +26,4 @@ enum class Flags {
     ALLOC,
 };
 typedef u8 Flag;
+typedef u32 TypeID;
