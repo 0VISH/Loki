@@ -35,13 +35,6 @@ void writeType(Bytecode bc, s16 id){
     default: write("%%_struct.%d%d", id, bc);break;
     };
 };
-void writePointerDepth(Bytecode pd){
-    u32 pointerDepth = (u32)pd;
-    while(pointerDepth != 0){
-	write("*");
-	pointerDepth -= 1;
-    };
-};
 
 void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     off += 1;
@@ -144,7 +137,8 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	writeType(type, id);
 	write(", ");
 	writeType(type, id);
-	write("* ");
+	if((Type)type == Type::PTR){write(" ");}
+	else{write("* ");};
 	writeReg(getBytecode(bytecodes, off), id);
     }break;
     case Bytecode::RET:{
@@ -279,9 +273,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	writeReg(dest, id);
 	write(" = getelementptr inbounds ");
 	writeType(structID, id);
-	write(", ");
-	writeType(structID, id);
-	write("* ");
+	write(", ptr ");
 	writeReg(src, id);
 	write(", i32 0, i32 %d", offset);
     }break;

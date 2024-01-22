@@ -68,6 +68,9 @@ AST_Type getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &
 	SET_BIT(id, (u32)var->varEntRef.ent->type);
 	type.id = id;
 	type.pointerDepth = var->varEntRef.ent->pointerDepth;
+	if(var->pAccessDepth > type.pointerDepth){
+	    lexer.emitWarning(tokOffs[var->tokenOff].off, "Accessing pointer depth(%d) more than defined(%d)", var->pAccessDepth, type.pointerDepth);
+	};
 	return type;
     }break;
     };

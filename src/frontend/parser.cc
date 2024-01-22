@@ -140,6 +140,7 @@ struct ASTVariable : ASTBase{
 	EntityRef<StructEntity>   structEntRef;
     };
     u32 tokenOff;
+    u8 pAccessDepth;
 };
 struct ASTModifier : ASTBase{
     union{
@@ -149,6 +150,7 @@ struct ASTModifier : ASTBase{
     };
     ASTBase *child;
     u32 tokenOff;
+    u8 pAccessDepth;
 };
 struct ASTFor : ASTBase{
     DynamicArray<ASTBase*> body;
@@ -316,23 +318,31 @@ ASTBase *genVariable(u32 &x, Lexer &lexer, ASTFile &file){
     bool childReq = false;
     ASTModifier *lastMod = nullptr;
     while(tokTypes[x] == Token_Type::IDENTIFIER){
-	if(tokTypes[x+1] == (Token_Type)'.'){
+	u32 start = x;
+	x += 1;
+	u8 pointerDepth = 0;
+	while(tokTypes[x] == (Token_Type)'^'){
+	    pointerDepth += 1;
+	    x += 1;
+	};
+	if(tokTypes[x] == (Token_Type)'.'){
 	    ASTModifier *mod = (ASTModifier*)allocAST(sizeof(ASTModifier), ASTType::MODIFIER, file);
-	    mod->name = makeStringFromTokOff(x, lexer);
-	    mod->tokenOff = x;
+	    mod->name = makeStringFromTokOff(start, lexer);
+	    mod->tokenOff = start;
+	    mod->pAccessDepth = pointerDepth;
 	    childReq = true;
 	    if(root == nullptr){root = mod;};
 	    if(lastMod){lastMod->child = mod;};
 	    lastMod = mod;
-	    x += 2;
+	    x += 1;
 	}else{
 	    ASTVariable *var = (ASTVariable*)allocAST(sizeof(ASTVariable), ASTType::VARIABLE, file);
-	    var->name = makeStringFromTokOff(x, lexer);
-	    var->tokenOff = x;
+	    var->name = makeStringFromTokOff(start, lexer);
+	    var->tokenOff = start;
+	    var->pAccessDepth = pointerDepth;
 	    childReq = false;
 	    if(root == nullptr){root = var;};
 	    if(lastMod){lastMod->child = var;};
-	    x += 1;
 	};
     };
     if(childReq){
@@ -514,7 +524,7 @@ ASTBase *genASTExprTree(Lexer &lexer, ASTFile &file, u32 &x, u32 end) {
 };
 bool parseType(AST_Type *type, u32 &x, Lexer &lexer, ASTFile &file){
     BRING_TOKENS_TO_SCOPE;
-    u32 pointerDepth = 0;
+    u8 pointerDepth = 0;
     while(tokTypes[x] == (Token_Type)'^'){
 	pointerDepth += 1;
 	x += 1;
@@ -798,6 +808,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	x += 1;
 	ASTBase *lhs = nullptr;
 	switch (tokTypes[x]) {
+	case (Token_Type)'^':
 	case (Token_Type)'.':
 	case (Token_Type)'=':{
 	    x = start;
@@ -1142,6 +1153,8 @@ namespace dbg {
 	    printf("modifier");
 	    PAD;
 	    printf("name: %.*s", mod->name.len, mod->name.mem);
+	    PAD;
+	    printf("pAccessDepth: %d", mod->pAccessDepth);
 	    __dumpNodesWithoutEndPadding(mod->child, lexer, padding+1);
 	    PAD;
 	}break;
@@ -1230,6 +1243,8 @@ namespace dbg {
 	    ASTVariable *var = (ASTVariable*)node;
 	    String name = var->name;
 	    printf("name: %.*s", name.len, name.mem);
+	    PAD;
+	    printf("pAccessDepth: %d", var->pAccessDepth);
 	}break;
 	case ASTType::DECLERATION: {
 	    ASTUniVar *decl = (ASTUniVar*)node;

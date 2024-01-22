@@ -414,6 +414,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	    u32 off = modc->structEntRef.id;
 	    Reg memberReg = bf.newReg();
 	    bf.getMember(memberReg, rootReg, id, off);
+	    rootReg = memberReg;
 	    mod = modc;
 	};
 	Reg memberReg = bf.newReg();
@@ -429,8 +430,18 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     case ASTType::VARIABLE:{
 	ASTVariable *var = (ASTVariable*)node;
 	u32 id = var->varEntRef.id;
-	return getVarExprFromID(id, bca);
+	u32 pAccessDepth = var->pAccessDepth;
 	//NOTE: we do not need to check if off == -1 as the checker would have raised a problem
+	Expr expr = getVarExprFromID(id, bca);
+	Reg base = expr.reg;
+	while(pAccessDepth != 0){
+	    Reg temp = bf.newReg();
+	    bf.load(Type::PTR, temp, base);
+	    base = temp;
+	    pAccessDepth -= 1;
+	};
+	expr.reg = base;
+	return expr;
     }break;
     case ASTType::BIN_ADD:{									
 	return emitBinOpBc(Bytecode::ADD, node, bca, bf, see);

@@ -283,6 +283,19 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    entity.varToType[x] = type;
 	};
     }break;
+    case ASTType::VARIABLE:{
+	ASTVariable *var = (ASTVariable*)node;
+	VariableEntity *varEnt = getVarEntity(var->name, see);
+	if(varEnt == nullptr){
+	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable is not defined: %.*s", var->name.len, var->name.mem);
+	    return false;
+	};
+	if(var->pAccessDepth > varEnt->pointerDepth){
+	    lexer.emitWarning(tokOffs[var->tokenOff].off, "Accessing pointer depth(%d) more than defined(%d)", var->pAccessDepth, varEnt->pointerDepth);
+	};
+	var->varEntRef.ent = varEnt;
+	var->varEntRef.id  = varEnt->id;
+    }break;
     case ASTType::MODIFIER:{
 	ASTModifier *mod = (ASTModifier*)node;
 	VariableEntity *varEnt = getVarEntity(mod->name, see);
