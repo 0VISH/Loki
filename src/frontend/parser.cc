@@ -351,12 +351,23 @@ ASTBase *genVariable(u32 &x, Lexer &lexer, ASTFile &file){
     };
     return root;
 };
+s32 getTokenOff(Token_Type tok, DynamicArray<Token_Type> &tokTypes, u32 cur){
+    s32 x = cur;
+    while(tokTypes[x] != tok){
+	switch(tokTypes[x]){
+	case Token_Type::END_OF_FILE:
+	    return -1;
+	};
+	x += 1;
+    };
+    return x;
+};
 u32 getEnd(DynamicArray<Token_Type>& tokTypes, u32 x) {
     //SIMD?
     u8 bra = 1;
     while(true){
 	switch(tokTypes[x]){
-	case (Token_Type)'\n': return x;
+	case (Token_Type)';': return x;
 	case (Token_Type)',': return x;
 	case (Token_Type)'(': bra += 1; break;
 	case (Token_Type)')':{
@@ -418,8 +429,17 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	    x += 2;
 	    pc->args.init();
 	    pc->argOffs.init();
+	    s32 bend = getTokenOff((Token_Type)')', tokTypes, x);
+	    if(bend == -1){
+		lexer.emitErr(tokOffs[pc->off].off, "Expected ending ')'");
+		return false;
+	    };
 	    while(true){
-		u32 end = getEnd(tokTypes, x);
+		s32 cend = getTokenOff((Token_Type)',', tokTypes, x);
+		s32 end = cend;
+		if(cend == -1){
+		    end = bend;
+		};
 		pc->argOffs.push(x);
 		ASTBase *arg = genASTExprTree(lexer, file, x, end);
 		if(arg == false){return nullptr;};
@@ -537,19 +557,6 @@ bool parseType(AST_Type *type, u32 &x, Lexer &lexer, ASTFile &file){
     type->pointerDepth = pointerDepth;
     return true;
 };
-s32 getTokenOffInLine(Token_Type tok, Lexer &lexer, u32 cur){
-    BRING_TOKENS_TO_SCOPE;
-    s32 x = cur;
-    while(tokTypes[x] != tok){
-	switch(tokTypes[x]){
-	case Token_Type::END_OF_FILE:
-	case (Token_Type)'\n':
-	    return -1;
-	};
-	x += 1;
-    };
-    return x;
-};
 bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
     Flag flag = 0;
@@ -569,19 +576,15 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	if(tokTypes[x] == (Token_Type)'}' || tokTypes[x] == (Token_Type)'\n'){
 	    ret->expr = nullptr;
 	}else{
-	    s32 end;
-	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
-	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
-	    if(bend != -1){
-		end = bend;
-	    }else{
-		end = nend;
+	    s32 end = getTokenOff((Token_Type)';', tokTypes, x);
+	    if(end == -1){
+		lexer.emitErr(tokOffs[start].off, "Expected ending ';'");
+		return false;
 	    };
 	    ret->expr = genASTExprTree(lexer, file, x, end);
 	};
 	x += 1;
 	table.push(ret);
-	return true;
     }break;
     case Token_Type::P_IMPORT:{
 	x += 1;
@@ -603,7 +606,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	ASTImport *Import = (ASTImport*)allocAST(sizeof(ASTImport), ASTType::IMPORT, file);
 	Import->fileName = fullFileName;
 	table.push(Import);
-	return true;
     }break;
     case Token_Type::K_FOR:{
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);
@@ -614,15 +616,12 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    //for ever
 	    For->loopType = ForType::FOR_EVER;
 	    x += 1;
-	    eatNewlines(lexer.tokenTypes, x);
 	    while(tokTypes[x] != (Token_Type)'}'){
 		bool result = parseBlock(lexer, file, For->body, x);
 		if(result == false){return false;};
-		eatNewlines(lexer.tokenTypes, x);
 	    };
 	    x += 1;
 	    table.push(For);
-	    return true;
 	}break;
 	case Token_Type::IDENTIFIER:{
 	    if(tokTypes[x+1] != (Token_Type)':'){
@@ -642,7 +641,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		var->type = ASTType::INITIALIZATION_T_KNOWN;
 		x += 1;
 	    };
-	    s32 end = getTokenOffInLine(Token_Type::TDOT, lexer, x);
+	    s32 end = getTokenOff(Token_Type::TDOT, tokTypes, x);
 	    if(end == -1){
 		lexer.emitErr(tokOffs[x].off, "Expected '...' to specify the upper bound");
 		return false;
@@ -650,15 +649,15 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    var->rhs = genASTExprTree(lexer, file, x, end);
 	    if(var->rhs == nullptr){return false;};
 	    x = end + 1;
-	    s32 dend = getTokenOffInLine(Token_Type::DDOT, lexer, x);
-	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
-	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
+	    s32 dend = getTokenOff(Token_Type::DDOT, tokTypes, x);
+	    s32 bend = getTokenOff((Token_Type)'{', tokTypes,  x);
 	    if(dend != -1){
 		end = dend;
 	    }else if(bend != -1){
 		end = bend;
 	    }else{
-		end = nend;
+		lexer.emitErr(tokOffs[start].off, "Expected '..' or '{'. Found nothing.");
+		return false;
 	    };
 	    switch(tokTypes[x]){
 	    case (Token_Type)'<':{
@@ -675,66 +674,47 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    x = end;
 	    if(dend != -1){
 		x += 1;
-		if(bend != -1){
-		    end = bend;
-		}else{
-		    end = nend;
-		};
 		For->increment = genASTExprTree(lexer, file, x, end);
 		if(For->increment == nullptr){return false;};
 		For->incrementOff = end;
 		x = end;
 	    };
-	    if(bend == -1){
-		eatNewlines(lexer.tokenTypes, x);
-	    };
 	    if(tokTypes[x] != (Token_Type)'{'){
 		lexer.emitErr(tokOffs[x].off, "Expected '{' here");
 		return false;
 	    };
 	    x += 1;
-	    eatNewlines(lexer.tokenTypes, x);
 	    while(tokTypes[x] != (Token_Type)'}'){
 		bool result = parseBlock(lexer, file, For->body, x);
 		if(result == false){return false;};
-		eatNewlines(lexer.tokenTypes, x);
 	    };
 	    x += 1;
 	    table.push(For);
-	    return true;
 	}break;
 	default:{
 	    x += 1;
 	    PARSE_FOR_EXPR:
 	    For->loopType = ForType::EXPR;
-	    s32 bend = getTokenOffInLine((Token_Type)'{', lexer,  x);
-	    s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
-	    if(bend == -1 && nend == -1){
-		lexer.emitErr(tokOffs[x-1].off, "Line has to be finished with '{' or a newline");
+	    s32 end = getTokenOff((Token_Type)'{', tokTypes,  x);
+	    if(end == -1){
+		lexer.emitErr(tokOffs[start].off, "Expected '{' to define the body");
 		return false;
 	    };
-	    u32 end = (bend != -1)? bend : nend;
 	    For->expr = genASTExprTree(lexer, file, x, end);
 	    if(For->expr == nullptr){return false;};
 	    x = end;
-	    if(bend == -1){
-		eatNewlines(lexer.tokenTypes, x);
-	    };
 	    if(tokTypes[x] != (Token_Type)'{'){
 		lexer.emitErr(tokOffs[x].off, "Expected '{' here");
 		return nullptr;
 	    };
 	    x += 1;
-	    eatNewlines(lexer.tokenTypes, x);
 	    For->body.init();
 	    while(tokTypes[x] != (Token_Type)'}'){
 		bool result = parseBlock(lexer, file, For->body, x);
 		if(result == false){return false;};
-		eatNewlines(lexer.tokenTypes, x);
 	    };
 	    x += 1;
 	    table.push(For);
-	    return true;
 	}break;
 	};
     }break;
@@ -744,51 +724,34 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	x += 1;
 	If->body.zero();
 	If->elseBody.zero();
-	s32 end;
-	s32 bend = getTokenOffInLine((Token_Type)'{', lexer, x);
-	s32 nend = getTokenOffInLine((Token_Type)'\n', lexer, x);
-	if(bend == -1 && nend == -1){
-	    lexer.emitErr(tokOffs[x-1].off, "Line has to be finished with '{' or a newline");
+	s32 end = getTokenOff((Token_Type)'{', tokTypes, x);
+	if(end == -1){
+	    lexer.emitErr(tokOffs[start].off, "Expected '{' to define the body");
 	    return nullptr;
-	};
-	if(bend == -1){
-	    end = nend;
-	}else{
-	    end = bend;
 	};
 	If->expr = genASTExprTree(lexer, file, x, end);
 	if(If->expr == nullptr){return false;};
 	x = end;
-	if(bend == -1){
-	    x += 1;
-	    eatNewlines(lexer.tokenTypes, x);
-	};
 	if(tokTypes[x] != (Token_Type)'{'){
 	    lexer.emitErr(tokOffs[x].off, "Expected '{' here");
 	    return false;
 	};
 	If->body.init();
 	x += 1;
-	eatNewlines(lexer.tokenTypes, x);
 	while(tokTypes[x] != (Token_Type)'}'){
 	    bool result = parseBlock(lexer, file, If->body, x);
 	    if(result == false){return false;};
-	    eatNewlines(lexer.tokenTypes, x);
 	};
 	x += 1;
-	eatNewlines(lexer.tokenTypes, x);
 	if(tokTypes[x] != Token_Type::K_ELSE){return (ASTBase*)If;};
 	If->elseBody.init();
 	x += 1;
-	eatNewlines(lexer.tokenTypes, x);
 	switch(tokTypes[x]){
 	case (Token_Type)'{':{
 	    x += 1;
-	    eatNewlines(lexer.tokenTypes, x);
 	    while(tokTypes[x] != (Token_Type)'}'){
 		bool result = parseBlock(lexer, file, If->elseBody, x);
 		if(result == false){return false;};
-		eatNewlines(lexer.tokenTypes, x);
 	    };
 	    x += 1;
 	    if(tokTypes[x] == Token_Type::K_ELSE){
@@ -802,7 +765,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	}break;
 	};
 	table.push(If);
-	return false;
     }break;
     case Token_Type::IDENTIFIER: {
 	x += 1;
@@ -818,14 +780,17 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		return false;
 	    };
 	    x += 1;
-	    u32 end = getEnd(tokTypes, x);
+	    s32 end = getTokenOff((Token_Type)';', tokTypes, x);
+	    if(end == -1){
+		lexer.emitErr(tokOffs[start].off, "Expected ending ';'");
+		return false;
+	    };
 	    ASTBase *rhs = genASTExprTree(lexer, file, x, end);
 	    if(rhs == nullptr){return false;};
 	    ASTAssignment *ass= (ASTAssignment*)allocAST(sizeof(ASTAssignment), ASTType::ASSIGNMENT, file);
 	    ass->lhs = lhs;
 	    ass->rhs = rhs;
 	    table.push(ass);
-	    return true;
 	}break;
 	case (Token_Type)':': {
 	    x += 1;
@@ -839,7 +804,11 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		assign->name = makeStringFromTokOff(start, lexer);
 		assign->varType.pointerDepth = 0;
 		x += 1;
-		u32 end = getEnd(tokTypes, x);
+		s32 end = getTokenOff((Token_Type)';', tokTypes, x);
+		if(end == -1){
+		    lexer.emitErr(tokOffs[start].off, "Expected ending ';'");
+		    return false;
+		};
 		if(tokTypes[x] == Token_Type::TDOT){
 		    SET_BIT(flag, Flags::UNINITIALIZED);
 		    x += 1;
@@ -849,20 +818,17 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		};
 		assign->flag = flag;
 		table.push(assign);
-		return true;
 	    } break;
 	    case (Token_Type)':': {
 		x += 1;
 		switch (tokTypes[x]){
 		case Token_Type::K_STRUCT:{
 		    x += 1;
-		    eatNewlines(tokTypes, x);
 		    if(tokTypes[x] != (Token_Type)'{'){
 			lexer.emitErr(tokOffs[x].off, "Expected '{'");
 			return false;
 		    };
 		    x += 1;
-		    eatNewlines(tokTypes, x);
 		    ASTStructDef *Struct = (ASTStructDef*)allocAST(sizeof(ASTStructDef), ASTType::STRUCT_DEFENITION, file);
 		    Struct->name = makeStringFromTokOff(start, lexer);
 		    Struct->members.init();
@@ -879,11 +845,9 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			    lexer.emitErr(tokOffs[x].off, "Invalid statement. Struct only takes uni/multi decleration");
 			    return nullptr;
 			};
-			eatNewlines(tokTypes, x);
 		    };
 		    x += 1;
 		    table.push(Struct);
-		    return true;
 		}break;
 		case Token_Type::K_PROC:{
 		    //procedure defenition
@@ -903,7 +867,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    x += 1;
 		    if(tokTypes[x] == (Token_Type)')'){goto END_PROC_INPUT_PARSING_LOOP;};
 		    while(true){
-			eatNewlines(tokTypes, x);
 			u32 argStart = x;
 			bool result = parseBlock(lexer, file, proc->body, x);
 			if(result == false){return false;};
@@ -932,7 +895,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    };
 		    PARSE_AFTER_ARGS:
 		    x += 1;
-		    eatNewlines(tokTypes, x);
 		    switch (tokTypes[x]) {
 		    case Token_Type::ARROW: {
 			x += 1;
@@ -941,7 +903,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			if (tokTypes[x] == (Token_Type)'(') { bracket = true; x += 1; };
 			//parse output
 			while (true) {
-			    eatNewlines(tokTypes, x);
 			    ASTBase *typeNode = allocAST(sizeof(AST_Type), ASTType::TYPE, file);
 			    if(parseType((AST_Type*)typeNode, x, lexer, file) == false){return false;};
 			    x += 1;
@@ -958,7 +919,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 				return false;
 			    };
 			    x += 1;
-			    eatNewlines(tokTypes, x);
 			} else if(bracket == true) {
 			    lexer.emitErr(tokOffs[x].off, "Expected ')'");
 			    return false;
@@ -977,24 +937,15 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			return false;
 		    } break;
 		    };
-		    eatNewlines(tokTypes, x);
-		    if (tokTypes[x] == (Token_Type)'}') {
-			x += 1;
-			table.push(proc);
-			return true;
-		    };
 		    while (tokTypes[x] != (Token_Type)'}') {
 			//parse body
 			bool result = parseBlock(lexer, file, proc->body, x);
 			if (result == false) {
 			    return false;
 			};
-			
-			eatNewlines(tokTypes, x);
 		    };
 		    x += 1;
 		    table.push(proc);
-		    return true;
 		}break;
 		};
 	    }break;
@@ -1011,7 +962,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    assign->name = makeStringFromTokOff(start, lexer);
 		    assign->flag = flag;
 		    table.push(assign);
-		    return true;
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected a type");
 		    return false;
@@ -1021,57 +971,37 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	}break;
 	case (Token_Type)',': {
 	    //multi var def/decl
-	    u32 i = x;
 	    x = start;
-	    ASTType type;
+	    ASTType type = ASTType::INITIALIZATION_T_UNKNOWN;
 	    u32 equalSignPos = 0;
-	    u32 end = 0;
-	    while(true){
-		switch(tokTypes[i]){
-		case (Token_Type)':':{
-		    i += 1;
-		    if(tokTypes[i] == Token_Type::IDENTIFIER || isType(tokTypes[i])){
-			if(tokTypes[i+1] == (Token_Type)'='){
-			    type = ASTType::INITIALIZATION_T_KNOWN;
-			    equalSignPos = i + 1;
-			}else{
-			    type = ASTType::DECLERATION;
-			    end = i+1;
-			};
-		    }else if(tokTypes[i] == (Token_Type)'='){
-			type = ASTType::INITIALIZATION_T_UNKNOWN;
-			equalSignPos = i + 1;
-		    }else{
-			lexer.emitErr(tokOffs[i].off, "Expected a type or '='");
-			return false;
-		    };
-		    goto EXIT_LOOP_MULTI_VAR;
-		}break;
-		case Token_Type::END_OF_FILE:
-		case (Token_Type)'\n':{
-		    lexer.emitErr(tokOffs[i].off, "Expected ':'");
-		    return false;
-		}break;
-		};
-		i += 1;
-	    };
-	    EXIT_LOOP_MULTI_VAR:
-	    if(end == 0){
-		end = getEnd(tokTypes, x);
+	    s32 end = getTokenOff((Token_Type)';', tokTypes, x);
+	    if(end == -1){
+		lexer.emitErr(tokOffs[start].off, "Expected ending ';'");
+		return false;
 	    };
 	    Flag flag = 0;
-	    ASTMultiVarRHS *mvr = nullptr;
-	    if(type != ASTType::DECLERATION){
-		mvr = (ASTMultiVarRHS*)allocAST(sizeof(ASTMultiVarRHS), ASTType::MULTI_VAR_RHS, file);
-		mvr->reg = 0;
+	    ASTMultiVarRHS *mvr = (ASTMultiVarRHS*)allocAST(sizeof(ASTMultiVarRHS), ASTType::MULTI_VAR_RHS, file);
+	    mvr->reg = 0;
+	    s32 cend = getTokenOff((Token_Type)':', tokTypes, x);
+	    if(cend == -1){
+		lexer.emitErr(tokOffs[start].off, "Expected a ':'");
+		return false;
 	    };
-	    if(equalSignPos != 0){
-		if(tokTypes[equalSignPos] == Token_Type::TDOT){
+	    AST_Type varType;
+	    u32 ucend = cend;
+	    if(tokTypes[cend] != (Token_Type)'='){
+		type = ASTType::INITIALIZATION_T_KNOWN;
+		parseType(&varType, ucend, lexer, file);
+		cend = ucend;
+	    };
+	    if(tokTypes[cend] == (Token_Type)'='){
+		cend += 1;
+		if(tokTypes[cend] == Token_Type::TDOT){
 		    SET_BIT(flag, Flags::UNINITIALIZED);
-		    x = end;
-		    return true;
+		    mvr->flag = flag;
 		}else{
-		    mvr->rhs = genASTExprTree(lexer, file, equalSignPos, end);
+		    ucend = cend;
+		    mvr->rhs = genASTExprTree(lexer, file, ucend, end);
 		    if(mvr->rhs == nullptr){return false;}
 		};
 	    };
@@ -1081,7 +1011,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		    uv->flag = flag;
 		    uv->rhs = mvr;
 		    uv->name = makeStringFromTokOff(x, lexer);
-		    uv->varType.tokenOff = i;
+		    uv->varType = varType;
 		    table.push(uv);
 		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected an identifier");
@@ -1098,7 +1028,6 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 		x += 1;
 	    };
 	    x = end;
-	    return true;
 	}break;
 	default:
 	    goto PARSE_EXPR;
@@ -1107,14 +1036,23 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
     default: {
 	PARSE_EXPR:
 	x = start;
-	u32 end = getEnd(tokTypes, x);
+	s32 end = getTokenOff((Token_Type)';', tokTypes, x);
+	if(end == -1){
+	    lexer.emitErr(tokOffs[start].off, "Expected ending ';'");
+	    return false;
+	};
 	ASTBase *tree = genASTExprTree(lexer, file, x, end);
 	if(tree == nullptr){return false;};
 	table.push(tree);
 	return true;
     } break;
     };
-    return false;
+    if(tokTypes[x] != (Token_Type)';'){
+	lexer.emitErr(tokOffs[x].off, "Expected ';'");
+	return false;
+    };
+    x += 1;
+    return true;
 };
 
 u32 pow(u32 base, u32 exp){

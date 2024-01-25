@@ -7,14 +7,12 @@ ScopeEntities *parseCheckAndLoadEntities(char *fileName, ASTFile &astFile){
     };
     bool wasEntryPointKnown = (config.entryPointFileID != -1);
     u32 off = 0;
-    eatNewlines(lexer.tokenTypes, off);
     if(lexer.tokenTypes[off] == Token_Type::END_OF_FILE) {
 	return nullptr;
     };
     while (lexer.tokenTypes[off] != Token_Type::END_OF_FILE) {
 	bool result = parseBlock(lexer, astFile, astFile.nodes, off);
 	if(result == false){return nullptr;};
-	eatNewlines(lexer.tokenTypes, off);
     };
     for(u32 x=0; x<astFile.nodes.count; x+=1){
 	ASTBase *base = astFile.nodes[x];

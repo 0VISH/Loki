@@ -90,6 +90,7 @@ bool isType(Token_Type type) {
 void eatUnwantedChars(char *mem, u64& x) {
     while (true) {
 	switch (mem[x]) {
+	case '\n':
 	case ' ':
 	case '\r':
 	case '\t':
@@ -100,9 +101,6 @@ void eatUnwantedChars(char *mem, u64& x) {
 	    return;
 	};
     };
-};
-void eatNewlines(DynamicArray<Token_Type> &tokTypes, u32 &x){
-    while (tokTypes[x] == (Token_Type)'\n') { x += 1; };
 };
 b32 isAlpha(char x) { return (x >= 'a' && x <= 'z') || (x >= 'A' && x <= 'Z'); };
 b32 isNum(char x) { return (x >= '0' && x <= '9'); };
