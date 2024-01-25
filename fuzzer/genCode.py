@@ -110,7 +110,7 @@ def genVarDef(varToType, tabs, depth):
 
     varToType[name] = type
 
-    loCode = tabs*tab + name + " :" + getTypeName(type) + " = " + expr
+    loCode = tabs*tab + name + " :" + getTypeName(type) + " = " + expr + ";"
     pyCode = name + " = " + expr
 
     exec(pyCode, pyScope)
@@ -123,7 +123,7 @@ def genVarDecl(varToType, tabs, depth):
 
     varToType[name] = type
 
-    loCode = tabs*tab + name + " :" + getTypeName(type)
+    loCode = tabs*tab + name + " :" + getTypeName(type) + ";"
     pyCode = name + " = 0"
 
     exec(pyCode, pyScope)
@@ -175,7 +175,7 @@ def genProcDef(varToType, tabs, depth):
         loCode += ")"
 
     varToTypeBody = {}
-    loCode += genBody(varToTypeBody, tabs, depth, True)
+    loCode += genBody(varToTypeBody, tabs, depth, True) + ";"
     return loCode
 def genIf(varToType, tabs, depth):
     loCode = tabs*tab + "if "
@@ -199,7 +199,7 @@ def genIf(varToType, tabs, depth):
 
     varToTypeIfBody = {}
     loCode += genBody(varToTypeIfBody, tabs, depth, shouldIfBodyBeExecuted)
-    if randBool(): return loCode
+    if randBool(): return loCode + ";"
 
     #else if
     lhsExpr = genExpression(type)
@@ -224,7 +224,7 @@ def genIf(varToType, tabs, depth):
     shouldElseBodyBeExecuted = (shouldIfBodyBeExecuted == False) and (shouldElseIfBodyBeExecuted == False)
     varToTypeElseBody = {}
     loCode += "else"
-    loCode += genBody(varToTypeElseBody, tabs, depth, shouldElseBodyBeExecuted)
+    loCode += genBody(varToTypeElseBody, tabs, depth, shouldElseBodyBeExecuted) + ";"
     return loCode
     
 entities = [genVarDef, genVarDecl, genProcDef, genIf]
@@ -247,7 +247,7 @@ for j in range(0, GARBAGE_COUNT):
     loCode += "main :: proc(){\n"
     for i in range(0, ENTITY_COUNT):
         loCode += genEntity(x, 1, 0) + "\n"
-    loCode += "}"
+    loCode += "};"
     fuzzFile.write(loCode)
     fuzzFile.close()
     
