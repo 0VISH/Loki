@@ -174,6 +174,7 @@ struct ASTStructDef : ASTBase{
 };
 struct ASTReturn : ASTBase{
     ASTBase *expr;
+    u32 tokenOff;
 };
 
 void freeNodeInternal(ASTBase *base);
@@ -572,6 +573,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
     switch (tokTypes[x]) {
     case Token_Type::K_RETURN:{
 	ASTReturn *ret = (ASTReturn*)allocAST(sizeof(ASTReturn), ASTType::RETURN, file);
+	ret->tokenOff = x;
 	x += 1;
 	if(tokTypes[x] == (Token_Type)'}' || tokTypes[x] == (Token_Type)'\n'){
 	    ret->expr = nullptr;
@@ -937,12 +939,19 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			return false;
 		    } break;
 		    };
+		    u32 retCount = 0;
 		    while (tokTypes[x] != (Token_Type)'}') {
 			//parse body
 			bool result = parseBlock(lexer, file, proc->body, x);
 			if (result == false) {
 			    return false;
 			};
+			if(proc->body[proc->body.count-1]->type == ASTType::RETURN){retCount += 1;};
+		    };
+		    if(retCount == 0 && proc->out.count == 0){
+			ASTReturn *ret = (ASTReturn*)allocAST(sizeof(ASTReturn), ASTType::RETURN, file);
+			ret->expr = nullptr;
+			proc->body.push(ret);
 		    };
 		    x += 1;
 		    table.push(proc);

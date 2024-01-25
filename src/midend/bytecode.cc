@@ -530,14 +530,15 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	Type type = entity->type;
 	bf.alloc((entity->pointerDepth==0)?type:Type::PTR, reg);
 	if(!IS_BIT(var->flag, Flags::UNINITIALIZED)){
-	    if(isFloat(type)){
+	    if(IS_BIT(config.helps, Help::INITIALIZE_WITH_0)){
 		Reg init = bf.newReg();
-		bf.movConst(type, init, (f64)0.0);
-		bf.store(type, reg, init);
-	    }else if(isInt(type)){
-		Reg init = bf.newReg();
-		bf.movConst(type, init, (s64)0);
-		bf.store(type, reg, init);
+		if(isFloat(type)){
+		    bf.movConst(type, init, (f64)0.0);
+		    bf.store(type, reg, init);
+		}else if(isInt(type)){
+		    bf.movConst(type, init, (s64)0);
+		    bf.store(type, reg, init);
+		};
 	    };
 	};
 	bc.registerVar(reg, type, id);

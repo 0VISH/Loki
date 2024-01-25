@@ -8,6 +8,9 @@ enum class EndType{
     DYNAMIC,
     CHECK,
 };
+enum class Help{
+    INITIALIZE_WITH_0,
+};
 
 struct Config{
     char *entryPoint;
@@ -19,4 +22,5 @@ struct Config{
     Arch arch;
     OS os;
     EndType end;
+    u32 helps;
 };

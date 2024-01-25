@@ -1,4 +1,3 @@
 :: change for loop syntax(for i:u32= 0...5)(for i=0...5)
 :: tracy
-:: store 0 only when asked
 :: MEM LEAKSSSSS

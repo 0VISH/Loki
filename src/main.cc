@@ -73,6 +73,7 @@ s32 main(s32 argc, char **argv) {
     config.end          = EndType::EXECUTABLE;
     config.arch         = Arch::x64;
     config.os           = OS::WINDOWS;
+    config.helps        = ~0;
     
     HashmapStr argMap;
     argMap.init((u16)ArgType::COUNT);
