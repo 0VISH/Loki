@@ -112,6 +112,6 @@ namespace report{
 	if(warnOff != 0){
 	    printf("\nwarning: %d", warnOff);
 	};
-	if(errorOff | warnOff != 0){printf("\n");};
+	if((errorOff | warnOff) != 0){printf("\n");};
     };
 }

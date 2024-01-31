@@ -20,7 +20,7 @@ struct Config{
     s32   entryPointFileID;
 
     Arch arch;
-    OS os;
+    Target target;
     EndType end;
     u32 helps;
 };

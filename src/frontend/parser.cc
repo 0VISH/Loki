@@ -433,7 +433,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 	    s32 bend = getTokenOff((Token_Type)')', tokTypes, x);
 	    if(bend == -1){
 		lexer.emitErr(tokOffs[pc->off].off, "Expected ending ')'");
-		return false;
+		return nullptr;
 	    };
 	    while(true){
 		s32 cend = getTokenOff((Token_Type)',', tokTypes, x);
@@ -443,7 +443,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 		};
 		pc->argOffs.push(x);
 		ASTBase *arg = genASTExprTree(lexer, file, x, end);
-		if(arg == false){return nullptr;};
+		if(arg == nullptr){return nullptr;};
 		pc->args.push(arg);
 		switch(tokTypes[x]){
 		case (Token_Type)')': goto EXIT_LOOP_PROC_CALL;
@@ -671,7 +671,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    }break;
 	    };
 	    For->end = genASTExprTree(lexer, file, x, end);
-	    if(For->end == false){return false;};
+	    if(For->end == nullptr){return false;};
 	    For->endOff = end;
 	    x = end;
 	    if(dend != -1){
@@ -707,7 +707,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	    x = end;
 	    if(tokTypes[x] != (Token_Type)'{'){
 		lexer.emitErr(tokOffs[x].off, "Expected '{' here");
-		return nullptr;
+		return false;
 	    };
 	    x += 1;
 	    For->body.init();
@@ -729,7 +729,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	s32 end = getTokenOff((Token_Type)'{', tokTypes, x);
 	if(end == -1){
 	    lexer.emitErr(tokOffs[start].off, "Expected '{' to define the body");
-	    return nullptr;
+	    return false;
 	};
 	If->expr = genASTExprTree(lexer, file, x, end);
 	if(If->expr == nullptr){return false;};
@@ -845,7 +845,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 			case ASTType::DECLERATION: break;
 			default:
 			    lexer.emitErr(tokOffs[x].off, "Invalid statement. Struct only takes uni/multi decleration");
-			    return nullptr;
+			    return false;
 			};
 		    };
 		    x += 1;

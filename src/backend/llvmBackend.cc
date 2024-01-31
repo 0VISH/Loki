@@ -1,7 +1,9 @@
 #include "backend.cc"
 #include "../frontend/typeBasic.cc"
+#if(WIN)
 #define MICROSOFT_CRAZINESS_IMPLEMENTATION
 #include "microsoft_craziness.h"
+#endif
 
 /*
   (dd): (bytecode file id, specific id)
@@ -325,8 +327,9 @@ EXPORT bool backendCompileStage2(Config *config){
 	off = sprintf(targetBuff, "x86");
     }break;
     };
-    switch(config->os){
-    case OS::WINDOWS:{
+    switch(config->target){
+    case Target::WINDOWS:{
+#if(WIN)
 	Find_Result res = find_visual_studio_and_windows_sdk();
 	if(res.windows_sdk_version == 0){
 	    printf("\n[ERROR] cannot find windows sdk\n");
@@ -334,20 +337,26 @@ EXPORT bool backendCompileStage2(Config *config){
 	};
 	sprintf(targetBuff+off, "-pc-windows-msvc%d.0.0", res.windows_sdk_version);
 	free_resources(&res);
+#endif
     }break;
+    case Target::METAL: break;
     };
     
-    sprintf(buff, "%s.ll", config->out);
-    FILE *f = fopen(buff, "w");
-    off = sprintf(buff, "target triple = \"%s\"\n", targetBuff);
-    fwrite(buff, 1, off, f);
-    for(u32 x=0; x<pages.count; x+=1){
-	Page &pg = pages[x];
-	fwrite(pg.mem, 1, pg.watermark, f);
+    if(config->target != Target::METAL){
+	sprintf(buff, "%s.ll", config->out);
+	FILE *f = fopen(buff, "w");
+	off = sprintf(buff, "target triple = \"%s\"\n", targetBuff);
+	fwrite(buff, 1, off, f);
+	for(u32 x=0; x<pages.count; x+=1){
+	    Page &pg = pages[x];
+	    fwrite(pg.mem, 1, pg.watermark, f);
+	};
+	fclose(f);
+	sprintf(buff, "clang -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
+    }else{
+	sprintf(buff, "clang -ffreestanding -nostdlib %s.ll -c -o %s.obj", config->out, config->out);
     };
-    fclose(f);
 
-    sprintf(buff, "clang -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
     printf("\n[LLVM] %s\n", buff);
     if(system(buff) != 0){return false;};
     if(config->end == EndType::STATIC){return true;};

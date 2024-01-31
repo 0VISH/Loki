@@ -4,7 +4,8 @@ enum class Arch{
     x86,
     x64,
 };
-enum class OS{
+enum class Target{
     WINDOWS,
     LINUX,
+    METAL,
 };

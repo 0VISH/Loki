@@ -22,7 +22,7 @@ enum class ArgType{
     OUTNAME,
     END,
     ARCH,
-    OS,
+    TARGET,
     HELP,
     COUNT,
 };
@@ -47,10 +47,10 @@ s32 main(s32 argc, char **argv) {
     ArgData argsData[] = {
 	{"entrypoint", ArgType::ENTRYPOINT, "execution begins from this function"},
 	{"file", ArgType::FILE, "main file(file which is read first by the compiler)"},
-	{"arch", ArgType::ARCH, "target architecture\n             1: x86_64\n             2: x86"},
-	{"os",   ArgType::OS,   "target os\n             1: win\n             2: lin"},
+	{"arch", ArgType::ARCH, "target architecture\n1: x86_64\n2: x86"},
+	{"target", ArgType::TARGET,   "target\n1: win\n2: lin\n3: metal"},
 	{"out",  ArgType::OUTNAME, "name of output file"},
-	{"end",  ArgType::END, "end goal\n             1: exe\n             2: dll\n             3: check"},
+	{"end",  ArgType::END, "end goal\n1: exe\n2: dll\n3: static 4: check"},
 	{"help", ArgType::HELP, "print all the switches available"}
     };
 
@@ -72,7 +72,7 @@ s32 main(s32 argc, char **argv) {
     config.out          = "out";
     config.end          = EndType::EXECUTABLE;
     config.arch         = Arch::x64;
-    config.os           = OS::WINDOWS;
+    config.target       = Target::WINDOWS;
     config.helps        = ~0;
     
     HashmapStr argMap;
@@ -93,6 +93,7 @@ s32 main(s32 argc, char **argv) {
 	    argMap.uninit();
 	    return EXIT_SUCCESS;
 	};
+	char *end = arg + len + 1;
 	switch((ArgType)type){
 	case ArgType::HELP:{
 	    goto PRINT_HELP_AND_QUIT;
@@ -107,7 +108,6 @@ s32 main(s32 argc, char **argv) {
 	    config.out = arg + len + 1;
 	}break;
 	case ArgType::END:{
-	    char *end = arg + len + 1;
 	    if(strcmp("executable", end) == 0){
 		config.end = EndType::EXECUTABLE;
 	    }else if(strcmp("dynamic", end) == 0){
@@ -118,6 +118,19 @@ s32 main(s32 argc, char **argv) {
 		config.end = EndType::CHECK;
 	    }else{
 		printf("unkown end goal: %s", end);
+		argMap.uninit();
+		return EXIT_SUCCESS;
+	    };
+	}break;
+	case ArgType::TARGET:{
+	    if(strcmp("metal", end) == 0){
+		config.target = Target::METAL;
+	    }else if(strcmp("linux", end) == 0){
+		config.target = Target::LINUX;
+	    }else if(strcmp("windows", end) == 0){
+		config.target = Target::WINDOWS;
+	    }else{
+		printf("unkown target: %s", end);
 		argMap.uninit();
 		return EXIT_SUCCESS;
 	    };

@@ -521,7 +521,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	};
 	CHECK_TREE_AND_MERGE_FLAGS;
 	EntityRef<VariableEntity> entRef = checkVarEntityPresentInScopeElseReg(var, flag, treeType, see, idGiver);
-	if(entRef.ent == false){
+	if(entRef.ent == nullptr){
 	    lexer.emitErr(tokOffs[var->tokenOff].off, "Variable redefinition");
 	    return false;
 	};

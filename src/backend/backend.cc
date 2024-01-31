@@ -1,3 +1,16 @@
+//@ignore
+#if(__clang__)
+#pragma clang diagnostic ignored "-Wwritable-strings"
+#pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wmicrosoft-include"
+#pragma clang diagnostic ignored "-Wmicrosoft-goto"
+#pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wnull-arithmetic"
+#pragma clang diagnostic ignored "-Wformat"
+#pragma clang diagnostic ignored "-Wnull-conversion"
+#endif
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
