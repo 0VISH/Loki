@@ -435,7 +435,7 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 		lexer.emitErr(tokOffs[pc->off].off, "Expected ending ')'");
 		return nullptr;
 	    };
-	    while(true){
+	    while(tokTypes[x] != (Token_Type)')'){
 		s32 cend = getTokenOff((Token_Type)',', tokTypes, x);
 		s32 end = cend;
 		if(cend == -1){
@@ -445,16 +445,14 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 		ASTBase *arg = genASTExprTree(lexer, file, x, end);
 		if(arg == nullptr){return nullptr;};
 		pc->args.push(arg);
-		switch(tokTypes[x]){
-		case (Token_Type)')': goto EXIT_LOOP_PROC_CALL;
-		case (Token_Type)',': x+=1; break;
-		default:
+		if(tokTypes[x] != (Token_Type)','){
+		    x += 1;
+		}else{
 		    lexer.emitErr(tokOffs[x].off, "Expected ',' or ')'");
 		    return nullptr;
 		};
 	    };
-	EXIT_LOOP_PROC_CALL:
-	    x += 1;
+	    x += 2;
 	    return (ASTBase*)pc;
 	}else{
 	    return genVariable(x, lexer, file);
@@ -608,6 +606,7 @@ bool parseBlock(Lexer &lexer, ASTFile &file, DynamicArray<ASTBase*> &table, u32 
 	ASTImport *Import = (ASTImport*)allocAST(sizeof(ASTImport), ASTType::IMPORT, file);
 	Import->fileName = fullFileName;
 	table.push(Import);
+	Dep::pushToStack(fullFileName);
     }break;
     case Token_Type::K_FOR:{
 	ASTFor *For = (ASTFor*)allocAST(sizeof(ASTFor), ASTType::FOR, file);

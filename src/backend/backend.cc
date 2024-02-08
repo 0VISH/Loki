@@ -11,14 +11,6 @@
 #pragma clang diagnostic ignored "-Wnull-conversion"
 #endif
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "../basic.hh"
-#include "../mem.cc"
-#include "../ds.cc"
 #include "backend.hh"
 
 DynamicArray<Page> pages;

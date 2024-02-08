@@ -12,7 +12,7 @@ struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
     IDGiver idGiver;
-    ScopeEntities *scope;
+    ScopeEntities *entities;
     s16 id;
     u16 pageBrim;
 
@@ -36,31 +36,30 @@ struct ASTFile{
 	};
 	memPages.uninit();
 	nodes.uninit();
-	scope->uninit();
-	mem::free(scope);
+	entities->uninit();
+	mem::free(entities);
     };
 };
 
 namespace Dep{
-    DynamicArray<char*>   parseCheckStack;
-    DynamicArray<s16>     compileStack;
+    //NOTE: 1-to-1 relation
+    DynamicArray<char*>   fileStack;
     DynamicArray<ASTFile> astFiles;
+    //NOTE: this hashmaps exist in case we only the filename
+    HashmapStr fileToId;
 
     void init(){
-	parseCheckStack.init();
-	compileStack.init();
+	fileStack.init();
 	astFiles.init();
+	fileToId.init();
     };
     void uninit(){
-	parseCheckStack.uninit();
+	fileStack.uninit();
 	astFiles.uninit();
-	compileStack.uninit();
+	fileToId.uninit();
     };
-    void pushToParseCheckStack(char *fileName){
-	parseCheckStack.push(fileName);
-    };
-    void pushToCompileStack(s16 id){
-	compileStack.push(id);
+    void pushToStack(char *fileName){
+	fileStack.push(fileName);
     };
     ASTFile &newASTFile(){
 	u32 id = astFiles.count;

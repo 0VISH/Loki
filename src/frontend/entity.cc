@@ -65,7 +65,7 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
 
 #define GET_ENTITY_TEMPLATE(KEY, MAP, ENTITIES)				\
     u32 x=see.count;							\
-    while(x>0){								\
+    while(true){							\
 	x -= 1;								\
 	ScopeEntities *se = see[x];					\
 	if(se->MAP.len != 0){						\
@@ -73,12 +73,12 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
 	    if(se->MAP.getValue(KEY, &k) != false){return se->ENTITIES+k;}; \
 	};								\
 	if(se->scope == Scope::PROC){					\
-	    ScopeEntities *globalScope = see[0];			\
-	    if(globalScope->MAP.len != 0){				\
-		u32 k;							\
-		if(globalScope->MAP.getValue(KEY, &k) != false){return globalScope->ENTITIES+k;}; \
+	    while(se->scope != Scope::GLOBAL){				\
+		x -= 1;							\
+		se = see[x];						\
 	    };								\
-	    return nullptr;						\
+	    x += 1;							\
+	    continue;							\
 	};								\
     };									\
     return nullptr;							\
@@ -352,8 +352,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	if(checkExpression(mvr->rhs, lexer, see) == false){return false;};
     }break;
     case ASTType::IMPORT:{
-	ASTImport *imp = (ASTImport*)node;
-	Dep::pushToParseCheckStack(imp->fileName);
+	
     }break;
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
@@ -446,12 +445,12 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
     case ASTType::PROC_CALL:{
 	ASTProcCall *pc = (ASTProcCall*)node;
 	ProcEntity *pe = getProcEntity(pc->name, see);
-	pc->entRef.ent = pe;
-	pc->entRef.id  = pe->id;
 	if(pe == nullptr){
 	    lexer.emitErr(tokOffs[pc->off].off, "Procedure not defined: %.*s", pc->name.len, pc->name.mem);
 	    return false;
 	};
+	pc->entRef.ent = pe;
+	pc->entRef.id  = pe->id;
 	if(pc->args.count != pe->argTypes.count){
 	    lexer.emitErr(tokOffs[pc->off].off, "Procedure definition has %d argument%s but while calling %d argument%shas been passed", pe->argTypes.count, (pe->argTypes.count==1)?",":"s,", pc->args.count, (pc->args.count==1)?" ":"s ");
 	    return false;

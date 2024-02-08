@@ -1,5 +1,3 @@
-#include "backend.cc"
-#include "../frontend/typeBasic.cc"
 #if(WIN)
 #define MICROSOFT_CRAZINESS_IMPLEMENTATION
 #include "microsoft_craziness.h"
@@ -293,7 +291,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     write("\n");
 };
 
-EXPORT void backendCompileStage1(BytecodeBucket *buc, s16 id, Config *config){
+void backendCompileStage1(BytecodeBucket *buc, s16 id, Config *config){
     BytecodeBucket *curBucket = buc;
     u32 off = 0;
     while(curBucket){
@@ -308,13 +306,13 @@ EXPORT void backendCompileStage1(BytecodeBucket *buc, s16 id, Config *config){
     };
     return;
 };
-EXPORT void initLLVMBackend(){
+void initLLVMBackend(){
     initBackend();
 };
-EXPORT void uninitLLVMBackend(){
+void uninitLLVMBackend(){
     uninitBackend();
 };
-EXPORT bool backendCompileStage2(Config *config){
+bool backendCompileStage2(Config *config){
     char buff[100];
     char targetBuff[100];
 
@@ -342,19 +340,22 @@ EXPORT bool backendCompileStage2(Config *config){
     case Target::METAL: break;
     };
     
+    
+    sprintf(buff, "%s.ll", config->out);
+    FILE *f = fopen(buff, "w");
     if(config->target != Target::METAL){
-	sprintf(buff, "%s.ll", config->out);
-	FILE *f = fopen(buff, "w");
 	off = sprintf(buff, "target triple = \"%s\"\n", targetBuff);
 	fwrite(buff, 1, off, f);
-	for(u32 x=0; x<pages.count; x+=1){
-	    Page &pg = pages[x];
-	    fwrite(pg.mem, 1, pg.watermark, f);
-	};
-	fclose(f);
-	sprintf(buff, "clang -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
-    }else{
+    };
+    for(u32 x=0; x<pages.count; x+=1){
+	Page &pg = pages[x];
+	fwrite(pg.mem, 1, pg.watermark, f);
+    };
+    fclose(f);
+    if(config->target == Target::METAL){
 	sprintf(buff, "clang -ffreestanding -nostdlib %s.ll -c -o %s.obj", config->out, config->out);
+    }else{
+	sprintf(buff, "clang -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
     };
 
     printf("\n[LLVM] %s\n", buff);

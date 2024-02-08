@@ -24,6 +24,5 @@
 #include "report.cc"
 #include "frontend/include.hh"
 #include "midend/include.hh"
-#include "backend/backend.hh"
-#include "backend/backendLoader.cc"
+#include "backend/include.hh"
 #include "loki.cc"
