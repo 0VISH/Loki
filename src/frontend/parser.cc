@@ -139,6 +139,7 @@ struct ASTVariable : ASTBase{
 	EntityRef<VariableEntity> varEntRef;
 	EntityRef<StructEntity>   structEntRef;
     };
+    u32 fileID;
     u32 tokenOff;
     u8 pAccessDepth;
 };

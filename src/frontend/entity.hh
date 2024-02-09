@@ -7,7 +7,8 @@ enum class Scope{
 };
 struct ScopeEntities;
 struct Entity{
-    u32  id;
+    u16  id;
+    u16  fileID;
     Flag flag;
 };
 struct VariableEntity : Entity{

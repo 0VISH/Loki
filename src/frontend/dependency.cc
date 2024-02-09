@@ -4,22 +4,24 @@
 
 struct ASTBase;
 struct IDGiver{
-    u32 procID;
-    u32 varID;
-    u32 structID;
+    u16 procID;
+    u16 varID;
+    u16 gblID;
+    u16 structID;
+    u16 fileID;
 };
 struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
     IDGiver idGiver;
     ScopeEntities *entities;
-    s16 id;
     u16 pageBrim;
 
     void init(s16 fileID){
-	id = fileID;
+	idGiver.fileID = fileID;
 	idGiver.procID = 0;
 	idGiver.varID = 0;
+	idGiver.gblID = 0;
 	idGiver.structID = (u32)(Type::TYPE_COUNT) + 1;
 	pageBrim = 0;
 	memPages.init(2);

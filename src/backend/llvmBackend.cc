@@ -7,13 +7,13 @@
   (dd): (bytecode file id, specific id)
   register:  %_dd
   struct:    %_struct.dd
-  global:    @_dd
+  global:    @_Gd
   procedure: @__dd
  */
 void writeReg(Bytecode bc, s16 id){
     Reg reg = (Reg)bc;
     if(reg < 0){
-	write("@_%d%d", id, reg*-1);
+	write("@_G%d", reg*-1);
 	return;
     };
     write("%%_%d%d", id, reg);
@@ -69,6 +69,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	};
     }break;
     case Bytecode::CALL:{
+	Bytecode fileID = getBytecode(bytecodes, off);
 	Bytecode procID = getBytecode(bytecodes, off);
 	write("call ");
 	u32 retCount = (u32)getBytecode(bytecodes, off);
@@ -81,7 +82,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	    write(" ");
 	    retCount -= 1;
 	};
-	write("@__%d%d(", id, procID);
+	write("@__%d%d(", fileID, procID);
 	u32 inCount = (u32)getBytecode(bytecodes, off);
 	while(inCount > 1){
 	    writeType(getBytecode(bytecodes, off), id);
@@ -213,7 +214,8 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     case Bytecode::GLOBAL:{
 	Bytecode reg = getBytecode(bytecodes, off);
 	Bytecode type = getBytecode(bytecodes, off);
-	write("@_%d%d = global ", id, ((Reg)reg)*-1);
+	writeReg(reg, id);
+	write(" = global ");
 	writeType(type, id);
 	write(" ");
 	if(isFloat((Type)type)){
@@ -344,7 +346,7 @@ bool backendCompileStage2(Config *config){
     sprintf(buff, "%s.ll", config->out);
     FILE *f = fopen(buff, "w");
     if(config->target != Target::METAL){
-	off = sprintf(buff, "target triple = \"%s\"\n", targetBuff);
+	off = sprintf(buff, "target triple = \"%s\"\n\n", targetBuff);
 	fwrite(buff, 1, off, f);
     };
     for(u32 x=0; x<pages.count; x+=1){

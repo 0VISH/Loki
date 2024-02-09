@@ -1,3 +1,4 @@
 :: change for loop syntax(for i:u32= 0...5)(for i=0...5)
+:: while checking for se(getEntity), jmp to 0 offset and start
 :: tracy
 :: MEM LEAKSSSSS

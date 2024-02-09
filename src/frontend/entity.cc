@@ -63,32 +63,36 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
     se->init(varCount, procCount, structCount);
 };
 
+
 #define GET_ENTITY_TEMPLATE(KEY, MAP, ENTITIES)				\
     u32 x=see.count;							\
-    while(true){							\
-	x -= 1;								\
-	ScopeEntities *se = see[x];					\
+    while(x != 0){							\
+    x -= 1;								\
+    ScopeEntities *se = see[x];						\
+    if(se->MAP.len != 0){						\
+	u32 k;								\
+	if(se->MAP.getValue(KEY, &k) != false){return se->ENTITIES+k;}; \
+    };									\
+    if(se->scope == Scope::PROC){					\
+    se = see[0];							\
+    while(se->scope == Scope::GLOBAL){					\
 	if(se->MAP.len != 0){						\
 	    u32 k;							\
 	    if(se->MAP.getValue(KEY, &k) != false){return se->ENTITIES+k;}; \
 	};								\
-	if(se->scope == Scope::PROC){					\
-	    while(se->scope != Scope::GLOBAL){				\
-		x -= 1;							\
-		se = see[x];						\
-	    };								\
-	    x += 1;							\
-	    continue;							\
-	};								\
+	se = see[x];							\
+	x += 1;								\
     };									\
     return nullptr;							\
+    };									\
+      };								\
+	return nullptr;							\
 
 
 s32 getVarEntityScopeOff(String name, DynamicArray<ScopeEntities*> &see){
     u32 x = see.count;
     while(x>0){
 	x -= 1;
-	
     };
     return -1;
 };
@@ -139,6 +143,7 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
 	if(ent == nullptr){return false;};
 	var->varEntRef.ent = ent;
 	var->varEntRef.id  = ent->id;
+	var->fileID = ent->fileID;
     }break;
     case ASTType::UNI_NEG:{
 	ASTUniOp *op = (ASTUniOp*)node;
@@ -195,6 +200,7 @@ EntityRef<ProcEntity> checkProcEntityPresentElseReg(String name, Flag flag, Dyna
     entity.retTypes.init();
     entity.flag = flag;
     entity.id   = idGiver.procID;
+    entity.fileID = idGiver.fileID;
     ref.ent = &entity;
     ref.id  = idGiver.procID;
     idGiver.procID += 1;
@@ -222,11 +228,18 @@ EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(ASTUniVar *var, Fl
     VariableEntity &entity = se->varEntities[localID];
     entity.type = type;
     entity.flag = var->flag;
+    entity.fileID = idGiver.fileID;
     entity.pointerDepth = var->varType.pointerDepth;
     ref.ent = &entity;
-    ref.id = idGiver.varID;
-    entity.id = idGiver.varID;
-    idGiver.varID += 1;
+    if(IS_BIT(flag, Flags::GLOBAL)){
+	ref.id = idGiver.gblID;
+	entity.id = idGiver.gblID;
+	idGiver.gblID += 1;
+    }else{
+	ref.id = idGiver.varID;
+	entity.id = idGiver.varID;
+	idGiver.varID += 1;
+    };
     return ref;
 };
 

@@ -29,7 +29,11 @@ struct Array {
     Array(u32 length){
 	count = 0;
 	len = length;
-	mem = (T*)mem::alloc(sizeof(T)*len);
+	if(length == 0){
+	    mem = nullptr;
+	}else{
+	    mem = (T*)mem::alloc(sizeof(T)*len);
+	};
     };
     void uninit(){
 	mem::free(mem);

@@ -24,7 +24,7 @@ ScopeEntities *parseFile(char *fileName, ASTFile &astFile, Lexer &lexer){
     astFile.entities = fileScopeEntities;
     
     if(config.entryPointProcID != -1 && (wasEntryPointKnown == false)){
-	config.entryPointFileID = astFile.id;
+	config.entryPointFileID = astFile.idGiver.fileID;
     };
     return fileScopeEntities;
 };
@@ -38,12 +38,11 @@ bool compile(char *fileName){
 	ASTFile &file = Dep::newASTFile();
 	Lexer &lexer = lexers.newElem();
 	file.entities = parseFile(filePath, file, lexer);
-	if(file.entities == nullptr){break;};
-	Dep::fileToId.insertValue({filePath, (u32)strlen(filePath)}, file.id);
-    };
-    report::flushReports();
-    if(report::errorOff != 0){
-	return false;
+	if(file.entities == nullptr){
+	    report::flushReports();
+	    return false;
+	};
+	Dep::fileToId.insertValue({filePath, (u32)strlen(filePath)}, file.idGiver.fileID);
     };
     DynamicArray<ScopeEntities*> see;
     see.init();
@@ -64,6 +63,7 @@ bool compile(char *fileName){
 	};
 	see.push(file.entities);
 	if(checkEntities(file.nodes, lexers[x], see, file.idGiver) == false){
+	    report::flushReports();
 	    return false;
 	};
 	see.pop();
@@ -85,7 +85,7 @@ bool compile(char *fileName){
 	ASTFile &file = Dep::astFiles[x];
 	ScopeEntities *fileEntities = file.entities;
 	BytecodeFile &bf = bfs[x];
-	bf.init(file.id);
+	bf.init(file.idGiver.fileID);
 	BytecodeContext &bc = bca.newElem();
 	bc.init(Scope::GLOBAL);
 	see.push(fileEntities);

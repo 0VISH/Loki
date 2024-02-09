@@ -18,7 +18,7 @@ struct BytecodeFile{
     u8                        id;
 
     void init(s16 fileID){
-	registerID = 0;
+	registerID = 1;
 	labels.init();
 	startupNodes.init();
 	cursor = 0;
@@ -203,9 +203,10 @@ struct BytecodeFile{
 	emit(type);
 	emitConstDec(num);
     };
-    void call(u32 id, DynamicArray<AST_Type*> &argTypes, Array<Reg> argRegs, DynamicArray<AST_Type*> &retTypes){
-	reserve(1 + 1 + 1 + retTypes.count + 1 + argTypes.count*2);
+    void call(u32 fileID, u32 id, DynamicArray<AST_Type*> &argTypes, Array<Reg> argRegs, DynamicArray<AST_Type*> &retTypes){
+	reserve(1 + 1 + 1 + 1 + retTypes.count + 1 + argTypes.count*2);
 	emit(Bytecode::CALL);
+	emit(fileID);
 	emit(id);
 	emit(retTypes.count);
 	for(u32 x=0; x<retTypes.count; x+=1){
@@ -506,6 +507,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ASTAssignment *ass = (ASTAssignment*)node;
 	Expr lhs = compileExprToBytecode(ass->lhs, see, bca, bf);
 	Expr rhs = compileExprToBytecode(ass->rhs, see, bca, bf);
+	printf("%d %d", lhs.type, rhs.type);
 	if(lhs.type != rhs.type){
 	    Reg castedReg = bf.newReg();
 	    bf.cast(lhs.type, castedReg, rhs.type, rhs.reg);
@@ -599,7 +601,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    argRegs.push(argReg);
 	    
 	};
-	bf.call(procID, pe->argTypes, argRegs, pe->retTypes);
+	bf.call(pe->fileID, procID, pe->argTypes, argRegs, pe->retTypes);
     }break;
     case ASTType::GLOBAL_VAR_INIT:{
 	ASTGblVarInit *gvi = (ASTGblVarInit*)node;
@@ -1024,8 +1026,9 @@ namespace dbg{
 	    };
 	}break;
 	case Bytecode::CALL:{
+	    Bytecode fileID = getBytecode(buc, x);
 	    Bytecode id = getBytecode(buc, x);
-	    printf("call %d", id);
+	    printf("call %d%d", fileID, id);
 	    Bytecode retCount = getBytecode(buc, x);
 	    for(u32 j=0; j<(u32)retCount; j+=1){
 		DUMP_TYPE;
