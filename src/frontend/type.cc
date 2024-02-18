@@ -29,15 +29,7 @@ AST_Type getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &
 	TypeID rhsTypeID = rhsTypeNode.id;
 	if(rhsTypeID == 0){return type;};
 	flag = lhsFlag & rhsFlag;
-	Type lhsType = typeID2Type(lhsTypeID);
-	Type rhsType = typeID2Type(rhsTypeID);
-	if(isSameTypeRange(lhsType, rhsType) == false){
-	    lexer.emitErr(tokOffs[node->tokenOff].off, "LHS type and RHS type are not in the same type range");
-	    return type;
-	};
-	if(lhsTypeNode.pointerDepth != rhsTypeNode.pointerDepth){
-	    lexer.emitWarning(tokOffs[node->tokenOff].off, "LHS pointer depth(%d) != RHS pointer depth(%d)", lhsTypeNode.pointerDepth, rhsTypeNode.pointerDepth);
-	};
+	
 	type.id = (TypeID)((u32)lhsTypeID | (u32)rhsTypeID);
 	return type;
     } break;
@@ -78,8 +70,10 @@ AST_Type getTreeTypeID(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &
     type.id = id;
     return type;
 };
-Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer){
-    return typeID2Type(getTreeTypeID(base, flag, see, lexer).id);
+AST_Type getTreeType(ASTBase *base, Flag &flag, DynamicArray<ScopeEntities*> &see, Lexer &lexer){
+    auto t = getTreeTypeID(base, flag, see, lexer);
+    t.varType = typeID2Type(t.id);
+    return t;
 };
 StructEntity *getStructEntity(String name, DynamicArray<ScopeEntities*> &see);
 Type tokenKeywordToType(u32 off, Lexer &lexer, DynamicArray<ScopeEntities*> &see){

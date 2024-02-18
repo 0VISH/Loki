@@ -32,6 +32,11 @@ enum class Token_Type {
     ARROW,
     DDOT,
     TDOT,
+    O_SHL,
+    O_SHR,
+    O_GEQU,
+    O_LEQU,
+    O_EQU,
     END_OF_FILE,
 };
 struct TokenOffset {
@@ -248,14 +253,33 @@ struct Lexer {
 		    if (src[x] == '-' && src[x+1] == '>') {
 			type = Token_Type::ARROW;
 			x += 1;
-		    } else if(src[x] == '.' && src[x+1] == '.'){
+		    }else if(src[x] == '.' && src[x+1] == '.'){
 			type = Token_Type::DDOT;
 			x += 1;
 			if(src[x+1] == '.'){
 			    type = Token_Type::TDOT;
 			    x += 1;
 			};
-		    } else if (src[x] == '/' && src[x + 1] == '/') {
+		    }else if(src[x] == '<'){
+			if(src[x+1] == '<'){
+			    type = Token_Type::O_SHL;
+			    x += 1;
+			}else if(src[x+1] == '='){
+			    type = Token_Type::O_LEQU;
+			    x += 1;
+			};
+		    }else if(src[x] == '>'){
+			if(src[x+1] == '>'){
+			    type = Token_Type::O_SHR;
+			    x += 1;
+			}else if(src[x+1] == '='){
+			    type = Token_Type::O_GEQU;
+			    x += 1;
+			};
+		    }else if(src[x] == '=' && src[x+1] == '='){
+			type = Token_Type::O_EQU;
+			x += 1;
+		    }else if (src[x] == '/' && src[x + 1] == '/') {
 #if(SIMD)
 			x += 2;
 			//Since the src buffer is padded we do not have to worry

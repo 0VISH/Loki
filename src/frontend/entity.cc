@@ -124,15 +124,69 @@ bool checkExpression(ASTBase *node, Lexer &lexer, DynamicArray<ScopeEntities*> &
 	ASTBinOp *op = (ASTBinOp*)node;
 	Flag flag;
 	if(checkExpression(op->lhs, lexer, see) == false){return false;};
-	Type lhsType = getTreeType(op->lhs, flag, see, lexer);
+	auto lhsTypeAst = getTreeType(op->lhs, flag, see, lexer);
+	Type lhsType = lhsTypeAst.varType;
 	if(lhsType == Type::UNKOWN){return false;};
-	if(isTypeNum(lhsType) == false){return false;};
 	if(checkExpression(op->rhs, lexer, see) == false){return false;};
-	Type rhsType = getTreeType(op->rhs, flag, see, lexer);
+	auto rhsTypeAst = getTreeType(op->rhs, flag, see, lexer);
+	Type rhsType = rhsTypeAst.varType;
 	if(rhsType == Type::UNKOWN){return false;};
-	if(isTypeNum(rhsType) == false){return false;};
+	
+	u32 lhsPD = lhsTypeAst.pointerDepth;
+	u32 rhsPD = rhsTypeAst.pointerDepth;
+	if(lhsPD != 0 || rhsPD != 0){
+	    if(lhsPD != 0 && rhsPD != 0){
+		lexer.emitErr(tokOffs[op->tokenOff].off, "Both LHS and RHS are of type pointer");
+		return false;
+	    };
+	    Type t;
+	    if(lhsPD != 0){t = rhsType;}
+	    else{t = lhsType;};
+	    if(isInt(t) == false){
+		lexer.emitErr(tokOffs[op->tokenOff].off, "Binary operation with pointers only possible with integers");
+		return false;
+	    };
+	    if(node->type != ASTType::BIN_ADD){
+		lexer.emitErr(tokOffs[op->tokenOff].off, "Pointer arithmetic only allows addition and subtraction");
+		return false;
+	    };
+	};
+	if(isSameTypeRange(lhsType, rhsType) == false){
+	    lexer.emitErr(tokOffs[op->tokenOff].off, "LHS type and RHS type are not in the same type range");
+	    return false;
+	};
+	if(lhsPD != rhsPD){
+	    lexer.emitWarning(tokOffs[op->tokenOff].off, "LHS pointer depth(%d) != RHS pointer depth(%d)", lhsPD, rhsPD);
+	}else{
+	    if(isTypeNum(rhsType) == false){return false;};
+	    if(isTypeNum(lhsType) == false){return false;};
+	};
 	op->lhsType = lhsType;
 	op->rhsType = rhsType;
+    }break;
+    case ASTType::BIN_SHL:
+    case ASTType::BIN_SHR:{
+	ASTBinOp *op = (ASTBinOp*)node;
+	Flag flag;
+	if(checkExpression(op->lhs, lexer, see) == false){return false;};
+	auto lhsTypeAst = getTreeType(op->lhs, flag, see, lexer);
+	Type lhsType = lhsTypeAst.varType;
+	if(lhsType == Type::UNKOWN){return false;};
+	if(checkExpression(op->rhs, lexer, see) == false){return false;};
+	auto rhsTypeAst = getTreeType(op->rhs, flag, see, lexer);
+	Type rhsType = rhsTypeAst.varType;
+	if(rhsType == Type::UNKOWN){return false;};
+
+	if(lhsTypeAst.pointerDepth > 0){
+	    lexer.emitErr(tokOffs[op->tokenOff].off, "LHS is a pointer");
+	    return false;
+	};
+	if(rhsTypeAst.pointerDepth > 0){
+	    lexer.emitErr(tokOffs[op->tokenOff].off, "RHS is a pointer");
+	    return false;
+	};
+	if(isTypeNum(rhsType) == false){return false;};
+	if(isTypeNum(lhsType) == false){return false;};
     }break;
     case ASTType::STRING:
     case ASTType::NUM_INTEGER:
@@ -249,7 +303,7 @@ EntityRef<VariableEntity> checkVarEntityPresentInScopeElseReg(ASTUniVar *var, Fl
 	if(checkExpression(rhs, lexer, see) == false){return false;};	\
     }else{rhs = ((ASTMultiVarRHS*)rhs)->rhs;};   /* WOW :) */		\
     Flag treeFlag = 0;							\
-    Type treeType = getTreeType(rhs, treeFlag, see, lexer);		\
+    Type treeType = getTreeType(rhs, treeFlag, see, lexer).varType;	\
     if(treeType == Type::UNKOWN){return false;};			\
     flag |= treeFlag;							\
 
@@ -389,7 +443,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	case ForType::C_EQU:{
 	    if(checkExpression(For->end, lexer, see) == false){return false;};
 	    Flag endTreeFlag = 0;
-	    Type endTreeType = getTreeType(For->end, endTreeFlag, see, lexer);
+	    auto endTreeTypeAst = getTreeType(For->end, endTreeFlag, see, lexer);
+	    Type endTreeType = endTreeTypeAst.varType;
 	    if(isTypeNum(endTreeType) == false){
 		lexer.emitErr(tokOffs[For->endOff].off, "Upper bound type is not a number");
 		return false;
@@ -398,7 +453,8 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	    if(For->increment != nullptr){
 		if(checkExpression(For->increment, lexer, see) == false){return false;};
 		Flag incrementTreeFlag = 0;
-		incrementTreeType = getTreeType(For->increment, endTreeFlag, see, lexer);
+		auto incrementTreeTypeAst = getTreeType(For->increment, endTreeFlag, see, lexer);
+		incrementTreeType = incrementTreeTypeAst.varType;
 		if(isTypeNum(incrementTreeType) == false){
 		    lexer.emitErr(tokOffs[For->incrementOff].off, "Upper bound type is not a number");
 		    return false;
@@ -436,7 +492,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	ASTIf *If = (ASTIf*)node;
 	if(checkExpression(If->expr, lexer, see) == false){return false;};
 	Flag treeFlag;
-	Type treeType = getTreeType(If->expr, treeFlag, see, lexer);
+	Type treeType = getTreeType(If->expr, treeFlag, see, lexer).varType;
 	if(treeType == Type::UNKOWN){return false;};
 	switch(treeType){
 	case Type::XE_VOID:
@@ -471,7 +527,7 @@ bool checkEntity(ASTBase* node, Lexer &lexer, DynamicArray<ScopeEntities*> &see,
 	for(u32 x=0; x<pc->args.count; x+=1){
 	    if(checkExpression(pc->args[x], lexer, see) == false){return false;};
 	    Flag flag;
-	    Type argTreeType = getTreeType(pc->args[x], flag, see, lexer);
+	    Type argTreeType = getTreeType(pc->args[x], flag, see, lexer).varType;
 	    Type argType = pe->argTypes[x]->varType;
 	    if(isSameTypeRange(argTreeType, argType) == false){
 		lexer.emitErr(tokOffs[pc->argOffs[x]].off, "Type mismatch. They don't belong to the same range");

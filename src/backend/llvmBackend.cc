@@ -41,6 +41,7 @@ void writeType(Bytecode bc, s16 id){
 void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
     off += 1;
     Bytecode *bytecodes = buc->bytecodes;
+    char *binOpName;
     switch(bytecodes[off-1]){
     case Bytecode::STRUCT:{
 	Bytecode structID = getBytecode(bytecodes, off);
@@ -102,10 +103,14 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	Bytecode label = getBytecode(bytecodes, off);
 	write("br label %%__%d%d", id, label);
     }break;
-    case Bytecode::ADD:{
+    case Bytecode::ADD: binOpName = "add"; goto COMPILE_BINOP;
+    case Bytecode::SHR: binOpName = "shr"; goto COMPILE_BINOP;
+    case Bytecode::SHL:{
+	binOpName = "shl";
+	COMPILE_BINOP:
 	Bytecode type = getBytecode(bytecodes, off);
 	writeReg(getBytecode(bytecodes, off), id);
-	write(" = add ");
+	write(" = %s ", binOpName);
 	writeType(type, id);
 	write(" ");
 	writeReg(getBytecode(bytecodes, off), id);

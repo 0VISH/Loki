@@ -464,19 +464,16 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	    base = temp;
 	    pAccessDepth -= 1;
 	};
+	//TODO: load contents
 	expr.reg = base;
 	expr.isPtr = var->varEntRef.ent->pointerDepth > 0;
 	return expr;
     }break;
-    case ASTType::BIN_ADD:{									
-	return emitBinOpBc(Bytecode::ADD, node, bca, bf, see);
-    }break;
-    case ASTType::BIN_MUL:{
-	return emitBinOpBc(Bytecode::MUL, node, bca, bf, see);
-    }break;
-    case ASTType::BIN_DIV:{
-	return emitBinOpBc(Bytecode::DIV, node, bca, bf, see);
-    }break;
+    case ASTType::BIN_ADD: return emitBinOpBc(Bytecode::ADD, node, bca, bf, see);
+    case ASTType::BIN_MUL: return emitBinOpBc(Bytecode::MUL, node, bca, bf, see);
+    case ASTType::BIN_DIV: return emitBinOpBc(Bytecode::DIV, node, bca, bf, see);
+    case ASTType::BIN_SHL: return emitBinOpBc(Bytecode::SHL, node, bca, bf, see);
+    case ASTType::BIN_SHR: return emitBinOpBc(Bytecode::SHR, node, bca, bf, see);
     case ASTType::BIN_GRT:
     case ASTType::BIN_GRTE:
     case ASTType::BIN_LSR:
@@ -886,7 +883,6 @@ namespace dbg{
     };
     BytecodeBucket *dumpBytecode(BytecodeBucket *buc, u32 &x, DynamicArray<Bytecode*> &labels){
 	printf("\n%p|%s    ", buc->bytecodes + x, spaces);
-	bool flag = true;
 	Bytecode bc = getBytecode(buc, x);
 	switch(bc){
 	case Bytecode::NONE: return nullptr;
@@ -906,34 +902,48 @@ namespace dbg{
 	    printf("%lld", num);
 	}break;
 	case Bytecode::MOV:{
-	    if(flag){printf("mov");};
+	    printf("mov");
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;	    
 	}break;
 	case Bytecode::ADD:{
-	    if(flag){printf("add");};
+	    printf("add");
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;
 	case Bytecode::SUB:{
-	    if(flag){printf("sub");};
+	    printf("sub");
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;;
 	}break;
 	case Bytecode::MUL:{
-	    if(flag){printf("mul");};
+	    printf("mul");
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
 	    DUMP_REG;
 	}break;
 	case Bytecode::DIV:{
-	    if(flag){printf("div");};
+	    printf("div");
+	    DUMP_TYPE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;
+	}break;
+	case Bytecode::SHL:{
+	    printf("shl");
+	    DUMP_TYPE;
+	    DUMP_REG;
+	    DUMP_REG;
+	    DUMP_REG;
+	}break;
+	case Bytecode::SHR:{
+	    printf("shr");
 	    DUMP_TYPE;
 	    DUMP_REG;
 	    DUMP_REG;
@@ -1082,7 +1092,7 @@ namespace dbg{
 	    Bytecode src  = getBytecode(buc, x);
 	    Bytecode offType = getBytecode(buc, x);
 	    Bytecode off  = getBytecode(buc, x);
-	    printf("%%%d = get_element type:%d, src:%%%d, offType:%d, off:%d", dest, type, src, offType, off);
+	    printf("%%%d = get_element type:%d, src:%%%d, offType:%d, off:%%%d", dest, type, src, offType, off);
 	}break;
 	case Bytecode::GET_MEMBER:{
 	    Bytecode id = getBytecode(buc, x);

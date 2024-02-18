@@ -20,6 +20,8 @@ enum class Bytecode : u16{
     SUB,
     MUL,
     DIV,
+    SHL,
+    SHR,
     CMP,
     SETG,
     SETL,

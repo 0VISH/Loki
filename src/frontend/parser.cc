@@ -14,6 +14,8 @@ enum class ASTType {
     BIN_LSR,
     BIN_LSRE,
     BIN_EQU,
+    BIN_SHL,
+    BIN_SHR,
     DECLERATION,
     INITIALIZATION_T_UNKNOWN,
     INITIALIZATION_T_KNOWN,
@@ -242,37 +244,19 @@ ASTBinOp *genASTOperator(Lexer &lexer, u32 &x, ASTFile &file) {
     ASTType type;
     u32 start = x;
     switch (tokTypes[x]) {
-    case (Token_Type)'-': x -= 1;//NOTE: sub is a uni operator
-    case (Token_Type)'+': type = ASTType::BIN_ADD; x += 1; break;
-    case (Token_Type)'*': type = ASTType::BIN_MUL; x += 1; break;
-    case (Token_Type)'/': type = ASTType::BIN_DIV; x += 1; break;
-    case (Token_Type)'=':{
-	type = ASTType::BIN_EQU;
-	x += 1;
-	if(tokTypes[x] == (Token_Type)'='){
-	    x += 1;
-	}else{
-	    lexer.emitErr(tokOffs[x].off, "Expected '='");
-	};
-    }break;
-    case (Token_Type)'>':{
-	type = ASTType::BIN_GRT;
-	x += 1;
-	if(tokTypes[x] == (Token_Type)'='){
-	    type = ASTType::BIN_GRTE;
-	    x += 1;
-	};
-    }break;
-    case (Token_Type)'<':{
-	type = ASTType::BIN_LSR;
-	x += 1;
-	if(tokTypes[x] == (Token_Type)'='){
-	    type = ASTType::BIN_LSRE;
-	    x += 1;
-	};
-    }break;
+    case (Token_Type)'-': //NOTE: sub is a uni operator
+    case (Token_Type)'+': type = ASTType::BIN_ADD; break;
+    case (Token_Type)'*': type = ASTType::BIN_MUL; break;
+    case (Token_Type)'/': type = ASTType::BIN_DIV; break;
+    case (Token_Type)'>': type = ASTType::BIN_GRT; break;
+    case Token_Type::O_EQU:  type = ASTType::BIN_EQU;  break;
+    case Token_Type::O_GEQU: type = ASTType::BIN_GRTE; break;
+    case Token_Type::O_LEQU: type = ASTType::BIN_LSRE; break;
+    case Token_Type::O_SHL:  type = ASTType::BIN_SHL;  break;
+    case Token_Type::O_SHR:  type = ASTType::BIN_SHR;  break;
     default: UNREACHABLE;
     };
+    x += 1;
     ASTBinOp *binOp = (ASTBinOp*)allocAST(sizeof(ASTBinOp), type, file);
     binOp->tokenOff = start;
     return binOp;
@@ -468,17 +452,19 @@ ASTBase *genASTOperand(Lexer &lexer, u32 &x, ASTFile &file, s16 &bracket) {
 s16 checkAndGetPrio(Lexer &lexer, u32 &x) {
     BRING_TOKENS_TO_SCOPE;
     switch (tokTypes[x]) {
-    case (Token_Type)'=':
-    case (Token_Type)'<':
-    case (Token_Type)'>':
-	//NOTE: this takes care of <=, >=
+    case Token_Type::O_GEQU:
+    case Token_Type::O_LEQU:
+    case Token_Type::O_EQU:
 	return 1;
+    case Token_Type::O_SHL:
+    case Token_Type::O_SHR:
+	return 2;
     case (Token_Type)'+':
     case (Token_Type)'-':
-	return 2;
+	return 3;
     case (Token_Type)'*':
     case (Token_Type)'/':
-	return 3;
+	return 4;
     default:
 	lexer.emitErr(tokOffs[x].off, "Invalid operator");
 	return -1;

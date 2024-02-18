@@ -16,7 +16,6 @@ ScopeEntities *parseFile(char *fileName, ASTFile &astFile, Lexer &lexer){
 	ASTBase *base = astFile.nodes[x];
 	SET_BIT(base->flag, Flags::GLOBAL);
     };
-    dbg::dumpASTFile(astFile, lexer);
     DynamicArray<ScopeEntities*> see;
     see.init(3);
     DEFER(see.uninit());
