@@ -7,5 +7,5 @@ enum class Arch{
 enum class Target{
     WINDOWS,
     LINUX,
-    METAL,
+    RISCV,
 };

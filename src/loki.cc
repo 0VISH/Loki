@@ -59,6 +59,7 @@ bool compile(char *fileName){
 		Dep::fileToId.getValue({imp->fileName, (u32)strlen(imp->fileName)}, &off);
 		ASTFile &importFile = Dep::astFiles[off];
 		see.push(importFile.entities);
+		file.importFiles.push(off);
 	    };
 	};
 	see.push(file.entities);
@@ -75,23 +76,34 @@ bool compile(char *fileName){
     os::endTimer(TimeSlot::FRONTEND);
     ASSERT(Dep::fileStack.count != 0);
     os::startTimer(TimeSlot::MIDEND);
-    DynamicArray<BytecodeContext> bca;
+    DynamicArray<VariableContext> bca;
     bca.init(3);
     DEFER(bca.uninit());
     Array<BytecodeFile> bfs(Dep::fileStack.count);
     DEFER(bfs.uninit());
+    Dep::initVariableContext();
+    DEFER(Dep::uninitVariableContext());
     for(u32 x=Dep::fileStack.count; x>0;){
 	x -= 1;
 	ASTFile &file = Dep::astFiles[x];
+	if(bca.count < file.importFiles.count){
+	    bca.reserve(file.importFiles.count);
+	};
+	bca.count = 0;
+	for(u32 i=0; i<file.importFiles.count; i+=1){
+	    u32 j = file.importFiles[i];
+	    bca[i] = Dep::varContexts[j];
+	};
+	VariableContext &bc = bca[file.importFiles.count];
+	bca.count = file.importFiles.count+1;
+	bc.init(Scope::GLOBAL);
 	ScopeEntities *fileEntities = file.entities;
 	BytecodeFile &bf = bfs[x];
 	bf.init(file.idGiver.fileID);
-	BytecodeContext &bc = bca.newElem();
-	bc.init(Scope::GLOBAL);
 	see.push(fileEntities);
 	compileASTFileToBytecode(file, see, bca, bf);
 	see.pop();
-	bca.pop().uninit();
+	Dep::varContexts[x] = bc;
 	dbg::dumpBytecodeFile(bf);
 	file.uninit();
     };

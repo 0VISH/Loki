@@ -1,4 +1,5 @@
 #include "entity.hh"
+#include "../midend/bytecode.hh"
 
 #define AST_PAGE_SIZE 1024
 
@@ -13,6 +14,7 @@ struct IDGiver{
 struct ASTFile{
     DynamicArray<char*> memPages;
     DynamicArray<ASTBase*> nodes;
+    DynamicArray<u32> importFiles;
     IDGiver idGiver;
     ScopeEntities *entities;
     u16 pageBrim;
@@ -28,6 +30,7 @@ struct ASTFile{
 	char *page = (char*)mem::alloc(AST_PAGE_SIZE);
 	memPages.push(page);
 	nodes.init(10);
+	importFiles.init();
     };
     void uninit(){
 	for(u32 x=0; x<nodes.count; x += 1){
@@ -40,6 +43,7 @@ struct ASTFile{
 	nodes.uninit();
 	entities->uninit();
 	mem::free(entities);
+	importFiles.uninit();
     };
 };
 
@@ -47,6 +51,7 @@ namespace Dep{
     //NOTE: 1-to-1 relation
     DynamicArray<char*>   fileStack;
     DynamicArray<ASTFile> astFiles;
+    VariableContext* varContexts;
     //NOTE: this hashmaps exist in case we only the filename
     HashmapStr fileToId;
 
@@ -59,6 +64,15 @@ namespace Dep{
 	fileStack.uninit();
 	astFiles.uninit();
 	fileToId.uninit();
+    };
+    void initVariableContext(){
+	varContexts = (VariableContext*)mem::alloc(sizeof(VariableContext)*astFiles.count);
+    };
+    void uninitVariableContext(){
+	for(u32 x=0; x<astFiles.count; x+=1){
+	    varContexts[x].uninit();
+	};
+	mem::free(varContexts);
     };
     void pushToStack(char *fileName){
 	fileStack.push(fileName);

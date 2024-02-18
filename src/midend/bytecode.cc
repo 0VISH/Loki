@@ -235,6 +235,15 @@ struct BytecodeFile{
 	emit(src);
 	emit(off);
     };
+    void getElement(Reg dest, Reg src, Type type, Type offType, u32 off){
+	reserve(1 + 1 + 1 + 1);
+	emit(Bytecode::GET_ELEMENT);
+	emit(type);
+	emit(dest);
+	emit(src);
+	emit(offType);
+	emit(off);
+    };
     Reg newReg(){
 	Reg reg = registerID;
 	registerID += 1;
@@ -242,65 +251,76 @@ struct BytecodeFile{
     };
 };
 
-static u16 labelID = 1;
-
 u16 newLabel(){
+    static u16 labelID = 1;
     u16 lbl = labelID;
     labelID += 1;
     return lbl;
 };
 
-struct BytecodeContext{
-    Hashmap<u32, u32> varIDToOff;  
-    Expr *varRegAndTypes;
-    Scope scope;
-    u32   varLen;
-    u32   varCount;
-
-    void init(Scope scopeOfContext, u32 varlen = 10){
-	scope = scopeOfContext;
-	varLen = varlen;
-	varCount = 0;
-	varRegAndTypes = (Expr*)mem::alloc(sizeof(Expr)*varLen);
-	varIDToOff.init();
-    };
-    void uninit(){
-	mem::free(varRegAndTypes);
-	varIDToOff.init();
-    };
-    void registerVar(Reg reg, Type type, u32 id){
-	if(varLen == varCount){
-	    varLen = varLen + varLen/2 + 10;
-	    Expr *varRegAndTypesNew = (Expr*)mem::alloc(sizeof(Expr)*varLen);
-	    memcpy(varRegAndTypesNew, varRegAndTypes, varCount);
-	    mem::free(varRegAndTypes);
-	    varRegAndTypes = varRegAndTypesNew;
-	};
-	u32 off;
-	if(varIDToOff.getValue(id, &off) == false){
-	    off = varCount;
-	    varCount += 1;
-	};
-	varIDToOff.insertValue(id, off);
-	Expr &expr = varRegAndTypes[off];
-	expr.reg = reg;
-	expr.type = type;
-    };
-    Expr getVar(u32 id){
-	u32 off;
-	varIDToOff.getValue(id, &off);
-	return varRegAndTypes[off];
-    };
+void VariableContext::init(Scope scopeOfContext, u32 varlen){
+    scope = scopeOfContext;
+    varRegAndTypes.init();
+    varIDToOff.init();
 };
-Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf);
-Expr emitBinOpBc(Bytecode binOp, ASTBase *node, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf, DynamicArray<ScopeEntities*> &see){
+void VariableContext::uninit(){
+    varRegAndTypes.uninit();
+    varIDToOff.uninit();
+};
+void VariableContext::registerVar(Reg reg, Type type, u32 id){
+    u32 off;
+    Expr *expr;
+    if(varIDToOff.getValue(id, &off) == false){
+	expr = &varRegAndTypes.newElem();
+	off = varRegAndTypes.count - 1;
+    }else{
+	expr = &varRegAndTypes[off];
+    };
+    varIDToOff.insertValue(id, off);
+    expr->reg = reg;
+    expr->type = type;
+};
+Expr VariableContext::getVar(u32 id){
+    u32 off;
+    varIDToOff.getValue(id, &off);
+    return varRegAndTypes[off];
+};
+Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<VariableContext> &bca, BytecodeFile &bf);
+Expr emitBinOpBc(Bytecode binOp, ASTBase *node, DynamicArray<VariableContext> &bca, BytecodeFile &bf, DynamicArray<ScopeEntities*> &see){
     Expr out;
     ASTBinOp *op = (ASTBinOp*)node;
-    BytecodeContext &bc = bca[bca.count-1];
+    VariableContext &bc = bca[bca.count-1];
     Expr lhs = compileExprToBytecode(op->lhs, see, bca, bf);
     Expr rhs = compileExprToBytecode(op->rhs, see, bca, bf);
     Type ansType = greaterType(lhs.type, rhs.type);
     Reg outputReg = bf.newReg();
+    if(lhs.isPtr || rhs.isPtr){
+	Reg reg;
+	Type type;
+	Reg offReg;
+	Type offType;
+	if(lhs.isPtr){
+	    reg = lhs.reg;
+	    type = lhs.type;
+	    offReg = rhs.reg;
+	    offType = rhs.type;
+	}
+	else if(rhs.isPtr){
+	    reg = rhs.reg;
+	    type = rhs.type;
+	    offReg = lhs.reg;
+	    offType = rhs.type;
+	};
+	Reg lreg = bf.newReg();
+	bf.load(Type::PTR, lreg, reg);
+	Reg dreg = bf.newReg();
+	bf.getElement(dreg, lreg, type, offType, offReg);
+
+	out.reg = dreg;
+	out.type = type;
+	out.isPtr = true;
+	return out;
+    };
     if(lhs.type != rhs.type){
 	Reg casted = bf.newReg();
 	if(ansType == lhs.type){
@@ -329,26 +349,29 @@ Bytecode *getPointer(Bytecode *page){
     Bytecode *mem = (Bytecode*)page;
     return mem;
 };
-Expr getVarExprFromID(u32 id, DynamicArray<BytecodeContext> &bca){
+Expr getVarExprFromID(u32 id, DynamicArray<VariableContext> &bca){
     u32 bcOff = bca.count;
     while(bcOff>0){
 	bcOff -= 1;
-	BytecodeContext &bcont = bca[bcOff];
-	u32 temp;
+	VariableContext *bcont = &bca[bcOff];
 	u32 off;
-	if(bcont.varCount != 0){
-	    bool res = bcont.varIDToOff.getValue(id, &off);
+	if(bcont->varRegAndTypes.count != 0){
+	    bool res = bcont->varIDToOff.getValue(id, &off);
 	    if(res){
-		return bcont.varRegAndTypes[off];
+		return bcont->varRegAndTypes[off];
 	    };
 	};
-	if(bcont.scope == Scope::PROC){
-	    BytecodeContext &globalScope = bca[0];
-	    if(globalScope.varCount != 0){
-		bool res = globalScope.varIDToOff.getValue(id, &off);
-		if(res){
-		    return bcont.varRegAndTypes[off];
+	if(bcont->scope == Scope::PROC){
+	    bcont = &bca[0];
+	    while(bcont->scope == Scope::GLOBAL){
+		if(bcont->varRegAndTypes.count != 0){
+		    bool res = bcont->varIDToOff.getValue(id, &off);
+		    if(res){
+			return bcont->varRegAndTypes[off];
+		    };
 		};
+		bcont = &bca[bcOff];
+		bcOff += 1;
 	    };
 	    break;
 	};
@@ -357,14 +380,14 @@ Expr getVarExprFromID(u32 id, DynamicArray<BytecodeContext> &bca){
     expr.type = Type::UNKOWN;
     return expr;
 };
-Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, DynamicArray<VariableContext> &bca, BytecodeFile &bf){
     Expr out = {};
     if(IS_BIT(node->flag, Flags::GLOBAL) && node->type != ASTType::PROC_DEFENITION && node->type != ASTType::DECLERATION && node->type != ASTType::INITIALIZATION_T_KNOWN && node->type != ASTType::INITIALIZATION_T_UNKNOWN){
 	bf.startupNodes.push(node);
 	return out;
     };
     ASTType type = node->type;
-    BytecodeContext &bc = bca[bca.count - 1];
+    VariableContext &bc = bca[bca.count - 1];
     Reg outputReg;
     switch(type){
     case ASTType::MULTI_VAR_RHS:{
@@ -442,6 +465,7 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
 	    pAccessDepth -= 1;
 	};
 	expr.reg = base;
+	expr.isPtr = var->varEntRef.ent->pointerDepth > 0;
 	return expr;
     }break;
     case ASTType::BIN_ADD:{									
@@ -498,8 +522,8 @@ Expr compileExprToBytecode(ASTBase *node, DynamicArray<ScopeEntities*> &see, Dyn
     };
     return out;
 };
-void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
-    BytecodeContext &bc = bca[bca.count-1];
+void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<VariableContext> &bca, BytecodeFile &bf){
+    VariableContext &bc = bca[bca.count-1];
     ScopeEntities *se = see[see.count-1];
     ASTType type = node->type;
     switch(type){
@@ -507,13 +531,13 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ASTAssignment *ass = (ASTAssignment*)node;
 	Expr lhs = compileExprToBytecode(ass->lhs, see, bca, bf);
 	Expr rhs = compileExprToBytecode(ass->rhs, see, bca, bf);
-	printf("%d %d", lhs.type, rhs.type);
 	if(lhs.type != rhs.type){
 	    Reg castedReg = bf.newReg();
 	    bf.cast(lhs.type, castedReg, rhs.type, rhs.reg);
 	    rhs.reg = castedReg;
+	    rhs.type = lhs.type;
 	};
-	bf.store(lhs.type, lhs.reg, rhs.reg);
+	bf.store((rhs.isPtr)?Type::PTR:rhs.type, lhs.reg, rhs.reg);
     }break;
     case ASTType::RETURN:{
 	ASTReturn *ret = (ASTReturn*)node;
@@ -554,7 +578,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	Flag flag = var->flag;
 	Reg reg;
 	if(IS_BIT(flag, Flags::GLOBAL)){
-	    Reg reg = bf.newReg() * -1;
+	    reg = bf.newReg() * -1;
 	    if(IS_BIT(flag, Flags::UNINITIALIZED)){
 		bf.gbl(reg, type, (s64)0);
 	    }else if(var->rhs->type == ASTType::NUM_INTEGER){
@@ -611,7 +635,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     case ASTType::FOR:{
 	ASTFor *For = (ASTFor*)node;
 	ScopeEntities *ForSe = For->ForSe;
-	BytecodeContext &blockBC = bca.newElem();
+	VariableContext &blockBC = bca.newElem();
 	blockBC.init(Scope::BLOCK);
 	see.push(ForSe);
 	switch(For->loopType){
@@ -695,7 +719,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
     case ASTType::IF:{
 	ASTIf *If = (ASTIf*)node;
 	u32 exprID = compileExprToBytecode(If->expr, see, bca, bf).reg;
-	BytecodeContext &blockBC = bca.newElem();
+	VariableContext &blockBC = bca.newElem();
 	ScopeEntities *IfSe = If->IfSe;
 	blockBC.init(Scope::BLOCK);
 	see.push(IfSe);
@@ -718,7 +742,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	    bf.label(inElseLbl);
 	    ScopeEntities *ElseSe = If->ElseSe;
 	    see.push(ElseSe);
-	    BytecodeContext &elseBC = bca.newElem();
+	    VariableContext &elseBC = bca.newElem();
 	    elseBC.init(Scope::BLOCK);
 	    for(u32 x=0; x<If->elseBody.count; x+=1){
 		compileToBytecode(If->elseBody[x], file, see, bca, bf);
@@ -735,7 +759,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	ProcEntity *pe = proc->entRef.ent;
 	u32 procBytecodeID = proc->entRef.id;
 	ScopeEntities *procSE = proc->se;
-	BytecodeContext &procBC = bca.newElem();
+	VariableContext &procBC = bca.newElem();
         procBC.init(Scope::PROC);
 	//        DEF    OUTPUT_COUNT         OUTPUT       ID     INPUT_COUNT     INPUT*(Type + Reg)
 	bf.reserve(1  + const_in_stream + proc->out.count + 1 + const_in_stream + (proc->inCount)*2);
@@ -787,7 +811,7 @@ void compileToBytecode(ASTBase *node, ASTFile &file, DynamicArray<ScopeEntities*
 	break;
     };
 };
-void compileASTFileToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<BytecodeContext> &bca, BytecodeFile &bf){
+void compileASTFileToBytecode(ASTFile &file, DynamicArray<ScopeEntities*> &see, DynamicArray<VariableContext> &bca, BytecodeFile &bf){
     for(u32 x=0; x<file.nodes.count; x+=1){
 	ASTBase *node = file.nodes[x];
 	compileToBytecode(node, file, see, bca, bf);
@@ -1051,6 +1075,14 @@ namespace dbg{
 		printf(",");
 	    };
 	    printf("}");
+	}break;
+	case Bytecode::GET_ELEMENT:{
+	    Bytecode type = getBytecode(buc, x);
+	    Bytecode dest = getBytecode(buc, x);
+	    Bytecode src  = getBytecode(buc, x);
+	    Bytecode offType = getBytecode(buc, x);
+	    Bytecode off  = getBytecode(buc, x);
+	    printf("%%%d = get_element type:%d, src:%%%d, offType:%d, off:%d", dest, type, src, offType, off);
 	}break;
 	case Bytecode::GET_MEMBER:{
 	    Bytecode id = getBytecode(buc, x);

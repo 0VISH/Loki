@@ -47,8 +47,8 @@ s32 main(s32 argc, char **argv) {
     ArgData argsData[] = {
 	{"entrypoint", ArgType::ENTRYPOINT, "execution begins from this function"},
 	{"file", ArgType::FILE, "main file(file which is read first by the compiler)"},
-	{"arch", ArgType::ARCH, "target architecture\n1: x86_64\n2: x86"},
-	{"target", ArgType::TARGET,   "target\n1: win\n2: lin\n3: metal"},
+	{"arch", ArgType::ARCH, "target architecture\n1: x86_64\n2: x86\n3: riscv"},
+	{"target", ArgType::TARGET,   "target\n1: win\n2: lin\n3: riscv"},
 	{"out",  ArgType::OUTNAME, "name of output file"},
 	{"end",  ArgType::END, "end goal\n1: exe\n2: dll\n3: static 4: check"},
 	{"help", ArgType::HELP, "print all the switches available"}
@@ -107,6 +107,17 @@ s32 main(s32 argc, char **argv) {
 	case ArgType::OUTNAME:{
 	    config.out = arg + len + 1;
 	}break;
+	case ArgType::ARCH:{
+	    if(strcmp("x86", end) == 0){
+		config.arch = Arch::x86;
+	    }else if(strcmp("x64", end) == 0){
+		config.arch = Arch::x64;
+	    }else{
+		printf("unkown architecture: %s", end);
+		argMap.uninit();
+		return EXIT_SUCCESS;
+	    };
+	}break;
 	case ArgType::END:{
 	    if(strcmp("executable", end) == 0){
 		config.end = EndType::EXECUTABLE;
@@ -123,8 +134,8 @@ s32 main(s32 argc, char **argv) {
 	    };
 	}break;
 	case ArgType::TARGET:{
-	    if(strcmp("metal", end) == 0){
-		config.target = Target::METAL;
+	    if(strcmp("riscv", end) == 0){
+		config.target = Target::RISCV;
 	    }else if(strcmp("linux", end) == 0){
 		config.target = Target::LINUX;
 	    }else if(strcmp("windows", end) == 0){

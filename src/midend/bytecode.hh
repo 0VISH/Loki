@@ -38,6 +38,7 @@ enum class Bytecode : u16{
     CALL,
     STRUCT,
     GET_MEMBER,
+    GET_ELEMENT,
     _TEXT_STARTUP_START,
     _TEXT_STARTUP_END,
     NEXT_BUCKET,
@@ -57,4 +58,15 @@ struct BytecodeBucket{
 struct Expr{
     Type type;
     Reg reg;
+    bool isPtr;
+};
+struct VariableContext{
+    Hashmap<u32, u32> varIDToOff;
+    DynamicArray<Expr> varRegAndTypes;
+    Scope scope;
+
+    void init(Scope scopeOfContext, u32 varlen = 10);
+    void uninit();
+    void registerVar(Reg reg, Type type, u32 id);
+    Expr getVar(u32 id);
 };

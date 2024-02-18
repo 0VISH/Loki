@@ -69,16 +69,16 @@ void goThroughEntitiesAndInitScope(DynamicArray<ASTBase*> &entities, ScopeEntiti
     while(x != 0){							\
     x -= 1;								\
     ScopeEntities *se = see[x];						\
-    if(se->MAP.len != 0){						\
+    if(se->MAP.count != 0){						\
 	u32 k;								\
 	if(se->MAP.getValue(KEY, &k) != false){return se->ENTITIES+k;}; \
     };									\
     if(se->scope == Scope::PROC){					\
     se = see[0];							\
     while(se->scope == Scope::GLOBAL){					\
-	if(se->MAP.len != 0){						\
+	if(se->MAP.count != 0){						\
 	    u32 k;							\
-	    if(se->MAP.getValue(KEY, &k) != false){return se->ENTITIES+k;}; \
+	    if(se->MAP.getValue(KEY, &k)){return se->ENTITIES+k;};	\
 	};								\
 	se = see[x];							\
 	x += 1;								\

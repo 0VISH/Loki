@@ -120,9 +120,7 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	writeType(type, id);
 	write(" ");
 	writeReg(src, id);
-	write(", ");
-	writeType(type, id);
-	write("* ");
+	write(", ptr ");
 	writeReg(dst, id);
     }break;
     case Bytecode::JMPS:{
@@ -269,6 +267,22 @@ void translate(BytecodeBucket *buc, u32 &off, s16 id, Config *config){
 	write(" = alloca ");
 	writeType(type, id);
     }break;
+    case Bytecode::GET_ELEMENT:{
+	Bytecode type = getBytecode(bytecodes, off);
+	Bytecode dest = getBytecode(bytecodes, off);
+	Bytecode src  = getBytecode(bytecodes, off);
+	Bytecode offType = getBytecode(bytecodes, off);
+	Bytecode offset = getBytecode(bytecodes, off);
+	writeReg(dest, id);
+	write(" = getelementptr inbounds ");
+	writeType(type, id);
+	write(", ptr ");
+	writeReg(src, id);
+	write(", ");
+	writeType(offType, id);
+	write(" ");
+	writeReg(offset, id);
+    }break;
     case Bytecode::GET_MEMBER:{
 	Bytecode structID = getBytecode(bytecodes, off);
 	Bytecode dest = getBytecode(bytecodes, off);
@@ -335,37 +349,39 @@ bool backendCompileStage2(Config *config){
 	    printf("\n[ERROR] cannot find windows sdk\n");
 	    return false;
 	};
-	sprintf(targetBuff+off, "-pc-windows-msvc%d.0.0", res.windows_sdk_version);
+	sprintf(targetBuff+off, "-pc-windows-msvc");
 	free_resources(&res);
 #endif
     }break;
-    case Target::METAL: break;
+    case Target::LINUX:{
+	sprintf(targetBuff+off, "-unknown-linux-gnu");
+    }break;
+    case Target::RISCV:{
+	u32 arch;
+	if(config->arch == Arch::x64){arch = 64;}
+	else if(config->arch == Arch::x86){arch = 32;};
+	sprintf(targetBuff, "riscv%d -march=rv%di -mabi=lp64d", arch, arch);
+    }break;
     };
     
     
     sprintf(buff, "%s.ll", config->out);
     FILE *f = fopen(buff, "w");
-    if(config->target != Target::METAL){
-	off = sprintf(buff, "target triple = \"%s\"\n\n", targetBuff);
-	fwrite(buff, 1, off, f);
-    };
     for(u32 x=0; x<pages.count; x+=1){
 	Page &pg = pages[x];
 	fwrite(pg.mem, 1, pg.watermark, f);
     };
     fclose(f);
-    if(config->target == Target::METAL){
-	sprintf(buff, "clang -ffreestanding -nostdlib %s.ll -c -o %s.obj", config->out, config->out);
-    }else{
-	sprintf(buff, "clang -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
-    };
+    sprintf(buff, "clang -Wno-override-module -target %s %s.ll -c -o %s.obj", targetBuff, config->out, config->out);
 
     printf("\n[LLVM] %s\n", buff);
     if(system(buff) != 0){return false;};
     if(config->end == EndType::STATIC){return true;};
+#if(WIN)
+    if(config->target != Target::WINDOWS){return true;};
     sprintf(buff, "link /NOLOGO /SUBSYSTEM:WINDOWS /ENTRY:__main %s.obj /OUT:%s.%s", config->out, config->out, (config->end==EndType::EXECUTABLE)?"exe":"dll");
     printf("[LINKER] %s\n", buff);
     system(buff);
-
+#endif
     return true;
 };
